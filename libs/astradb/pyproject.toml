@@ -1,9 +1,14 @@
 [tool.poetry]
 name = "langchain-astradb"
-version = "0.0.1"
+version = "0.1.0rc0"
 description = "An integration package connecting Astra DB and LangChain"
 authors = []
 readme = "README.md"
+repository = "https://github.com/langchain-ai/langchain-datastax"
+license = "MIT"
+
+[tool.poetry.urls]
+"Source Code" = "https://github.com/langchain-ai/langchain-datastax/tree/main/libs/astradb"
 
 [tool.poetry.dependencies]
 python = ">=3.8.1,<4.0"
