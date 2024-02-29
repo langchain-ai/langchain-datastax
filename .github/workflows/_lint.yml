@@ -7,10 +7,6 @@ on:
         required: true
         type: string
         description: "From which folder this pipeline executes"
-      langchain-location:
-        required: false
-        type: string
-        description: "Relative path to the langchain library folder"
 
 env:
   POETRY_VERSION: "1.7.1"
