@@ -1,4 +1,4 @@
-# 🦜️🔗 LangChain {partner}
+# 🦜️🔗 LangChain DataStax
 
 This repository contains 1 package with Datastax integrations with LangChain:
 
