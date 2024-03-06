@@ -10,7 +10,7 @@ from typing import Any, Awaitable, Dict, List, Optional, Union
 
 import langchain_core
 from astrapy.api import APIRequestError
-from astrapy.db import AstraDB, AsyncAstraDB
+from astrapy.db import AstraDB, AstraDBCollection, AsyncAstraDB, AsyncAstraDBCollection
 
 
 class SetupMode(Enum):
@@ -95,8 +95,6 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
         requested_indexing_policy: Optional[Dict[str, Any]] = None,
         default_indexing_policy: Optional[Dict[str, Any]] = None,
     ) -> None:
-        from astrapy.db import AstraDBCollection, AsyncAstraDBCollection
-
         super().__init__(
             token, api_endpoint, astra_db_client, async_astra_db_client, namespace
         )
