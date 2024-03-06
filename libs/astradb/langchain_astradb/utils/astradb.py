@@ -247,8 +247,9 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
                     warnings.warn(
                         (
                             f"Astra DB collection '{collection_name}' is "
-                            "detected as legacy and has indexing turned "
-                            "on for all fields. This implies stricter "
+                            "detected as having indexing turned on for all "
+                            "fields (either created manually or by older "
+                            "versions of this plugin). This implies stricter "
                             "limitations on the amount of text each string in a "
                             "document can store. Consider reindexing anew on a "
                             "fresh collection to be able to store longer texts."
@@ -259,8 +260,9 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
                 else:
                     raise ValueError(
                         f"Astra DB collection '{collection_name}' is "
-                        "detected as legacy and has indexing turned "
-                        "on for all fields. This is incompatible with "
+                        "detected as having indexing turned on for all "
+                        "fields (either created manually or by older "
+                        "versions of this plugin). This is incompatible with "
                         "the requested indexing policy for this object. "
                         "Consider reindexing anew on a fresh "
                         "collection with the requested indexing "
