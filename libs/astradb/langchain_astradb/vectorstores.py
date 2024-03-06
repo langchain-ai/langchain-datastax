@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-import asyncio
 import uuid
 import warnings
-from asyncio import Task
 from concurrent.futures import ThreadPoolExecutor
 from typing import (
     Any,
+    Awaitable,
     Callable,
     Dict,
     Iterable,
@@ -16,7 +15,7 @@ from typing import (
     Tuple,
     Type,
     TypeVar,
-    cast,
+    Union,
 )
 
 import numpy as np
@@ -24,19 +23,18 @@ from astrapy.db import (
     AstraDB as AstraDBClient,
 )
 from astrapy.db import (
-    AstraDBCollection,
-    AsyncAstraDBCollection,
-)
-from astrapy.db import (
     AsyncAstraDB as AsyncAstraDBClient,
 )
 from langchain_core.documents import Document
 from langchain_core.embeddings import Embeddings
-from langchain_core.runnables import run_in_executor
 from langchain_core.runnables.utils import gather_with_concurrency
 from langchain_core.utils.iter import batch_iterate
 from langchain_core.vectorstores import VectorStore
 
+from langchain_astradb.utils.astradb import (
+    SetupMode,
+    _AstraDBCollectionEnvironment,
+)
 from langchain_astradb.utils.mmr import maximal_marginal_relevance
 
 T = TypeVar("T")
@@ -53,6 +51,9 @@ DEFAULT_BULK_INSERT_BATCH_CONCURRENCY = 16
 DEFAULT_BULK_INSERT_OVERWRITE_CONCURRENCY = 10
 # Number of threads (for deleting multiple rows concurrently):
 DEFAULT_BULK_DELETE_CONCURRENCY = 20
+
+# indexing options when creating a collection
+DEFAULT_INDEXING_OPTIONS = {"allow": ["metadata"]}
 
 
 def _unique_list(lst: List[T], key: Callable[[T], U]) -> List[T]:
@@ -87,6 +88,50 @@ class AstraDBVectorStore(VectorStore):
 
             return metadata_filter
 
+    @staticmethod
+    def _normalize_metadata_indexing_policy(
+        metadata_indexing_include: Optional[Iterable[str]],
+        metadata_indexing_exclude: Optional[Iterable[str]],
+        collection_indexing_policy: Optional[Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        """
+        Validate the constructor indexing parameters and normalize them
+        into a ready-to-use dict for the 'options' when creating a collection.
+        """
+        none_count = sum(
+            [
+                1 if var is None else 0
+                for var in [
+                    metadata_indexing_include,
+                    metadata_indexing_exclude,
+                    collection_indexing_policy,
+                ]
+            ]
+        )
+        if none_count >= 2:
+            if metadata_indexing_include is not None:
+                return {
+                    "allow": [
+                        f"metadata.{md_field}" for md_field in metadata_indexing_include
+                    ]
+                }
+            elif metadata_indexing_exclude is not None:
+                return {
+                    "deny": [
+                        f"metadata.{md_field}" for md_field in metadata_indexing_exclude
+                    ]
+                }
+            elif collection_indexing_policy is not None:
+                return collection_indexing_policy
+            else:
+                return DEFAULT_INDEXING_OPTIONS
+        else:
+            raise ValueError(
+                "At most one of the parameters `metadata_indexing_include`,"
+                " `metadata_indexing_exclude` and `collection_indexing_policy`"
+                " can be specified as non null."
+            )
+
     def __init__(
         self,
         *,
@@ -102,7 +147,11 @@ class AstraDBVectorStore(VectorStore):
         bulk_insert_batch_concurrency: Optional[int] = None,
         bulk_insert_overwrite_concurrency: Optional[int] = None,
         bulk_delete_concurrency: Optional[int] = None,
+        setup_mode: SetupMode = SetupMode.SYNC,
         pre_delete_collection: bool = False,
+        metadata_indexing_include: Optional[Iterable[str]] = None,
+        metadata_indexing_exclude: Optional[Iterable[str]] = None,
+        collection_indexing_policy: Optional[Dict[str, Any]] = None,
     ) -> None:
         """Wrapper around DataStax Astra DB for vector-store workloads.
 
@@ -151,6 +200,15 @@ class AstraDBVectorStore(VectorStore):
             pre_delete_collection: whether to delete the collection before creating it.
                 If False and the collection already exists, the collection will be used
                 as is.
+            metadata_indexing_include: an allowlist of the specific metadata subfields
+                that should be indexed for later filtering in searches.
+            metadata_indexing_exclude: a denylist of the specific metadata subfields
+                that should not be indexed for later filtering in searches.
+            collection_indexing_policy: a full "indexing" specification for
+                what fields should be indexed for later filtering in searches.
+                This dict must conform to to the API specifications
+                (see docs.datastax.com/en/astra/astra-db-vector/api-reference/
+                data-api-commands.html#advanced-feature-indexing-clause-on-createcollection)
 
         Note:
             For concurrency in synchronous :meth:`~add_texts`:, as a rule of thumb, on a
@@ -169,14 +227,7 @@ class AstraDBVectorStore(VectorStore):
             Remember you can pass concurrency settings to individual calls to
             :meth:`~add_texts` and :meth:`~add_documents` as well.
         """
-        # Conflicting-arg checks:
-        if astra_db_client is not None or async_astra_db_client is not None:
-            if token is not None or api_endpoint is not None:
-                raise ValueError(
-                    "You cannot pass 'astra_db_client' or 'async_astra_db_client' to "
-                    "AstraDBVectorStore if passing 'token' and 'api_endpoint'."
-                )
-
+        self.embedding_dimension: Optional[int] = None
         self.embedding = embedding
         self.collection_name = collection_name
         self.token = token
@@ -195,110 +246,52 @@ class AstraDBVectorStore(VectorStore):
             bulk_delete_concurrency or DEFAULT_BULK_DELETE_CONCURRENCY
         )
         # "vector-related" settings
-        self._embedding_dimension: Optional[int] = None
         self.metric = metric
+        embedding_dimension: Union[int, Awaitable[int], None] = None
+        if setup_mode == SetupMode.ASYNC:
+            embedding_dimension = self._aget_embedding_dimension()
+        elif setup_mode == SetupMode.SYNC or setup_mode == SetupMode.OFF:
+            embedding_dimension = self._get_embedding_dimension()
 
-        self.astra_db = astra_db_client
-        self.async_astra_db = async_astra_db_client
-        self.collection = None
-        self.async_collection = None
-
-        if token and api_endpoint:
-            self.astra_db = AstraDBClient(
-                token=cast(str, self.token),
-                api_endpoint=cast(str, self.api_endpoint),
-                namespace=self.namespace,
-            )
-            self.async_astra_db = AsyncAstraDBClient(
-                token=cast(str, self.token),
-                api_endpoint=cast(str, self.api_endpoint),
-                namespace=self.namespace,
-            )
-
-        if self.astra_db is not None:
-            self.collection = AstraDBCollection(
-                collection_name=self.collection_name,
-                astra_db=self.astra_db,
-            )
-
-        self.async_setup_db_task: Optional[Task] = None
-        if self.async_astra_db is not None:
-            self.async_collection = AsyncAstraDBCollection(
-                collection_name=self.collection_name,
-                astra_db=self.async_astra_db,
-            )
-            try:
-                asyncio.get_running_loop()
-                self.async_setup_db_task = asyncio.create_task(
-                    self._setup_db(pre_delete_collection)
-                )
-            except RuntimeError:
-                pass
-
-        if self.async_setup_db_task is None:
-            if not pre_delete_collection:
-                self._provision_collection()
-            else:
-                self.clear()
-
-    def _ensure_astra_db_client(self) -> None:
-        """
-        If no error is raised, that means self.collection
-        is also not None (as per constructor flow).
-        """
-        if not self.astra_db:
-            raise ValueError("Missing AstraDB client")
-
-    async def _setup_db(self, pre_delete_collection: bool) -> None:
-        if pre_delete_collection:
-            # _setup_db is called from the constructor only, from a place
-            # where async_astra_db is not None for sure
-            await self.async_astra_db.delete_collection(  # type: ignore[union-attr]
-                collection_name=self.collection_name,
-            )
-        await self._aprovision_collection()
-
-    async def _ensure_db_setup(self) -> None:
-        if self.async_setup_db_task:
-            await self.async_setup_db_task
-
-    def _get_embedding_dimension(self) -> int:
-        if self._embedding_dimension is None:
-            self._embedding_dimension = len(
-                self.embedding.embed_query("This is a sample sentence.")
-            )
-        return self._embedding_dimension
-
-    def _provision_collection(self) -> None:
-        """
-        Run the API invocation to create the collection on the backend.
-
-        Internal-usage method, no object members are set,
-        other than working on the underlying actual storage.
-        """
-        self._ensure_astra_db_client()
-        # self.astra_db is not None (by _ensure_astra_db_client)
-        self.astra_db.create_collection(  # type: ignore[union-attr]
-            dimension=self._get_embedding_dimension(),
-            collection_name=self.collection_name,
-            metric=self.metric,
+        # indexing policy setting
+        self.indexing_policy: Dict[str, Any] = self._normalize_metadata_indexing_policy(
+            metadata_indexing_include=metadata_indexing_include,
+            metadata_indexing_exclude=metadata_indexing_exclude,
+            collection_indexing_policy=collection_indexing_policy,
         )
 
-    async def _aprovision_collection(self) -> None:
-        """
-        Run the API invocation to create the collection on the backend.
+        self.astra_env = _AstraDBCollectionEnvironment(
+            collection_name=collection_name,
+            token=token,
+            api_endpoint=api_endpoint,
+            astra_db_client=astra_db_client,
+            async_astra_db_client=async_astra_db_client,
+            namespace=namespace,
+            setup_mode=setup_mode,
+            pre_delete_collection=pre_delete_collection,
+            embedding_dimension=embedding_dimension,
+            metric=metric,
+            requested_indexing_policy=self.indexing_policy,
+            default_indexing_policy=DEFAULT_INDEXING_OPTIONS,
+        )
+        self.astra_db = self.astra_env.astra_db
+        self.async_astra_db = self.astra_env.async_astra_db
+        self.collection = self.astra_env.collection
+        self.async_collection = self.astra_env.async_collection
 
-        Internal-usage method, no object members are set,
-        other than working on the underlying actual storage.
-        """
-        if not self.async_astra_db:
-            await run_in_executor(None, self._provision_collection)
-        else:
-            await self.async_astra_db.create_collection(
-                dimension=self._get_embedding_dimension(),
-                collection_name=self.collection_name,
-                metric=self.metric,
+    def _get_embedding_dimension(self) -> int:
+        if self.embedding_dimension is None:
+            self.embedding_dimension = len(
+                self.embedding.embed_query(text="This is a sample sentence.")
             )
+        return self.embedding_dimension
+
+    async def _aget_embedding_dimension(self) -> int:
+        if self.embedding_dimension is None:
+            self.embedding_dimension = len(
+                await self.embedding.aembed_query(text="This is a sample sentence.")
+            )
+        return self.embedding_dimension
 
     @property
     def embeddings(self) -> Embeddings:
@@ -319,18 +312,13 @@ class AstraDBVectorStore(VectorStore):
 
     def clear(self) -> None:
         """Empty the collection of all its stored entries."""
-        self._ensure_astra_db_client()
-        # self.collection is not None (by _ensure_astra_db_client)
-        self.collection.delete_many(filter={})  # type: ignore[union-attr]
+        self.astra_env.ensure_db_setup()
+        self.collection.delete_many({})
 
     async def aclear(self) -> None:
         """Empty the collection of all its stored entries."""
-        await self._ensure_db_setup()
-        if not self.async_astra_db:
-            return await run_in_executor(None, self.clear)
-        else:
-            # async_collection not None if so is async_astra_db (constr. flow)
-            await self.async_collection.delete_many({})  # type: ignore[union-attr]
+        await self.astra_env.aensure_db_setup()
+        await self.async_collection.delete_many({})
 
     def delete_by_document_id(self, document_id: str) -> bool:
         """
@@ -342,9 +330,9 @@ class AstraDBVectorStore(VectorStore):
         Returns
             True if a document has indeed been deleted, False if ID not found.
         """
-        self._ensure_astra_db_client()
+        self.astra_env.ensure_db_setup()
         # self.collection is not None (by _ensure_astra_db_client)
-        deletion_response = self.collection.delete_one(document_id)  # type: ignore[union-attr]
+        deletion_response = self.collection.delete_one(document_id)
         return ((deletion_response or {}).get("status") or {}).get(
             "deletedCount", 0
         ) == 1
@@ -359,9 +347,7 @@ class AstraDBVectorStore(VectorStore):
         Returns
             True if a document has indeed been deleted, False if ID not found.
         """
-        await self._ensure_db_setup()
-        if not self.async_collection:
-            return await run_in_executor(None, self.delete_by_document_id, document_id)
+        await self.astra_env.aensure_db_setup()
         deletion_response = await self.async_collection.delete_one(document_id)
         return ((deletion_response or {}).get("status") or {}).get(
             "deletedCount", 0
@@ -443,9 +429,8 @@ class AstraDBVectorStore(VectorStore):
         Stored data is lost and unrecoverable, resources are freed.
         Use with caution.
         """
-        self._ensure_astra_db_client()
-        # self.astra_db is not None (by _ensure_astra_db_client)
-        self.astra_db.delete_collection(  # type: ignore[union-attr]
+        self.astra_env.ensure_db_setup()
+        self.astra_db.delete_collection(
             collection_name=self.collection_name,
         )
 
@@ -456,13 +441,10 @@ class AstraDBVectorStore(VectorStore):
         Stored data is lost and unrecoverable, resources are freed.
         Use with caution.
         """
-        await self._ensure_db_setup()
-        if not self.async_astra_db:
-            return await run_in_executor(None, self.delete_collection)
-        else:
-            await self.async_astra_db.delete_collection(
-                collection_name=self.collection_name,
-            )
+        await self.astra_env.aensure_db_setup()
+        await self.async_astra_db.delete_collection(
+            collection_name=self.collection_name,
+        )
 
     @staticmethod
     def _get_documents_to_insert(
@@ -576,7 +558,7 @@ class AstraDBVectorStore(VectorStore):
                 f"unsupported arguments ({', '.join(sorted(kwargs.keys()))}), "
                 "which will be ignored."
             )
-        self._ensure_astra_db_client()
+        self.astra_env.ensure_db_setup()
 
         embedding_vectors = self.embedding.embed_documents(list(texts))
         documents_to_insert = self._get_documents_to_insert(
@@ -666,72 +648,60 @@ class AstraDBVectorStore(VectorStore):
         Returns:
             The list of ids of the added texts.
         """
-        await self._ensure_db_setup()
-        if not self.async_collection:
-            return await super().aadd_texts(
-                texts,
-                metadatas,
-                ids=ids,
-                batch_size=batch_size,
-                batch_concurrency=batch_concurrency,
-                overwrite_concurrency=overwrite_concurrency,
+        if kwargs:
+            warnings.warn(
+                "Method 'aadd_texts' of AstraDBVectorStore invoked with "
+                f"unsupported arguments ({', '.join(sorted(kwargs.keys()))}), "
+                "which will be ignored."
             )
-        else:
-            if kwargs:
-                warnings.warn(
-                    "Method 'aadd_texts' of AstraDBVectorStore invoked with "
-                    f"unsupported arguments ({', '.join(sorted(kwargs.keys()))}), "
-                    "which will be ignored."
-                )
+        await self.astra_env.aensure_db_setup()
 
-            embedding_vectors = await self.embedding.aembed_documents(list(texts))
-            documents_to_insert = self._get_documents_to_insert(
-                texts, embedding_vectors, metadatas, ids
+        embedding_vectors = await self.embedding.aembed_documents(list(texts))
+        documents_to_insert = self._get_documents_to_insert(
+            texts, embedding_vectors, metadatas, ids
+        )
+
+        async def _handle_batch(document_batch: List[DocDict]) -> List[str]:
+            # self.async_collection is not None here for sure
+            im_result = await self.async_collection.insert_many(
+                documents=document_batch,
+                options={"ordered": False},
+                partial_failures_allowed=True,
+            )
+            batch_inserted, missing_from_batch = self._get_missing_from_batch(
+                document_batch, im_result
             )
 
-            async def _handle_batch(document_batch: List[DocDict]) -> List[str]:
+            async def _handle_missing_document(missing_document: DocDict) -> str:
                 # self.async_collection is not None here for sure
-                im_result = await self.async_collection.insert_many(  # type: ignore[union-attr]
-                    documents=document_batch,
-                    options={"ordered": False},
-                    partial_failures_allowed=True,
+                replacement_result = await self.async_collection.find_one_and_replace(
+                    filter={"_id": missing_document["_id"]},
+                    replacement=missing_document,
                 )
-                batch_inserted, missing_from_batch = self._get_missing_from_batch(
-                    document_batch, im_result
-                )
+                return replacement_result["data"]["document"]["_id"]
 
-                async def _handle_missing_document(missing_document: DocDict) -> str:
-                    # self.async_collection is not None here for sure
-                    replacement_result = (
-                        await self.async_collection.find_one_and_replace(  # type: ignore[union-attr]
-                            filter={"_id": missing_document["_id"]},
-                            replacement=missing_document,
-                        )
-                    )
-                    return replacement_result["data"]["document"]["_id"]
-
-                _u_max_workers = (
-                    overwrite_concurrency or self.bulk_insert_overwrite_concurrency
-                )
-                batch_replaced = await gather_with_concurrency(
-                    _u_max_workers,
-                    *[_handle_missing_document(doc) for doc in missing_from_batch],
-                )
-                return batch_inserted + batch_replaced
-
-            _b_max_workers = batch_concurrency or self.bulk_insert_batch_concurrency
-            all_ids_nested = await gather_with_concurrency(
-                _b_max_workers,
-                *[
-                    _handle_batch(batch)
-                    for batch in batch_iterate(
-                        batch_size or self.batch_size,
-                        documents_to_insert,
-                    )
-                ],
+            _u_max_workers = (
+                overwrite_concurrency or self.bulk_insert_overwrite_concurrency
             )
+            batch_replaced = await gather_with_concurrency(
+                _u_max_workers,
+                *[_handle_missing_document(doc) for doc in missing_from_batch],
+            )
+            return batch_inserted + batch_replaced
 
-            return [iid for id_list in all_ids_nested for iid in id_list]
+        _b_max_workers = batch_concurrency or self.bulk_insert_batch_concurrency
+        all_ids_nested = await gather_with_concurrency(
+            _b_max_workers,
+            *[
+                _handle_batch(batch)
+                for batch in batch_iterate(
+                    batch_size or self.batch_size,
+                    documents_to_insert,
+                )
+            ],
+        )
+
+        return [iid for id_list in all_ids_nested for iid in id_list]
 
     def similarity_search_with_score_id_by_vector(
         self,
@@ -749,7 +719,7 @@ class AstraDBVectorStore(VectorStore):
         Returns:
             The list of (Document, score, id), the most similar to the query vector.
         """
-        self._ensure_astra_db_client()
+        self.astra_env.ensure_db_setup()
         metadata_parameter = self._filter_to_metadata(filter)
         #
         hits = list(
@@ -794,15 +764,7 @@ class AstraDBVectorStore(VectorStore):
         Returns:
             The list of (Document, score, id), the most similar to the query vector.
         """
-        await self._ensure_db_setup()
-        if not self.async_collection:
-            return await run_in_executor(
-                None,
-                self.similarity_search_with_score_id_by_vector,
-                embedding,
-                k,
-                filter,
-            )
+        await self.astra_env.aensure_db_setup()
         metadata_parameter = self._filter_to_metadata(filter)
         #
         return [
@@ -1121,7 +1083,7 @@ class AstraDBVectorStore(VectorStore):
         Returns:
             The list of Documents selected by maximal marginal relevance.
         """
-        self._ensure_astra_db_client()
+        self.astra_env.ensure_db_setup()
         metadata_parameter = self._filter_to_metadata(filter)
 
         prefetch_hits = list(
@@ -1167,18 +1129,7 @@ class AstraDBVectorStore(VectorStore):
         Returns:
             The list of Documents selected by maximal marginal relevance.
         """
-        await self._ensure_db_setup()
-        if not self.async_collection:
-            return await run_in_executor(
-                None,
-                self.max_marginal_relevance_search_by_vector,
-                embedding,
-                k,
-                fetch_k,
-                lambda_mult,
-                filter,
-                **kwargs,
-            )
+        await self.astra_env.aensure_db_setup()
         metadata_parameter = self._filter_to_metadata(filter)
 
         prefetch_hits = [
