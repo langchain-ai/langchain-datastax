@@ -172,7 +172,7 @@ class AstraDBCache(BaseCache):
         self.astra_env.ensure_db_setup()
         doc_id = self._make_id(prompt, llm_string)
         blob = _dumps_generations(return_val)
-        self.collection.upsert(
+        self.collection.upsert_one(
             {
                 "_id": doc_id,
                 "body_blob": blob,
@@ -185,7 +185,7 @@ class AstraDBCache(BaseCache):
         await self.astra_env.aensure_db_setup()
         doc_id = self._make_id(prompt, llm_string)
         blob = _dumps_generations(return_val)
-        await self.async_collection.upsert(
+        await self.async_collection.upsert_one(
             {
                 "_id": doc_id,
                 "body_blob": blob,
@@ -387,7 +387,7 @@ class AstraDBSemanticCache(BaseCache):
         embedding_vector = self._get_embedding(text=prompt)
         body = _dumps_generations(return_val)
         #
-        self.collection.upsert(
+        self.collection.upsert_one(
             {
                 "_id": doc_id,
                 "body_blob": body,
@@ -405,7 +405,7 @@ class AstraDBSemanticCache(BaseCache):
         embedding_vector = await self._aget_embedding(text=prompt)
         body = _dumps_generations(return_val)
         #
-        await self.async_collection.upsert(
+        await self.async_collection.upsert_one(
             {
                 "_id": doc_id,
                 "body_blob": body,
