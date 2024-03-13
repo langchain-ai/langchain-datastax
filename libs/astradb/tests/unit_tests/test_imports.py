@@ -6,6 +6,7 @@ EXPECTED_ALL = [
     "AstraDBCache",
     "AstraDBSemanticCache",
     "AstraDBChatMessageHistory",
+    "AstraDBLoader",
     "AstraDBVectorStore",
 ]
 
