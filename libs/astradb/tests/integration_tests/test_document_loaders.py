@@ -111,6 +111,7 @@ class TestAstraDB:
             namespace=ASTRA_DB_KEYSPACE,
             find_options={"limit": 30},
             page_content_mapper=lambda x: x["foo"],
+            filter_criteria={"foo": "bar"},
         )
         docs = loader.lazy_load()
         doc = next(docs)
@@ -125,6 +126,7 @@ class TestAstraDB:
             namespace=ASTRA_DB_KEYSPACE,
             find_options={"limit": 30},
             metadata_mapper=lambda x: {"a": x["foo"]},
+            filter_criteria={"foo": "bar"},
         )
         docs = loader.lazy_load()
         doc = next(docs)
@@ -175,6 +177,7 @@ class TestAstraDB:
             namespace=ASTRA_DB_KEYSPACE,
             find_options={"limit": 30},
             page_content_mapper=lambda x: x["foo"],
+            filter_criteria={"foo": "bar"},
         )
         doc = await loader.alazy_load().__anext__()
         assert doc.page_content == "bar"
@@ -189,6 +192,7 @@ class TestAstraDB:
             namespace=ASTRA_DB_KEYSPACE,
             find_options={"limit": 30},
             metadata_mapper=lambda x: {"a": x["foo"]},
+            filter_criteria={"foo": "bar"},
         )
         doc = await loader.alazy_load().__anext__()
         assert doc.metadata == {"a": "bar"}
