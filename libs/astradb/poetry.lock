@@ -884,7 +884,7 @@ extended-testing = ["jinja2 (>=3,<4)"]
 type = "git"
 url = "https://github.com/langchain-ai/langchain.git"
 reference = "HEAD"
-resolved_reference = "29282371db1fcb527610926331bb3fc872293dc1"
+resolved_reference = "6470b30173f22bd54d377456a6544b86cad78230"
 subdirectory = "libs/core"
 
 [[package]]
