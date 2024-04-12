@@ -414,7 +414,6 @@ class TestAstraDBVectorStore:
         res3 = store_someemb.similarity_search_with_score_id(
             query="cc", k=1, filter={"k": "c_new"}
         )
-        print(str(res3))
         doc3, score3, id3 = res3[0]
         assert doc3.page_content == "cc"
         assert doc3.metadata == {"k": "c_new", "ord": 102}
@@ -474,7 +473,6 @@ class TestAstraDBVectorStore:
         res3 = await store_someemb.asimilarity_search_with_score_id(
             query="cc", k=1, filter={"k": "c_new"}
         )
-        print(str(res3))
         doc3, score3, id3 = res3[0]
         assert doc3.page_content == "cc"
         assert doc3.metadata == {"k": "c_new", "ord": 102}
