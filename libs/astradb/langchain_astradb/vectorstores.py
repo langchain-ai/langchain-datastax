@@ -297,18 +297,13 @@ class AstraDBVectorStore(VectorStore):
     def embeddings(self) -> Embeddings:
         return self.embedding
 
-    @staticmethod
-    def _dont_flip_the_cos_score(similarity0to1: float) -> float:
-        """Keep similarity from client unchanged ad it's in [0:1] already."""
-        return similarity0to1
-
     def _select_relevance_score_fn(self) -> Callable[[float], float]:
         """
         The underlying API calls already returns a "score proper",
         i.e. one in [0, 1] where higher means more *similar*,
         so here the final score transformation is not reversing the interval:
         """
-        return self._dont_flip_the_cos_score
+        return lambda score: score
 
     def clear(self) -> None:
         """Empty the collection of all its stored entries."""
