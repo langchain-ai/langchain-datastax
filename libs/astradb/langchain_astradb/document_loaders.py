@@ -10,6 +10,7 @@ from typing import (
     Iterator,
     List,
     Optional,
+    Union,
 )
 
 from astrapy.db import AstraDB, AsyncAstraDB
@@ -23,6 +24,8 @@ from langchain_astradb.utils.astradb import (
 
 logger = logging.getLogger(__name__)
 
+_NOT_SET = object()
+
 
 class AstraDBLoader(BaseLoader):
     def __init__(
@@ -35,7 +38,7 @@ class AstraDBLoader(BaseLoader):
         async_astra_db_client: Optional[AsyncAstraDB] = None,
         namespace: Optional[str] = None,
         filter_criteria: Optional[Dict[str, Any]] = None,
-        projection: Optional[Dict[str, Any]] = None,
+        projection: Union[object, Optional[Dict[str, Any]]] = _NOT_SET,
         find_options: Optional[Dict[str, Any]] = None,
         nb_prefetched: int = 1000,
         page_content_mapper: Callable[[Dict], str] = json.dumps,
@@ -72,7 +75,9 @@ class AstraDBLoader(BaseLoader):
         )
         self.astra_db_env = astra_db_env
         self.filter = filter_criteria
-        self.projection = projection
+        self._projection: Optional[Dict[str, Any]] = (
+            projection if projection is not _NOT_SET else {"*": True}  # type: ignore[assignment]
+        )
         self.find_options = find_options or {}
         self.nb_prefetched = nb_prefetched
         self.page_content_mapper = page_content_mapper
@@ -94,7 +99,7 @@ class AstraDBLoader(BaseLoader):
         for doc in self.astra_db_env.collection.paginated_find(
             filter=self.filter,
             options=self.find_options,
-            projection=self.projection,
+            projection=self._projection,
             sort=None,
             prefetched=self.nb_prefetched,
         ):
@@ -108,7 +113,7 @@ class AstraDBLoader(BaseLoader):
         async for doc in self.astra_db_env.async_collection.paginated_find(
             filter=self.filter,
             options=self.find_options,
-            projection=self.projection,
+            projection=self._projection,
             sort=None,
             prefetched=self.nb_prefetched,
         ):
