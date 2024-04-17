@@ -4,6 +4,8 @@ from langchain_astradb.document_loaders import AstraDBLoader
 from langchain_astradb.storage import AstraDBByteStore, AstraDBStore
 from langchain_astradb.vectorstores import AstraDBVectorStore
 
+from astrapy.info import CollectionVectorServiceOptions
+
 __all__ = [
     "AstraDBByteStore",
     "AstraDBStore",
@@ -12,4 +14,5 @@ __all__ = [
     "AstraDBChatMessageHistory",
     "AstraDBLoader",
     "AstraDBVectorStore",
+    "CollectionVectorServiceOptions"
 ]
