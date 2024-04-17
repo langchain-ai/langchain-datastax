@@ -518,9 +518,12 @@ class TestAstraDBVectorStore:
                 await v_store_4.aclear()
 
     @pytest.mark.parametrize("vector_store", ["store_someemb", "vectorize_store"])
-    def test_astradb_vectorstore_crud(self, vector_store, request) -> None:
+    def test_astradb_vectorstore_crud(
+        self, vector_store: str, request: pytest.FixtureRequest
+    ) -> None:
         """Basic add/delete/update behaviour."""
         vstore: AstraDBVectorStore = request.getfixturevalue(vector_store)
+
         res0 = vstore.similarity_search("Abc", k=2)
         assert res0 == []
         # write and check again
@@ -577,9 +580,11 @@ class TestAstraDBVectorStore:
         assert res4[0].metadata["ord"] == 205
 
     @pytest.mark.parametrize("vector_store", ["store_someemb", "vectorize_store"])
-    async def test_astradb_vectorstore_crud_async(self, vector_store, request) -> None:
+    async def test_astradb_vectorstore_crud_async(
+        self, vector_store: str, request: pytest.FixtureRequest
+    ) -> None:
         """Basic add/delete/update behaviour."""
-        vstore = request.getfixturevalue(vector_store)
+        vstore: AstraDBVectorStore = request.getfixturevalue(vector_store)
 
         res0 = await vstore.asimilarity_search("Abc", k=2)
         assert res0 == []
@@ -698,14 +703,14 @@ class TestAstraDBVectorStore:
         with pytest.raises(ValueError):
             vectorize_store.max_marginal_relevance_search("aa", k=2, fetch_k=3)
 
-    def test_astradb_vectorstore_mmr_vectorize_unsupported_async(
+    async def test_astradb_vectorstore_mmr_vectorize_unsupported_async(
         self, vectorize_store: AstraDBVectorStore
     ) -> None:
         """
         MMR async testing with vectorize, currently unsupported.
         """
         with pytest.raises(ValueError):
-            vectorize_store.amax_marginal_relevance_search("aa", k=2, fetch_k=3)
+            await vectorize_store.amax_marginal_relevance_search("aa", k=2, fetch_k=3)
 
     def test_astradb_vectorstore_metadata(
         self, store_someemb: AstraDBVectorStore

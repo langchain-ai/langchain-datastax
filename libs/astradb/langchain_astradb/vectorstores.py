@@ -308,6 +308,8 @@ class AstraDBVectorStore(VectorStore):
         self.async_collection = self.astra_env.async_collection
 
     def _get_embedding_dimension(self) -> int:
+        assert self.embedding is not None
+
         if self.embedding_dimension is None:
             self.embedding_dimension = len(
                 self.embedding.embed_query(text="This is a sample sentence.")
@@ -315,6 +317,8 @@ class AstraDBVectorStore(VectorStore):
         return self.embedding_dimension
 
     async def _aget_embedding_dimension(self) -> int:
+        assert self.embedding is not None
+
         if self.embedding_dimension is None:
             self.embedding_dimension = len(
                 await self.embedding.aembed_query(text="This is a sample sentence.")
@@ -329,6 +333,7 @@ class AstraDBVectorStore(VectorStore):
                     available."
             )
 
+        assert self.embedding is not None
         return self.embedding
 
     def _select_relevance_score_fn(self) -> Callable[[float], float]:
@@ -624,11 +629,13 @@ class AstraDBVectorStore(VectorStore):
             documents_to_insert = self._get_vectorize_documents_to_insert(
                 texts, metadatas, ids
             )
-        else:
+        elif self.embedding is not None:
             embedding_vectors = self.embedding.embed_documents(list(texts))
             documents_to_insert = self._get_documents_to_insert(
                 texts, embedding_vectors, metadatas, ids
             )
+        else:
+            raise ValueError("No embeddings or vectorization service available.")
 
         def _handle_batch(document_batch: List[DocDict]) -> List[str]:
             # self.collection is not None (by _ensure_astra_db_client)
@@ -726,11 +733,13 @@ class AstraDBVectorStore(VectorStore):
             documents_to_insert = self._get_vectorize_documents_to_insert(
                 texts, metadatas, ids
             )
-        else:
+        elif self.embedding is not None:
             embedding_vectors = await self.embedding.aembed_documents(list(texts))
             documents_to_insert = self._get_documents_to_insert(
                 texts, embedding_vectors, metadatas, ids
             )
+        else:
+            raise ValueError("No embeddings or vectorization service available.")
 
         async def _handle_batch(document_batch: List[DocDict]) -> List[str]:
             # self.async_collection is not None here for sure
@@ -956,12 +965,17 @@ class AstraDBVectorStore(VectorStore):
                 k=k,
                 filter=filter,
             )
-        else:
+        elif self.embedding is not None:
             embedding_vector = self.embedding.embed_query(query)
             return self.similarity_search_with_score_id_by_vector(
                 embedding=embedding_vector,
                 k=k,
                 filter=filter,
+            )
+        else:
+            raise ValueError(
+                "expected one of `embedding` or\
+                `collection_vector_service_options`"
             )
 
     async def asimilarity_search_with_score_id(
@@ -986,12 +1000,17 @@ class AstraDBVectorStore(VectorStore):
                 k=k,
                 filter=filter,
             )
-        else:
+        elif self.embedding is not None:
             embedding_vector = await self.embedding.aembed_query(query)
             return await self.asimilarity_search_with_score_id_by_vector(
                 embedding=embedding_vector,
                 k=k,
                 filter=filter,
+            )
+        else:
+            raise ValueError(
+                "expected one of `embedding` or\
+                `collection_vector_service_options`"
             )
 
     def similarity_search_with_score_by_vector(
@@ -1065,12 +1084,27 @@ class AstraDBVectorStore(VectorStore):
         Returns:
             The list of Documents most similar to the query.
         """
-        embedding_vector = self.embedding.embed_query(query)
-        return self.similarity_search_by_vector(
-            embedding_vector,
-            k,
-            filter=filter,
-        )
+        if self.collection_vector_service_options is not None:
+            return [
+                doc
+                for (doc, _, _) in self._similarity_search_with_score_id_with_vectorize(
+                    query,
+                    k,
+                    filter=filter,
+                )
+            ]
+        elif self.embedding is not None:
+            embedding_vector = self.embedding.embed_query(query)
+            return self.similarity_search_by_vector(
+                embedding_vector,
+                k,
+                filter=filter,
+            )
+        else:
+            raise ValueError(
+                "expected one of `embedding` or \
+                `collection_vector_service_options`"
+            )
 
     async def asimilarity_search(
         self,
@@ -1089,12 +1123,31 @@ class AstraDBVectorStore(VectorStore):
         Returns:
             The list of Documents most similar to the query.
         """
-        embedding_vector = await self.embedding.aembed_query(query)
-        return await self.asimilarity_search_by_vector(
-            embedding_vector,
-            k,
-            filter=filter,
-        )
+        if self.collection_vector_service_options is not None:
+            return [
+                doc
+                for (
+                    doc,
+                    _,
+                    _,
+                ) in await self._asimilarity_search_with_score_id_with_vectorize(
+                    query,
+                    k,
+                    filter=filter,
+                )
+            ]
+        elif self.embedding is not None:
+            embedding_vector = await self.embedding.aembed_query(query)
+            return await self.asimilarity_search_by_vector(
+                embedding_vector,
+                k,
+                filter=filter,
+            )
+        else:
+            raise ValueError(
+                "expected one of `embedding` or \
+                `collection_vector_service_options`"
+            )
 
     def similarity_search_by_vector(
         self,
@@ -1172,17 +1225,22 @@ class AstraDBVectorStore(VectorStore):
                     score,
                     doc_id,
                 ) in self._similarity_search_with_score_id_with_vectorize(
-                    quer=query,
+                    query=query,
                     k=k,
                     filter=filter,
                 )
             ]
-        else:
+        elif self.embedding is not None:
             embedding_vector = self.embedding.embed_query(query)
             return self.similarity_search_with_score_by_vector(
                 embedding_vector,
                 k,
                 filter=filter,
+            )
+        else:
+            raise ValueError(
+                "expected one of `embedding` or \
+                `collection_vector_service_options`"
             )
 
     async def asimilarity_search_with_score(
@@ -1208,18 +1266,23 @@ class AstraDBVectorStore(VectorStore):
                     doc,
                     score,
                     doc_id,
-                ) in self._asimilarity_search_with_score_id_with_vectorize(
-                    quer=query,
+                ) in await self._asimilarity_search_with_score_id_with_vectorize(
+                    query=query,
                     k=k,
                     filter=filter,
                 )
             ]
-        else:
+        elif self.embedding is not None:
             embedding_vector = await self.embedding.aembed_query(query)
             return await self.asimilarity_search_with_score_by_vector(
                 embedding_vector,
                 k,
                 filter=filter,
+            )
+        else:
+            raise ValueError(
+                "expected one of `embedding` or \
+                `collection_vector_service_options`"
             )
 
     @staticmethod
@@ -1365,7 +1428,7 @@ class AstraDBVectorStore(VectorStore):
         """
         if self.collection_vector_service_options is not None:
             raise ValueError("MMR search is unsupported for server-side embeddings.")
-        else:
+        elif self.embedding is not None:
             embedding_vector = self.embedding.embed_query(query)
             return self.max_marginal_relevance_search_by_vector(
                 embedding_vector,
@@ -1373,6 +1436,11 @@ class AstraDBVectorStore(VectorStore):
                 fetch_k,
                 lambda_mult=lambda_mult,
                 filter=filter,
+            )
+        else:
+            raise ValueError(
+                "expected one of `embedding` or \
+                `collection_vector_service_options`"
             )
 
     async def amax_marginal_relevance_search(
@@ -1403,7 +1471,7 @@ class AstraDBVectorStore(VectorStore):
         """
         if self.collection_vector_service_options is not None:
             raise ValueError("MMR search is unsupported for server-side embeddings.")
-        else:
+        elif self.embedding is not None:
             embedding_vector = await self.embedding.aembed_query(query)
             return await self.amax_marginal_relevance_search_by_vector(
                 embedding_vector,
@@ -1411,6 +1479,11 @@ class AstraDBVectorStore(VectorStore):
                 fetch_k,
                 lambda_mult=lambda_mult,
                 filter=filter,
+            )
+        else:
+            raise ValueError(
+                "expected one of `embedding` or \
+                `collection_vector_service_options`"
             )
 
     @classmethod
@@ -1589,6 +1662,36 @@ class AstraDBVectorStore(VectorStore):
         texts = [d.page_content for d in documents]
         metadatas = [d.metadata for d in documents]
         return cls.from_texts(
+            texts,
+            embedding=embedding,
+            metadatas=metadatas,
+            collection_vector_service_options=collection_vector_service_options,
+            **kwargs,
+        )
+
+    @classmethod
+    async def afrom_documents(
+        cls: Type[AstraDBVectorStore],
+        documents: List[Document],
+        embedding: Optional[Embeddings] = None,
+        collection_vector_service_options: Optional[
+            CollectionVectorServiceOptions
+        ] = None,
+        **kwargs: Any,
+    ) -> AstraDBVectorStore:
+        """Create an Astra DB vectorstore from a document list.
+
+        Utility method that defers to 'afrom_texts' (see that one).
+
+        Args: see 'afrom_texts', except here you have to supply 'documents'
+            in place of 'texts' and 'metadatas'.
+
+        Returns:
+            an `AstraDBVectorStore` vectorstore.
+        """
+        texts = [d.page_content for d in documents]
+        metadatas = [d.metadata for d in documents]
+        return await cls.afrom_texts(
             texts,
             embedding=embedding,
             metadatas=metadatas,
