@@ -219,7 +219,7 @@ class AstraDBVectorStore(VectorStore):
                 data-api-commands.html#advanced-feature-indexing-clause-on-createcollection)
             collection_vector_service_options: specifies the use of server-side embeddings
                 within Astra DB. Only one of `embedding` or `collection_vector_service_options`
-                can be provided.
+                can be provided. NOTE: this feature is currently in beta.
 
         Note:
             For concurrency in synchronous :meth:`~add_texts`:, as a rule of thumb, on a
@@ -517,7 +517,6 @@ class AstraDBVectorStore(VectorStore):
         #
         documents_to_insert = [
             {
-                "content": b_txt,
                 "_id": b_id,
                 "$vectorize": b_txt,
                 "metadata": b_md,
