@@ -122,7 +122,7 @@ def astradb_credentials() -> Iterable[AstraDBCredentials]:
 
 
 @pytest.fixture(scope="function")
-def vstore(
+def store_someemb(
     astradb_credentials: AstraDBCredentials,
 ) -> Iterable[AstraDBVectorStore]:
     emb = SomeEmbeddings(dimension=2)
@@ -523,7 +523,6 @@ class TestAstraDBVectorStore:
     def test_astradb_vectorstore_crud(self, vector_store, request) -> None:
         """Basic add/delete/update behaviour."""
         vstore: AstraDBVectorStore = request.getfixturevalue(vector_store)
-        
         res0 = vstore.similarity_search("Abc", k=2)
         assert res0 == []
         # write and check again
@@ -715,10 +714,10 @@ class TestAstraDBVectorStore:
             vectorize_store.amax_marginal_relevance_search("aa", k=2, fetch_k=3)
 
     def test_astradb_vectorstore_metadata(
-        self, vstore: AstraDBVectorStore
+        self, store_someemb: AstraDBVectorStore
     ) -> None:
         """Metadata filtering."""
-        vstore.add_documents(
+        store_someemb.add_documents(
             [
                 Document(
                     page_content="q",
@@ -747,31 +746,31 @@ class TestAstraDBVectorStore:
             ]
         )
         # no filters
-        res0 = vstore.similarity_search("x", k=10)
+        res0 = store_someemb.similarity_search("x", k=10)
         assert {doc.page_content for doc in res0} == set("qwreio")
         # single filter
-        res1 = vstore.similarity_search(
+        res1 = store_someemb.similarity_search(
             "x",
             k=10,
             filter={"group": "vowel"},
         )
         assert {doc.page_content for doc in res1} == set("eio")
         # multiple filters
-        res2 = vstore.similarity_search(
+        res2 = store_someemb.similarity_search(
             "x",
             k=10,
             filter={"group": "consonant", "ord": ord("q")},
         )
         assert {doc.page_content for doc in res2} == set("q")
         # excessive filters
-        res3 = vstore.similarity_search(
+        res3 = store_someemb.similarity_search(
             "x",
             k=10,
             filter={"group": "consonant", "ord": ord("q"), "case": "upper"},
         )
         assert res3 == []
         # filter with logical operator
-        res4 = vstore.similarity_search(
+        res4 = store_someemb.similarity_search(
             "x",
             k=10,
             filter={"$or": [{"ord": ord("q")}, {"ord": ord("r")}]},
@@ -817,7 +816,7 @@ class TestAstraDBVectorStore:
         assert abs(1 - sco_near) < MATCH_EPSILON and abs(sco_far) < MATCH_EPSILON
 
     def test_astradb_vectorstore_massive_delete(
-        self, vstore: AstraDBVectorStore
+        self, store_someemb: AstraDBVectorStore
     ) -> None:
         """Larger-scale bulk deletes."""
         M = 50
@@ -825,15 +824,15 @@ class TestAstraDBVectorStore:
         ids0 = ["doc_%i" % i for i in range(M)]
         ids1 = ["doc_%i" % (i + M) for i in range(M)]
         ids = ids0 + ids1
-        vstore.add_texts(texts=texts, ids=ids)
+        store_someemb.add_texts(texts=texts, ids=ids)
         # deleting a bunch of these
-        del_res0 = vstore.delete(ids0)
+        del_res0 = store_someemb.delete(ids0)
         assert del_res0 is True
         # deleting the rest plus a fake one
-        del_res1 = vstore.delete(ids1 + ["ghost!"])
+        del_res1 = store_someemb.delete(ids1 + ["ghost!"])
         assert del_res1 is True  # ensure no error
         # nothing left
-        assert vstore.similarity_search("x", k=2 * M) == []
+        assert store_someemb.similarity_search("x", k=2 * M) == []
 
     @pytest.mark.skipif(
         SKIP_COLLECTION_DELETE,
