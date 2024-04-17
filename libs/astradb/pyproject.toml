@@ -13,7 +13,7 @@ license = "MIT"
 [tool.poetry.dependencies]
 python = ">=3.8.1,<4.0"
 langchain-core = "^0.1.31"
-astrapy = ">=0.7.7, <2"
+astrapy = "^1"
 numpy = "^1"
 
 [tool.poetry.group.test]

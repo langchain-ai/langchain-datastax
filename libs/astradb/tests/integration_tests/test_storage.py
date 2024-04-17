@@ -21,8 +21,6 @@ def _has_env_vars() -> bool:
 
 @pytest.fixture
 def astra_db() -> AstraDB:
-    from astrapy.db import AstraDB
-
     return AstraDB(
         token=os.environ["ASTRA_DB_APPLICATION_TOKEN"],
         api_endpoint=os.environ["ASTRA_DB_API_ENDPOINT"],
@@ -32,8 +30,6 @@ def astra_db() -> AstraDB:
 
 @pytest.fixture
 def async_astra_db() -> AsyncAstraDB:
-    from astrapy.db import AsyncAstraDB
-
     return AsyncAstraDB(
         token=os.environ["ASTRA_DB_APPLICATION_TOKEN"],
         api_endpoint=os.environ["ASTRA_DB_API_ENDPOINT"],
