@@ -272,11 +272,12 @@ class AstraDBVectorStore(VectorStore):
         # "vector-related" settings
         self.metric = metric
         embedding_dimension: Union[int, Awaitable[int], None] = None
-        if setup_mode == SetupMode.ASYNC:
-            embedding_dimension = self._aget_embedding_dimension()
-        elif setup_mode == SetupMode.SYNC or setup_mode == SetupMode.OFF:
-            embedding_dimension = self._get_embedding_dimension()
-
+        if self.embedding is not None:
+            if setup_mode == SetupMode.ASYNC:
+                embedding_dimension = self._aget_embedding_dimension()
+            elif setup_mode == SetupMode.SYNC or setup_mode == SetupMode.OFF:
+                embedding_dimension = self._get_embedding_dimension()
+    
         # indexing policy setting
         self.indexing_policy: Dict[str, Any] = self._normalize_metadata_indexing_policy(
             metadata_indexing_include=metadata_indexing_include,

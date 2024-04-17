@@ -95,7 +95,9 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
         metric: Optional[str] = None,
         requested_indexing_policy: Optional[Dict[str, Any]] = None,
         default_indexing_policy: Optional[Dict[str, Any]] = None,
-        collection_vector_service_options: Optional[CollectionVectorServiceOptions] = None,
+        collection_vector_service_options: Optional[
+            CollectionVectorServiceOptions
+        ] = None,
     ) -> None:
         super().__init__(
             token, api_endpoint, astra_db_client, async_astra_db_client, namespace
@@ -127,9 +129,9 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
                     dimension = await embedding_dimension
                 else:
                     dimension = embedding_dimension
-                
+
                 # Used for enabling $vectorize on the collection
-                service_dict: Optional[Dict[str, Any]]
+                service_dict: Optional[Dict[str, Any]] = None
                 if collection_vector_service_options is not None:
                     service_dict = collection_vector_service_options.as_dict()
 
@@ -139,7 +141,7 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
                         dimension=dimension,
                         metric=metric,
                         options=_options,
-                        service_dict=service_dict
+                        service_dict=service_dict,
                     )
                 except (APIRequestError, ValueError):
                     # possibly the collection is preexisting and may have legacy,
@@ -170,10 +172,9 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
                 )
             else:
                 # Used for enabling $vectorize on the collection
-                service_dict: Optional[Dict[str, Any]]
+                service_dict: Optional[Dict[str, Any]] = None
                 if collection_vector_service_options is not None:
                     service_dict = collection_vector_service_options.as_dict()
-
 
                 try:
                     self.astra_db.create_collection(
@@ -181,7 +182,7 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
                         dimension=embedding_dimension,  # type: ignore[arg-type]
                         metric=metric,
                         options=_options,
-                        service_dict=service_dict
+                        service_dict=service_dict,
                     )
                 except (APIRequestError, ValueError):
                     # possibly the collection is preexisting and may have legacy,

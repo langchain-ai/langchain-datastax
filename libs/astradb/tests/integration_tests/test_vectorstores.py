@@ -21,6 +21,7 @@ from typing import Iterable, List, Optional, TypedDict
 
 import pytest
 from astrapy.db import AstraDB, AsyncAstraDB
+from astrapy.info import CollectionVectorServiceOptions
 from langchain_core.documents import Document
 from langchain_core.embeddings import Embeddings
 
@@ -33,6 +34,7 @@ SKIP_COLLECTION_DELETE = (
 
 COLLECTION_NAME_DIM2 = "lc_test_d2"
 COLLECTION_NAME_DIM2_EUCLIDEAN = "lc_test_d2_eucl"
+COLLECTION_NAME_VECTORIZE = "lc_test_vectorize"
 
 MATCH_EPSILON = 0.0001
 
@@ -120,7 +122,7 @@ def astradb_credentials() -> Iterable[AstraDBCredentials]:
 
 
 @pytest.fixture(scope="function")
-def store_someemb(
+def vstore(
     astradb_credentials: AstraDBCredentials,
 ) -> Iterable[AstraDBVectorStore]:
     emb = SomeEmbeddings(dimension=2)
@@ -159,6 +161,31 @@ def store_parseremb(
         v_store.clear()
 
 
+@pytest.fixture(scope="function")
+def vectorize_store(
+    astradb_credentials: AstraDBCredentials,
+) -> Iterable[AstraDBVectorStore]:
+    """
+    astra db vector store with server-side embeddings using the nvidia model
+    """
+    options = CollectionVectorServiceOptions(
+        provider="nvidia", model_name="NV-Embed-QA"
+    )
+    v_store = AstraDBVectorStore(
+        collection_vector_service_options=options,
+        collection_name=COLLECTION_NAME_DIM2,
+        **astradb_credentials,
+    )
+    v_store.clear()
+
+    yield v_store
+
+    if not SKIP_COLLECTION_DELETE:
+        v_store.delete_collection()
+    else:
+        v_store.clear()
+
+
 @pytest.mark.skipif(not _has_env_vars(), reason="Missing Astra DB env. vars")
 class TestAstraDBVectorStore:
     def test_astradb_vectorstore_create_delete(
@@ -167,7 +194,8 @@ class TestAstraDBVectorStore:
         """Create and delete."""
 
         emb = SomeEmbeddings(dimension=2)
-        # creation by passing the connection secrets
+
+        # Creation by passing the connection secrets
         v_store = AstraDBVectorStore(
             embedding=emb,
             collection_name=COLLECTION_NAME_DIM2,
@@ -194,18 +222,34 @@ class TestAstraDBVectorStore:
         else:
             v_store_2.clear()
 
+        # Creation with vectorize option
+        options = CollectionVectorServiceOptions(
+            provider="nvidia", model_name="NV-Embed-QA"
+        )
+        v_store_3 = AstraDBVectorStore(
+            collection_vector_service_options=options,
+            collection_name=COLLECTION_NAME_VECTORIZE,
+            **astradb_credentials,
+        )
+        v_store_3.add_texts("Sample 3")
+        if not SKIP_COLLECTION_DELETE:
+            v_store_3.delete_collection()
+        else:
+            v_store_3.clear()
+
     async def test_astradb_vectorstore_create_delete_async(
         self, astradb_credentials: AstraDBCredentials
     ) -> None:
         """Create and delete."""
         emb = SomeEmbeddings(dimension=2)
-        # creation by passing the connection secrets
+        # Creation by passing the connection secrets
         v_store = AstraDBVectorStore(
             embedding=emb,
             collection_name=COLLECTION_NAME_DIM2,
             **astradb_credentials,
         )
         await v_store.adelete_collection()
+
         # Creation by passing a ready-made astrapy client:
         astra_db_client = AsyncAstraDB(
             **astradb_credentials,
@@ -219,6 +263,20 @@ class TestAstraDBVectorStore:
             await v_store_2.adelete_collection()
         else:
             await v_store_2.aclear()
+
+        # Creation with vectorize option
+        options = CollectionVectorServiceOptions(
+            provider="nvidia", model_name="NV-Embed-QA"
+        )
+        v_store_3 = AstraDBVectorStore(
+            collection_vector_service_options=options,
+            collection_name="lc_test_3_async",
+            **astradb_credentials,
+        )
+        if not SKIP_COLLECTION_DELETE:
+            await v_store_3.adelete_collection()
+        else:
+            await v_store_3.aclear()
 
     @pytest.mark.skipif(
         SKIP_COLLECTION_DELETE,
@@ -337,6 +395,42 @@ class TestAstraDBVectorStore:
             else:
                 v_store_2.clear()
 
+        # from_texts with vectorize
+        options = CollectionVectorServiceOptions(
+            provider="nvidia", model_name="NV-Embed-QA"
+        )
+        v_store_3 = AstraDBVectorStore.from_texts(
+            texts=["Haa", "Huu"],
+            collection_vector_service_options=options,
+            collection_name=COLLECTION_NAME_VECTORIZE,
+            **astradb_credentials,
+        )
+        try:
+            assert v_store_3.similarity_search("Haa", k=1)[0].page_content == "Haa"
+        finally:
+            if not SKIP_COLLECTION_DELETE:
+                v_store_3.delete_collection()
+            else:
+                v_store_3.clear()
+
+        # from_documents with vectorize
+        v_store_4 = AstraDBVectorStore.from_documents(
+            [
+                Document(page_content="HeeH"),
+                Document(page_content="HooH"),
+            ],
+            collection_vector_service_options=options,
+            collection_name=COLLECTION_NAME_VECTORIZE,
+            **astradb_credentials,
+        )
+        try:
+            assert v_store_4.similarity_search("HeeH", k=1)[0].page_content == "HeeH"
+        finally:
+            if not SKIP_COLLECTION_DELETE:
+                v_store_4.delete_collection()
+            else:
+                v_store_4.clear()
+
     async def test_astradb_vectorstore_from_x_async(
         self, astradb_credentials: AstraDBCredentials
     ) -> None:
@@ -383,12 +477,57 @@ class TestAstraDBVectorStore:
             else:
                 await v_store_2.aclear()
 
-    def test_astradb_vectorstore_crud(self, store_someemb: AstraDBVectorStore) -> None:
+        # from_text with vectorize
+        options = CollectionVectorServiceOptions(
+            provider="nvidia", model_name="NV-Embed-QA"
+        )
+        v_store_3 = await AstraDBVectorStore.afrom_texts(
+            texts=["Haa", "Huu"],
+            collection_vector_service_options=options,
+            collection_name=COLLECTION_NAME_VECTORIZE,
+            **astradb_credentials,
+        )
+        try:
+            assert (await v_store_3.asimilarity_search("Haa", k=1))[
+                0
+            ].page_content == "Haa"
+        finally:
+            if not SKIP_COLLECTION_DELETE:
+                await v_store_3.adelete_collection()
+            else:
+                await v_store_3.aclear()
+
+        # from_documents with vectorize
+        v_store_4 = await AstraDBVectorStore.afrom_documents(
+            [
+                Document(page_content="HeeH"),
+                Document(page_content="HooH"),
+            ],
+            collection_vector_service_options=options,
+            collection_name=COLLECTION_NAME_VECTORIZE,
+            **astradb_credentials,
+        )
+        try:
+            assert (await v_store_4.asimilarity_search("HeeH", k=1))[
+                0
+            ].page_content == "HeeH"
+        finally:
+            if not SKIP_COLLECTION_DELETE:
+                await v_store_4.adelete_collection()
+            else:
+                await v_store_4.aclear()
+
+    @pytest.mark.parametrize(
+        "vector_store", ["store_someemb", "vectorize_store"]
+    )
+    def test_astradb_vectorstore_crud(self, vector_store, request) -> None:
         """Basic add/delete/update behaviour."""
-        res0 = store_someemb.similarity_search("Abc", k=2)
+        vstore: AstraDBVectorStore = request.getfixturevalue(vector_store)
+        
+        res0 = vstore.similarity_search("Abc", k=2)
         assert res0 == []
         # write and check again
-        store_someemb.add_texts(
+        vstore.add_texts(
             texts=["aa", "bb", "cc"],
             metadatas=[
                 {"k": "a", "ord": 0},
@@ -397,10 +536,10 @@ class TestAstraDBVectorStore:
             ],
             ids=["a", "b", "c"],
         )
-        res1 = store_someemb.similarity_search("Abc", k=5)
+        res1 = vstore.similarity_search("Abc", k=5)
         assert {doc.page_content for doc in res1} == {"aa", "bb", "cc"}
         # partial overwrite and count total entries
-        store_someemb.add_texts(
+        vstore.add_texts(
             texts=["cc", "dd"],
             metadatas=[
                 {"k": "c_new", "ord": 102},
@@ -408,10 +547,10 @@ class TestAstraDBVectorStore:
             ],
             ids=["c", "d"],
         )
-        res2 = store_someemb.similarity_search("Abc", k=10)
+        res2 = vstore.similarity_search("Abc", k=10)
         assert len(res2) == 4
         # pick one that was just updated and check its metadata
-        res3 = store_someemb.similarity_search_with_score_id(
+        res3 = vstore.similarity_search_with_score_id(
             query="cc", k=1, filter={"k": "c_new"}
         )
         doc3, score3, id3 = res3[0]
@@ -420,34 +559,39 @@ class TestAstraDBVectorStore:
         assert score3 > 0.999  # leaving some leeway for approximations...
         assert id3 == "c"
         # delete and count again
-        del1_res = store_someemb.delete(["b"])
+        del1_res = vstore.delete(["b"])
         assert del1_res is True
-        del2_res = store_someemb.delete(["a", "c", "Z!"])
+        del2_res = vstore.delete(["a", "c", "Z!"])
         assert del2_res is True  # a non-existing ID was supplied
-        assert len(store_someemb.similarity_search("xy", k=10)) == 1
+        assert len(vstore.similarity_search("xy", k=10)) == 1
         # clear store
-        store_someemb.clear()
-        assert store_someemb.similarity_search("Abc", k=2) == []
+        vstore.clear()
+        assert vstore.similarity_search("Abc", k=2) == []
         # add_documents with "ids" arg passthrough
-        store_someemb.add_documents(
+        vstore.add_documents(
             [
                 Document(page_content="vv", metadata={"k": "v", "ord": 204}),
                 Document(page_content="ww", metadata={"k": "w", "ord": 205}),
             ],
             ids=["v", "w"],
         )
-        assert len(store_someemb.similarity_search("xy", k=10)) == 2
-        res4 = store_someemb.similarity_search("ww", k=1, filter={"k": "w"})
+        assert len(vstore.similarity_search("xy", k=10)) == 2
+        res4 = vstore.similarity_search("ww", k=1, filter={"k": "w"})
         assert res4[0].metadata["ord"] == 205
 
+    @pytest.mark.parametrize(
+        "vector_store", ["store_someemb", "vectorize_store"]
+    )
     async def test_astradb_vectorstore_crud_async(
-        self, store_someemb: AstraDBVectorStore
+        self, vector_store, request 
     ) -> None:
         """Basic add/delete/update behaviour."""
-        res0 = await store_someemb.asimilarity_search("Abc", k=2)
+        vstore = request.getfixturevalue(vector_store)
+
+        res0 = await vstore.asimilarity_search("Abc", k=2)
         assert res0 == []
         # write and check again
-        await store_someemb.aadd_texts(
+        await vstore.aadd_texts(
             texts=["aa", "bb", "cc"],
             metadatas=[
                 {"k": "a", "ord": 0},
@@ -456,10 +600,10 @@ class TestAstraDBVectorStore:
             ],
             ids=["a", "b", "c"],
         )
-        res1 = await store_someemb.asimilarity_search("Abc", k=5)
+        res1 = await vstore.asimilarity_search("Abc", k=5)
         assert {doc.page_content for doc in res1} == {"aa", "bb", "cc"}
         # partial overwrite and count total entries
-        await store_someemb.aadd_texts(
+        await vstore.aadd_texts(
             texts=["cc", "dd"],
             metadatas=[
                 {"k": "c_new", "ord": 102},
@@ -467,10 +611,10 @@ class TestAstraDBVectorStore:
             ],
             ids=["c", "d"],
         )
-        res2 = await store_someemb.asimilarity_search("Abc", k=10)
+        res2 = await vstore.asimilarity_search("Abc", k=10)
         assert len(res2) == 4
         # pick one that was just updated and check its metadata
-        res3 = await store_someemb.asimilarity_search_with_score_id(
+        res3 = await vstore.asimilarity_search_with_score_id(
             query="cc", k=1, filter={"k": "c_new"}
         )
         doc3, score3, id3 = res3[0]
@@ -479,24 +623,24 @@ class TestAstraDBVectorStore:
         assert score3 > 0.999  # leaving some leeway for approximations...
         assert id3 == "c"
         # delete and count again
-        del1_res = await store_someemb.adelete(["b"])
+        del1_res = await vstore.adelete(["b"])
         assert del1_res is True
-        del2_res = await store_someemb.adelete(["a", "c", "Z!"])
+        del2_res = await vstore.adelete(["a", "c", "Z!"])
         assert del2_res is False  # a non-existing ID was supplied
-        assert len(await store_someemb.asimilarity_search("xy", k=10)) == 1
+        assert len(await vstore.asimilarity_search("xy", k=10)) == 1
         # clear store
-        await store_someemb.aclear()
-        assert await store_someemb.asimilarity_search("Abc", k=2) == []
+        await vstore.aclear()
+        assert await vstore.asimilarity_search("Abc", k=2) == []
         # add_documents with "ids" arg passthrough
-        await store_someemb.aadd_documents(
+        await vstore.aadd_documents(
             [
                 Document(page_content="vv", metadata={"k": "v", "ord": 204}),
                 Document(page_content="ww", metadata={"k": "w", "ord": 205}),
             ],
             ids=["v", "w"],
         )
-        assert len(await store_someemb.asimilarity_search("xy", k=10)) == 2
-        res4 = await store_someemb.asimilarity_search("ww", k=1, filter={"k": "w"})
+        assert len(await vstore.asimilarity_search("xy", k=10)) == 2
+        res4 = await vstore.asimilarity_search("ww", k=1, filter={"k": "w"})
         assert res4[0].metadata["ord"] == 205
 
     def test_astradb_vectorstore_mmr(self, store_parseremb: AstraDBVectorStore) -> None:
@@ -552,11 +696,29 @@ class TestAstraDBVectorStore:
         res_i_vals = {doc.metadata["i"] for doc in res1}
         assert res_i_vals == {0, 4}
 
+    def test_astradb_vectorstore_mmr_vectorize_unsupported(
+        self, vectorize_store: AstraDBVectorStore
+    ) -> None:
+        """
+        MMR testing with vectorize, currently unsupported.
+        """
+        with pytest.raises(ValueError):
+            vectorize_store.max_marginal_relevance_search("aa", k=2, fetch_k=3)
+
+    def test_astradb_vectorstore_mmr_vectorize_unsupported_async(
+        self, vectorize_store: AstraDBVectorStore
+    ) -> None:
+        """
+        MMR async testing with vectorize, currently unsupported.
+        """
+        with pytest.raises(ValueError):
+            vectorize_store.amax_marginal_relevance_search("aa", k=2, fetch_k=3)
+
     def test_astradb_vectorstore_metadata(
-        self, store_someemb: AstraDBVectorStore
+        self, vstore: AstraDBVectorStore
     ) -> None:
         """Metadata filtering."""
-        store_someemb.add_documents(
+        vstore.add_documents(
             [
                 Document(
                     page_content="q",
@@ -585,31 +747,31 @@ class TestAstraDBVectorStore:
             ]
         )
         # no filters
-        res0 = store_someemb.similarity_search("x", k=10)
+        res0 = vstore.similarity_search("x", k=10)
         assert {doc.page_content for doc in res0} == set("qwreio")
         # single filter
-        res1 = store_someemb.similarity_search(
+        res1 = vstore.similarity_search(
             "x",
             k=10,
             filter={"group": "vowel"},
         )
         assert {doc.page_content for doc in res1} == set("eio")
         # multiple filters
-        res2 = store_someemb.similarity_search(
+        res2 = vstore.similarity_search(
             "x",
             k=10,
             filter={"group": "consonant", "ord": ord("q")},
         )
         assert {doc.page_content for doc in res2} == set("q")
         # excessive filters
-        res3 = store_someemb.similarity_search(
+        res3 = vstore.similarity_search(
             "x",
             k=10,
             filter={"group": "consonant", "ord": ord("q"), "case": "upper"},
         )
         assert res3 == []
         # filter with logical operator
-        res4 = store_someemb.similarity_search(
+        res4 = vstore.similarity_search(
             "x",
             k=10,
             filter={"$or": [{"ord": ord("q")}, {"ord": ord("r")}]},
@@ -655,7 +817,7 @@ class TestAstraDBVectorStore:
         assert abs(1 - sco_near) < MATCH_EPSILON and abs(sco_far) < MATCH_EPSILON
 
     def test_astradb_vectorstore_massive_delete(
-        self, store_someemb: AstraDBVectorStore
+        self, vstore: AstraDBVectorStore
     ) -> None:
         """Larger-scale bulk deletes."""
         M = 50
@@ -663,15 +825,15 @@ class TestAstraDBVectorStore:
         ids0 = ["doc_%i" % i for i in range(M)]
         ids1 = ["doc_%i" % (i + M) for i in range(M)]
         ids = ids0 + ids1
-        store_someemb.add_texts(texts=texts, ids=ids)
+        vstore.add_texts(texts=texts, ids=ids)
         # deleting a bunch of these
-        del_res0 = store_someemb.delete(ids0)
+        del_res0 = vstore.delete(ids0)
         assert del_res0 is True
         # deleting the rest plus a fake one
-        del_res1 = store_someemb.delete(ids1 + ["ghost!"])
+        del_res1 = vstore.delete(ids1 + ["ghost!"])
         assert del_res1 is True  # ensure no error
         # nothing left
-        assert store_someemb.similarity_search("x", k=2 * M) == []
+        assert vstore.similarity_search("x", k=2 * M) == []
 
     @pytest.mark.skipif(
         SKIP_COLLECTION_DELETE,
