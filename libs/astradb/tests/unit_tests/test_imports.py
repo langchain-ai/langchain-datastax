@@ -8,7 +8,7 @@ EXPECTED_ALL = [
     "AstraDBChatMessageHistory",
     "AstraDBLoader",
     "AstraDBVectorStore",
-    "CollectionVectorServiceOptions"
+    "CollectionVectorServiceOptions",
 ]
 
 

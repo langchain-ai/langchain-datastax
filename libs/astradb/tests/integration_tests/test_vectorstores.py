@@ -517,9 +517,7 @@ class TestAstraDBVectorStore:
             else:
                 await v_store_4.aclear()
 
-    @pytest.mark.parametrize(
-        "vector_store", ["store_someemb", "vectorize_store"]
-    )
+    @pytest.mark.parametrize("vector_store", ["store_someemb", "vectorize_store"])
     def test_astradb_vectorstore_crud(self, vector_store, request) -> None:
         """Basic add/delete/update behaviour."""
         vstore: AstraDBVectorStore = request.getfixturevalue(vector_store)
@@ -578,12 +576,8 @@ class TestAstraDBVectorStore:
         res4 = vstore.similarity_search("ww", k=1, filter={"k": "w"})
         assert res4[0].metadata["ord"] == 205
 
-    @pytest.mark.parametrize(
-        "vector_store", ["store_someemb", "vectorize_store"]
-    )
-    async def test_astradb_vectorstore_crud_async(
-        self, vector_store, request 
-    ) -> None:
+    @pytest.mark.parametrize("vector_store", ["store_someemb", "vectorize_store"])
+    async def test_astradb_vectorstore_crud_async(self, vector_store, request) -> None:
         """Basic add/delete/update behaviour."""
         vstore = request.getfixturevalue(vector_store)
 

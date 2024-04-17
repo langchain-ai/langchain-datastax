@@ -26,7 +26,6 @@ from astrapy.db import (
     AsyncAstraDB as AsyncAstraDBClient,
 )
 from astrapy.info import CollectionVectorServiceOptions
-
 from langchain_core.documents import Document
 from langchain_core.embeddings import Embeddings
 from langchain_core.runnables.utils import gather_with_concurrency
@@ -182,8 +181,8 @@ class AstraDBVectorStore(VectorStore):
         Args:
             embedding: the embeddings function or service to use.
                 This enables client-side embedding functions or calls to external
-                embedding providers. Only one of `embedding` or `collection_vector_service_options`
-                can be provided.
+                embedding providers. Only one of `embedding` or 
+                `collection_vector_service_options` can be provided.
             collection_name: name of the Astra DB collection to create/use.
             token: API token for Astra DB usage.
             api_endpoint: full URL to the API endpoint, such as
@@ -217,9 +216,10 @@ class AstraDBVectorStore(VectorStore):
                 This dict must conform to to the API specifications
                 (see docs.datastax.com/en/astra/astra-db-vector/api-reference/
                 data-api-commands.html#advanced-feature-indexing-clause-on-createcollection)
-            collection_vector_service_options: specifies the use of server-side embeddings
-                within Astra DB. Only one of `embedding` or `collection_vector_service_options`
-                can be provided. NOTE: this feature is currently in beta.
+            collection_vector_service_options: specifies the use of server-side 
+                embeddings within Astra DB. Only one of `embedding` or 
+                `collection_vector_service_options` can be provided. 
+                NOTE: this feature is currently in beta.
 
         Note:
             For concurrency in synchronous :meth:`~add_texts`:, as a rule of thumb, on a
@@ -242,12 +242,14 @@ class AstraDBVectorStore(VectorStore):
         # as both specify how to produce embeddings
         if embedding is None and collection_vector_service_options is None:
             raise ValueError(
-                "Either an `embedding` or a `collection_vector_service_options` must be provided."
+                "Either an `embedding` or a `collection_vector_service_options`\
+                    must be provided."
             )
 
         if embedding is not None and collection_vector_service_options is not None:
             raise ValueError(
-                "Only one of `embedding` or `collection_vector_service_options` can be provided."
+                "Only one of `embedding` or `collection_vector_service_options`\
+                    can be provided."
             )
 
         self.embedding_dimension: Optional[int] = None
@@ -277,7 +279,7 @@ class AstraDBVectorStore(VectorStore):
                 embedding_dimension = self._aget_embedding_dimension()
             elif setup_mode == SetupMode.SYNC or setup_mode == SetupMode.OFF:
                 embedding_dimension = self._get_embedding_dimension()
-    
+
         # indexing policy setting
         self.indexing_policy: Dict[str, Any] = self._normalize_metadata_indexing_policy(
             metadata_indexing_include=metadata_indexing_include,
@@ -323,7 +325,8 @@ class AstraDBVectorStore(VectorStore):
     def embeddings(self) -> Embeddings:
         if self.collection_vector_service_options is not None:
             raise ValueError(
-                "Server-side embeddings are in use, no client-side embeddings available."
+                "Server-side embeddings are in use, no client-side embeddings\
+                    available."
             )
 
         return self.embedding
@@ -1488,13 +1491,13 @@ class AstraDBVectorStore(VectorStore):
             texts: the texts to insert.
             embedding: the embedding function to use in the store.
                 This enables client-side embedding functions or calls to external
-                embedding providers. Only one of `embedding` or `collection_vector_service_options`
-                can be provided.
+                embedding providers. Only one of `embedding` or
+                `collection_vector_service_options` can be provided.
             metadatas: metadata dicts for the texts.
             ids: ids to associate to the texts.
-            collection_vector_service_options: specifies the use of server-side embeddings
-                within Astra DB. Only one of `embedding` or `collection_vector_service_options`
-                can be provided.
+            collection_vector_service_options: specifies the use of server-side
+                embeddings within Astra DB. Only one of `embedding` or
+                `collection_vector_service_options` can be provided.
             **kwargs: you can pass any argument that you would
                 to :meth:`~add_texts` and/or to the 'AstraDBVectorStore' constructor
                 (see these methods for details). These arguments will be
@@ -1537,9 +1540,9 @@ class AstraDBVectorStore(VectorStore):
             embedding: the embedding function to use in the store.
             metadatas: metadata dicts for the texts.
             ids: ids to associate to the texts.
-            collection_vector_service_options: specifies the use of server-side embeddings
-                within Astra DB. Only one of `embedding` or `collection_vector_service_options`
-                can be provided.
+            collection_vector_service_options: specifies the use of server-side
+                embeddings within Astra DB. Only one of `embedding` or 
+                `collection_vector_service_options` can be provided.
             **kwargs: you can pass any argument that you would
                 to :meth:`~add_texts` and/or to the 'AstraDBVectorStore' constructor
                 (see these methods for details). These arguments will be
