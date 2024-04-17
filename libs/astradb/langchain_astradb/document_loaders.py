@@ -10,7 +10,6 @@ from typing import (
     Iterator,
     List,
     Optional,
-    Union,
 )
 
 from astrapy.db import AstraDB, AsyncAstraDB
@@ -38,7 +37,7 @@ class AstraDBLoader(BaseLoader):
         async_astra_db_client: Optional[AsyncAstraDB] = None,
         namespace: Optional[str] = None,
         filter_criteria: Optional[Dict[str, Any]] = None,
-        projection: Union[object, Optional[Dict[str, Any]]] = _NOT_SET,
+        projection: Optional[Dict[str, Any]] = _NOT_SET,  # type: ignore[assignment]
         find_options: Optional[Dict[str, Any]] = None,
         nb_prefetched: int = 1000,
         page_content_mapper: Callable[[Dict], str] = json.dumps,
@@ -58,7 +57,8 @@ class AstraDBLoader(BaseLoader):
             namespace: namespace (aka keyspace) where the
                 collection is. Defaults to the database's "default namespace".
             filter_criteria: Criteria to filter documents.
-            projection: Specifies the fields to return.
+            projection: Specifies the fields to return. If not provided, reads
+                fall back to the Data API default projection.
             find_options: Additional options for the query.
             nb_prefetched: Max number of documents to pre-fetch. Defaults to 1000.
             page_content_mapper: Function applied to collection documents to create
@@ -76,7 +76,7 @@ class AstraDBLoader(BaseLoader):
         self.astra_db_env = astra_db_env
         self.filter = filter_criteria
         self._projection: Optional[Dict[str, Any]] = (
-            projection if projection is not _NOT_SET else {"*": True}  # type: ignore[assignment]
+            projection if projection is not _NOT_SET else {"*": True}
         )
         self.find_options = find_options or {}
         self.nb_prefetched = nb_prefetched
