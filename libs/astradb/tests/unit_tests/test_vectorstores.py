@@ -2,13 +2,13 @@ from typing import List
 from unittest.mock import Mock
 
 import pytest
+from astrapy.info import CollectionVectorServiceOptions
 from langchain_core.embeddings import Embeddings
 
 from langchain_astradb.vectorstores import (
     DEFAULT_INDEXING_OPTIONS,
     AstraDBVectorStore,
 )
-from astrapy.info import CollectionVectorServiceOptions
 
 
 class SomeEmbeddings(Embeddings):
@@ -51,7 +51,9 @@ class TestAstraDB:
         )
 
         # Test with server-side embeddings
-        vector_options = CollectionVectorServiceOptions(provider="test", model_name="test")
+        vector_options = CollectionVectorServiceOptions(
+            provider="test", model_name="test"
+        )
         AstraDBVectorStore(
             collection_name="mock_coll_name",
             astra_db_client=mock_astra_db,

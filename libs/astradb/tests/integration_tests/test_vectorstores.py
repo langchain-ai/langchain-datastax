@@ -123,7 +123,9 @@ def _has_env_vars() -> bool:
 
 
 @pytest.fixture(scope="session")
-@pytest.mark.skipif(is_vector_service_available(), reason="only run vectorize-specific tests in dev")
+@pytest.mark.skipif(
+    is_vector_service_available(), reason="only run vectorize-specific tests in dev"
+)
 def astradb_credentials() -> Iterable[AstraDBCredentials]:
     yield {
         "token": os.environ["ASTRA_DB_APPLICATION_TOKEN"],
@@ -133,7 +135,9 @@ def astradb_credentials() -> Iterable[AstraDBCredentials]:
 
 
 @pytest.fixture(scope="function")
-@pytest.mark.skipif(is_vector_service_available(), reason="only run vectorize-specific tests in dev")
+@pytest.mark.skipif(
+    is_vector_service_available(), reason="only run vectorize-specific tests in dev"
+)
 def store_someemb(
     astradb_credentials: AstraDBCredentials,
 ) -> Iterable[AstraDBVectorStore]:
@@ -154,7 +158,9 @@ def store_someemb(
 
 
 @pytest.fixture(scope="function")
-@pytest.mark.skipif(is_vector_service_available(), reason="only run vectorize-specific tests in dev")
+@pytest.mark.skipif(
+    is_vector_service_available(), reason="only run vectorize-specific tests in dev"
+)
 def store_parseremb(
     astradb_credentials: AstraDBCredentials,
 ) -> Iterable[AstraDBVectorStore]:
