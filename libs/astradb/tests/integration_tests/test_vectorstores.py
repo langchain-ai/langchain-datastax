@@ -38,6 +38,16 @@ COLLECTION_NAME_VECTORIZE = "lc_test_vectorize"
 
 MATCH_EPSILON = 0.0001
 
+
+def is_vector_service_available() -> bool:
+    return all(
+        [
+            "us-west-2" in os.environ.get("ASTRA_DB_API_ENDPOINT", ""),
+            "astra-dev.datastax.com" in os.environ.get("ASTRA_DB_API_ENDPOINT", ""),
+        ]
+    )
+
+
 # Ad-hoc embedding classes:
 
 
@@ -113,6 +123,7 @@ def _has_env_vars() -> bool:
 
 
 @pytest.fixture(scope="session")
+@pytest.mark.skipif(is_vector_service_available(), reason="only run vectorize-specific tests in dev")
 def astradb_credentials() -> Iterable[AstraDBCredentials]:
     yield {
         "token": os.environ["ASTRA_DB_APPLICATION_TOKEN"],
@@ -122,6 +133,7 @@ def astradb_credentials() -> Iterable[AstraDBCredentials]:
 
 
 @pytest.fixture(scope="function")
+@pytest.mark.skipif(is_vector_service_available(), reason="only run vectorize-specific tests in dev")
 def store_someemb(
     astradb_credentials: AstraDBCredentials,
 ) -> Iterable[AstraDBVectorStore]:
@@ -142,6 +154,7 @@ def store_someemb(
 
 
 @pytest.fixture(scope="function")
+@pytest.mark.skipif(is_vector_service_available(), reason="only run vectorize-specific tests in dev")
 def store_parseremb(
     astradb_credentials: AstraDBCredentials,
 ) -> Iterable[AstraDBVectorStore]:
@@ -162,6 +175,7 @@ def store_parseremb(
 
 
 @pytest.fixture(scope="function")
+@pytest.mark.skipif(not is_vector_service_available(), reason="vectorize unavailable")
 def vectorize_store(
     astradb_credentials: AstraDBCredentials,
 ) -> Iterable[AstraDBVectorStore]:
@@ -173,7 +187,7 @@ def vectorize_store(
     )
     v_store = AstraDBVectorStore(
         collection_vector_service_options=options,
-        collection_name=COLLECTION_NAME_DIM2,
+        collection_name=COLLECTION_NAME_VECTORIZE,
         **astradb_credentials,
     )
     v_store.clear()
@@ -229,9 +243,10 @@ class TestAstraDBVectorStore:
         v_store_3 = AstraDBVectorStore(
             collection_vector_service_options=options,
             collection_name=COLLECTION_NAME_VECTORIZE,
-            **astradb_credentials,
+            astra_db_client=astra_db_client,
         )
-        v_store_3.add_texts("Sample 3")
+        # Note -- the NeMo model currently fails to embed a space(s)
+        v_store_3.add_texts(["Sample 3"])
         if not SKIP_COLLECTION_DELETE:
             v_store_3.delete_collection()
         else:
@@ -517,7 +532,8 @@ class TestAstraDBVectorStore:
             else:
                 await v_store_4.aclear()
 
-    @pytest.mark.parametrize("vector_store", ["store_someemb", "vectorize_store"])
+    # @pytest.mark.parametrize("vector_store", ["store_someemb", "vectorize_store"])
+    @pytest.mark.parametrize("vector_store", ["vectorize_store"])
     def test_astradb_vectorstore_crud(
         self, vector_store: str, request: pytest.FixtureRequest
     ) -> None:
@@ -712,11 +728,13 @@ class TestAstraDBVectorStore:
         with pytest.raises(ValueError):
             await vectorize_store.amax_marginal_relevance_search("aa", k=2, fetch_k=3)
 
+    @pytest.mark.parametrize("vector_store", ["store_someemb", "vectorize_store"])
     def test_astradb_vectorstore_metadata(
-        self, store_someemb: AstraDBVectorStore
+        self, vector_store: str, request: pytest.FixtureRequest
     ) -> None:
         """Metadata filtering."""
-        store_someemb.add_documents(
+        vstore = request.getfixturevalue(vector_store)
+        vstore.add_documents(
             [
                 Document(
                     page_content="q",
@@ -745,49 +763,51 @@ class TestAstraDBVectorStore:
             ]
         )
         # no filters
-        res0 = store_someemb.similarity_search("x", k=10)
+        res0 = vstore.similarity_search("x", k=10)
         assert {doc.page_content for doc in res0} == set("qwreio")
         # single filter
-        res1 = store_someemb.similarity_search(
+        res1 = vstore.similarity_search(
             "x",
             k=10,
             filter={"group": "vowel"},
         )
         assert {doc.page_content for doc in res1} == set("eio")
         # multiple filters
-        res2 = store_someemb.similarity_search(
+        res2 = vstore.similarity_search(
             "x",
             k=10,
             filter={"group": "consonant", "ord": ord("q")},
         )
         assert {doc.page_content for doc in res2} == set("q")
         # excessive filters
-        res3 = store_someemb.similarity_search(
+        res3 = vstore.similarity_search(
             "x",
             k=10,
             filter={"group": "consonant", "ord": ord("q"), "case": "upper"},
         )
         assert res3 == []
         # filter with logical operator
-        res4 = store_someemb.similarity_search(
+        res4 = vstore.similarity_search(
             "x",
             k=10,
             filter={"$or": [{"ord": ord("q")}, {"ord": ord("r")}]},
         )
         assert {doc.page_content for doc in res4} == {"q", "r"}
 
+    @pytest.mark.parametrize("vector_store", ["store_someemb", "vectorize_store"])
     def test_astradb_vectorstore_similarity_scale(
-        self, store_parseremb: AstraDBVectorStore
+        self, vector_store: str, request: pytest.FixtureRequest
     ) -> None:
         """Scale of the similarity scores."""
-        store_parseremb.add_texts(
+        vstore: AstraDBVectorStore = request.getfixturevalue(vector_store)
+        vstore.add_texts(
             texts=[
                 json.dumps([1, 1]),
                 json.dumps([-1, -1]),
             ],
             ids=["near", "far"],
         )
-        res1 = store_parseremb.similarity_search_with_score(
+        res1 = vstore.similarity_search_with_score(
             json.dumps([0.5, 0.5]),
             k=2,
         )
@@ -795,18 +815,20 @@ class TestAstraDBVectorStore:
         sco_near, sco_far = scores
         assert abs(1 - sco_near) < MATCH_EPSILON and abs(sco_far) < MATCH_EPSILON
 
+    @pytest.mark.parametrize("vector_store", ["store_someemb", "vectorize_store"])
     async def test_astradb_vectorstore_similarity_scale_async(
-        self, store_parseremb: AstraDBVectorStore
+        self, vector_store: str, request: pytest.FixtureRequest
     ) -> None:
         """Scale of the similarity scores."""
-        await store_parseremb.aadd_texts(
+        vstore: AstraDBVectorStore = request.getfixturevalue(vector_store)
+        await vstore.aadd_texts(
             texts=[
                 json.dumps([1, 1]),
                 json.dumps([-1, -1]),
             ],
             ids=["near", "far"],
         )
-        res1 = await store_parseremb.asimilarity_search_with_score(
+        res1 = await vstore.asimilarity_search_with_score(
             json.dumps([0.5, 0.5]),
             k=2,
         )
@@ -814,24 +836,26 @@ class TestAstraDBVectorStore:
         sco_near, sco_far = scores
         assert abs(1 - sco_near) < MATCH_EPSILON and abs(sco_far) < MATCH_EPSILON
 
+    @pytest.mark.parametrize("vector_store", ["store_someemb", "vectorize_store"])
     def test_astradb_vectorstore_massive_delete(
-        self, store_someemb: AstraDBVectorStore
+        self, vector_store: str, request: pytest.FixtureRequest
     ) -> None:
         """Larger-scale bulk deletes."""
+        vstore = request.getfixturevalue(vector_store)
         M = 50
         texts = [str(i + 1 / 7.0) for i in range(2 * M)]
         ids0 = ["doc_%i" % i for i in range(M)]
         ids1 = ["doc_%i" % (i + M) for i in range(M)]
         ids = ids0 + ids1
-        store_someemb.add_texts(texts=texts, ids=ids)
+        vstore.add_texts(texts=texts, ids=ids)
         # deleting a bunch of these
-        del_res0 = store_someemb.delete(ids0)
+        del_res0 = vstore.delete(ids0)
         assert del_res0 is True
         # deleting the rest plus a fake one
-        del_res1 = store_someemb.delete(ids1 + ["ghost!"])
+        del_res1 = vstore.delete(ids1 + ["ghost!"])
         assert del_res1 is True  # ensure no error
         # nothing left
-        assert store_someemb.similarity_search("x", k=2 * M) == []
+        assert vstore.similarity_search("x", k=2 * M) == []
 
     @pytest.mark.skipif(
         SKIP_COLLECTION_DELETE,
