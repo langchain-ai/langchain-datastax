@@ -10,6 +10,7 @@ from langchain_astradb.vectorstores import (
     AstraDBVectorStore,
 )
 
+
 class SomeEmbeddings(Embeddings):
     """
     Turn a sentence into an embedding vector in some way.
