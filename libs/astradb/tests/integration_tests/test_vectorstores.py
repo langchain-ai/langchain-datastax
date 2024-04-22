@@ -123,9 +123,6 @@ def _has_env_vars() -> bool:
 
 
 @pytest.fixture(scope="session")
-@pytest.mark.skipif(
-    is_vector_service_available(), reason="only run vectorize-specific tests in dev"
-)
 def astradb_credentials() -> Iterable[AstraDBCredentials]:
     yield {
         "token": os.environ["ASTRA_DB_APPLICATION_TOKEN"],
@@ -135,9 +132,6 @@ def astradb_credentials() -> Iterable[AstraDBCredentials]:
 
 
 @pytest.fixture(scope="function")
-@pytest.mark.skipif(
-    is_vector_service_available(), reason="only run vectorize-specific tests in dev"
-)
 def store_someemb(
     astradb_credentials: AstraDBCredentials,
 ) -> Iterable[AstraDBVectorStore]:
@@ -158,9 +152,6 @@ def store_someemb(
 
 
 @pytest.fixture(scope="function")
-@pytest.mark.skipif(
-    is_vector_service_available(), reason="only run vectorize-specific tests in dev"
-)
 def store_parseremb(
     astradb_credentials: AstraDBCredentials,
 ) -> Iterable[AstraDBVectorStore]:
@@ -538,8 +529,7 @@ class TestAstraDBVectorStore:
             else:
                 await v_store_4.aclear()
 
-    # @pytest.mark.parametrize("vector_store", ["store_someemb", "vectorize_store"])
-    @pytest.mark.parametrize("vector_store", ["vectorize_store"])
+    @pytest.mark.parametrize("vector_store", ["store_someemb", "vectorize_store"])
     def test_astradb_vectorstore_crud(
         self, vector_store: str, request: pytest.FixtureRequest
     ) -> None:
@@ -739,7 +729,7 @@ class TestAstraDBVectorStore:
         self, vector_store: str, request: pytest.FixtureRequest
     ) -> None:
         """Metadata filtering."""
-        vstore = request.getfixturevalue(vector_store)
+        vstore: AstraDBVectorStore = request.getfixturevalue(vector_store)
         vstore.add_documents(
             [
                 Document(
@@ -847,7 +837,7 @@ class TestAstraDBVectorStore:
         self, vector_store: str, request: pytest.FixtureRequest
     ) -> None:
         """Larger-scale bulk deletes."""
-        vstore = request.getfixturevalue(vector_store)
+        vstore: AstraDBVectorStore = request.getfixturevalue(vector_store)
         M = 50
         texts = [str(i + 1 / 7.0) for i in range(2 * M)]
         ids0 = ["doc_%i" % i for i in range(M)]

@@ -336,7 +336,7 @@ class AstraDBVectorStore(VectorStore):
 
     def _using_vectorize(self) -> bool:
         """Indicates whether server-side embeddings are being used."""
-        return self._using_vectorize()
+        return self.collection_vector_service_options is not None
 
     def _select_relevance_score_fn(self) -> Callable[[float], float]:
         """
