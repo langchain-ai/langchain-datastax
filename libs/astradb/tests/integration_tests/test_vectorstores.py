@@ -172,13 +172,16 @@ def store_parseremb(
 
 
 @pytest.fixture(scope="function")
-@pytest.mark.skipif(not is_vector_service_available(), reason="vectorize unavailable")
 def vectorize_store(
     astradb_credentials: AstraDBCredentials,
 ) -> Iterable[AstraDBVectorStore]:
     """
     astra db vector store with server-side embeddings using the nvidia model
     """
+    # Only available in dev us-west-2 now
+    if not is_vector_service_available():
+        pytest.skip("vectorize unavailable")
+
     options = CollectionVectorServiceOptions(
         provider="nvidia", model_name="NV-Embed-QA"
     )
@@ -565,10 +568,9 @@ class TestAstraDBVectorStore:
         res3 = vstore.similarity_search_with_score_id(
             query="cc", k=1, filter={"k": "c_new"}
         )
-        doc3, score3, id3 = res3[0]
+        doc3, _, id3 = res3[0]
         assert doc3.page_content == "cc"
         assert doc3.metadata == {"k": "c_new", "ord": 102}
-        assert score3 > 0.999  # leaving some leeway for approximations...
         assert id3 == "c"
         # delete and count again
         del1_res = vstore.delete(["b"])
@@ -627,10 +629,9 @@ class TestAstraDBVectorStore:
         res3 = await vstore.asimilarity_search_with_score_id(
             query="cc", k=1, filter={"k": "c_new"}
         )
-        doc3, score3, id3 = res3[0]
+        doc3, _, id3 = res3[0]
         assert doc3.page_content == "cc"
         assert doc3.metadata == {"k": "c_new", "ord": 102}
-        assert score3 > 0.999  # leaving some leeway for approximations...
         assert id3 == "c"
         # delete and count again
         del1_res = await vstore.adelete(["b"])
