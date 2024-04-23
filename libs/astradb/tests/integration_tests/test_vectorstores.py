@@ -236,21 +236,26 @@ class TestAstraDBVectorStore:
         else:
             v_store_2.clear()
 
-        # Creation with vectorize option
+    @pytest.mark.skipif(
+        not is_vector_service_available(), reason="vectorize unavailable"
+    )
+    def test_astradb_vectorstore_create_delete_vectorize(
+        self, astradb_credentials: AstraDBCredentials
+    ) -> None:
+        """Create and delete with vectorize option."""
         options = CollectionVectorServiceOptions(
             provider="nvidia", model_name="NV-Embed-QA"
         )
-        v_store_3 = AstraDBVectorStore(
+        v_store = AstraDBVectorStore(
             collection_vector_service_options=options,
             collection_name=COLLECTION_NAME_VECTORIZE,
-            astra_db_client=astra_db_client,
+            **astradb_credentials,
         )
-        # Note -- the NeMo model currently fails to embed a space(s)
-        v_store_3.add_texts(["Sample 3"])
+        v_store.add_texts(["Sample 1"])
         if not SKIP_COLLECTION_DELETE:
-            v_store_3.delete_collection()
+            v_store.delete_collection()
         else:
-            v_store_3.clear()
+            v_store.clear()
 
     async def test_astradb_vectorstore_create_delete_async(
         self, astradb_credentials: AstraDBCredentials
@@ -279,19 +284,25 @@ class TestAstraDBVectorStore:
         else:
             await v_store_2.aclear()
 
-        # Creation with vectorize option
+    @pytest.mark.skipif(
+        not is_vector_service_available(), reason="vectorize unavailable"
+    )
+    async def test_astradb_vectorstore_create_delete_vectorize_async(
+        self, astradb_credentials: AstraDBCredentials
+    ) -> None:
+        """Create and delete with vectorize option."""
         options = CollectionVectorServiceOptions(
             provider="nvidia", model_name="NV-Embed-QA"
         )
-        v_store_3 = AstraDBVectorStore(
+        v_store = AstraDBVectorStore(
             collection_vector_service_options=options,
-            collection_name="lc_test_3_async",
+            collection_name=COLLECTION_NAME_VECTORIZE,
             **astradb_credentials,
         )
         if not SKIP_COLLECTION_DELETE:
-            await v_store_3.adelete_collection()
+            await v_store.adelete_collection()
         else:
-            await v_store_3.aclear()
+            await v_store.aclear()
 
     @pytest.mark.skipif(
         SKIP_COLLECTION_DELETE,
@@ -410,41 +421,55 @@ class TestAstraDBVectorStore:
             else:
                 v_store_2.clear()
 
-        # from_texts with vectorize
+    @pytest.mark.skipif(
+        not is_vector_service_available(), reason="vectorize unavailable"
+    )
+    def test_astradb_vectorstore_from_x_vectorize(
+        self, astradb_credentials: AstraDBCredentials
+    ) -> None:
+        """from_texts and from_documents methods with vectorize."""
         options = CollectionVectorServiceOptions(
             provider="nvidia", model_name="NV-Embed-QA"
         )
-        v_store_3 = AstraDBVectorStore.from_texts(
-            texts=["Haa", "Huu"],
+
+        AstraDBVectorStore(
+            collection_vector_service_options=options,
+            collection_name=COLLECTION_NAME_VECTORIZE,
+            **astradb_credentials,
+        ).clear()
+
+        # from_texts
+        v_store = AstraDBVectorStore.from_texts(
+            texts=["Hi", "Ho"],
             collection_vector_service_options=options,
             collection_name=COLLECTION_NAME_VECTORIZE,
             **astradb_credentials,
         )
         try:
-            assert v_store_3.similarity_search("Haa", k=1)[0].page_content == "Haa"
+            assert v_store.similarity_search("Ho", k=1)[0].page_content == "Ho"
         finally:
             if not SKIP_COLLECTION_DELETE:
-                v_store_3.delete_collection()
+                v_store.delete_collection()
             else:
-                v_store_3.clear()
+                v_store.clear()
 
-        # from_documents with vectorize
-        v_store_4 = AstraDBVectorStore.from_documents(
+        # from_documents
+        v_store_2 = AstraDBVectorStore.from_documents(
             [
-                Document(page_content="HeeH"),
-                Document(page_content="HooH"),
+                Document(page_content="Hee"),
+                Document(page_content="Hoi"),
             ],
             collection_vector_service_options=options,
             collection_name=COLLECTION_NAME_VECTORIZE,
             **astradb_credentials,
         )
         try:
-            assert v_store_4.similarity_search("HeeH", k=1)[0].page_content == "HeeH"
+            assert v_store_2.similarity_search("Hoi", k=1)[0].page_content == "Hoi"
         finally:
             if not SKIP_COLLECTION_DELETE:
-                v_store_4.delete_collection()
+                v_store_2.delete_collection()
             else:
-                v_store_4.clear()
+                v_store_2.clear()
 
     async def test_astradb_vectorstore_from_x_async(
         self, astradb_credentials: AstraDBCredentials
@@ -492,28 +517,33 @@ class TestAstraDBVectorStore:
             else:
                 await v_store_2.aclear()
 
+    pytest.mark.skipif(not is_vector_service_available(), reason="vectorize unavailable")
+    async def test_astradb_vectorstore_from_x_async_vectorize(
+        self, astradb_credentials: AstraDBCredentials
+    ) -> None:
+        """from_texts and from_documents methods with vectorize."""
         # from_text with vectorize
         options = CollectionVectorServiceOptions(
             provider="nvidia", model_name="NV-Embed-QA"
         )
-        v_store_3 = await AstraDBVectorStore.afrom_texts(
+        v_store = await AstraDBVectorStore.afrom_texts(
             texts=["Haa", "Huu"],
             collection_vector_service_options=options,
             collection_name=COLLECTION_NAME_VECTORIZE,
             **astradb_credentials,
         )
         try:
-            assert (await v_store_3.asimilarity_search("Haa", k=1))[
+            assert (await v_store.asimilarity_search("Haa", k=1))[
                 0
             ].page_content == "Haa"
         finally:
             if not SKIP_COLLECTION_DELETE:
-                await v_store_3.adelete_collection()
+                await v_store.adelete_collection()
             else:
-                await v_store_3.aclear()
+                await v_store.aclear()
 
         # from_documents with vectorize
-        v_store_4 = await AstraDBVectorStore.afrom_documents(
+        v_store_2 = await AstraDBVectorStore.afrom_documents(
             [
                 Document(page_content="HeeH"),
                 Document(page_content="HooH"),
@@ -523,14 +553,14 @@ class TestAstraDBVectorStore:
             **astradb_credentials,
         )
         try:
-            assert (await v_store_4.asimilarity_search("HeeH", k=1))[
+            assert (await v_store_2.asimilarity_search("HeeH", k=1))[
                 0
             ].page_content == "HeeH"
         finally:
             if not SKIP_COLLECTION_DELETE:
-                await v_store_4.adelete_collection()
+                await v_store_2.adelete_collection()
             else:
-                await v_store_4.aclear()
+                await v_store_2.aclear()
 
     @pytest.mark.parametrize("vector_store", ["store_someemb", "vectorize_store"])
     def test_astradb_vectorstore_crud(
