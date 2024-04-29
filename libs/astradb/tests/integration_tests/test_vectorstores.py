@@ -250,10 +250,7 @@ class TestAstraDBVectorStore:
             **astradb_credentials,
         )
         v_store.add_texts(["Sample 1"])
-        if not SKIP_COLLECTION_DELETE:
-            v_store.delete_collection()
-        else:
-            v_store.clear()
+        v_store.delete_collection()
 
     async def test_astradb_vectorstore_create_delete_async(
         self, astradb_credentials: AstraDBCredentials
@@ -297,10 +294,7 @@ class TestAstraDBVectorStore:
             collection_name=COLLECTION_NAME_VECTORIZE,
             **astradb_credentials,
         )
-        if not SKIP_COLLECTION_DELETE:
-            await v_store.adelete_collection()
-        else:
-            await v_store.aclear()
+        await v_store.adelete_collection()
 
     @pytest.mark.skipif(
         SKIP_COLLECTION_DELETE,
@@ -446,10 +440,7 @@ class TestAstraDBVectorStore:
         try:
             assert v_store.similarity_search("Ho", k=1)[0].page_content == "Ho"
         finally:
-            if not SKIP_COLLECTION_DELETE:
-                v_store.delete_collection()
-            else:
-                v_store.clear()
+            v_store.delete_collection()
 
         # from_documents
         v_store_2 = AstraDBVectorStore.from_documents(
@@ -464,10 +455,7 @@ class TestAstraDBVectorStore:
         try:
             assert v_store_2.similarity_search("Hoi", k=1)[0].page_content == "Hoi"
         finally:
-            if not SKIP_COLLECTION_DELETE:
-                v_store_2.delete_collection()
-            else:
-                v_store_2.clear()
+            v_store_2.delete_collection()
 
     async def test_astradb_vectorstore_from_x_async(
         self, astradb_credentials: AstraDBCredentials
@@ -537,10 +525,7 @@ class TestAstraDBVectorStore:
                 0
             ].page_content == "Haa"
         finally:
-            if not SKIP_COLLECTION_DELETE:
-                await v_store.adelete_collection()
-            else:
-                await v_store.aclear()
+            await v_store.adelete_collection()
 
         # from_documents with vectorize
         v_store_2 = await AstraDBVectorStore.afrom_documents(
@@ -557,10 +542,7 @@ class TestAstraDBVectorStore:
                 0
             ].page_content == "HeeH"
         finally:
-            if not SKIP_COLLECTION_DELETE:
-                await v_store_2.adelete_collection()
-            else:
-                await v_store_2.aclear()
+            await v_store_2.adelete_collection()
 
     @pytest.mark.parametrize("vector_store", ["store_someemb", "vectorize_store"])
     def test_astradb_vectorstore_crud(
