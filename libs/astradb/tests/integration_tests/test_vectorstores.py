@@ -517,7 +517,9 @@ class TestAstraDBVectorStore:
             else:
                 await v_store_2.aclear()
 
-    pytest.mark.skipif(not is_vector_service_available(), reason="vectorize unavailable")
+    @pytest.mark.skipif(
+        not is_vector_service_available(), reason="vectorize unavailable"
+    )
     async def test_astradb_vectorstore_from_x_async_vectorize(
         self, astradb_credentials: AstraDBCredentials
     ) -> None:
