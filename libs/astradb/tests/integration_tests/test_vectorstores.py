@@ -194,10 +194,8 @@ def vectorize_store(
 
     yield v_store
 
-    if not SKIP_COLLECTION_DELETE:
-        v_store.delete_collection()
-    else:
-        v_store.clear()
+    # explicilty delete the collection to avoid max collection limit
+    v_store.delete_collection()
 
 
 @pytest.mark.skipif(not _has_env_vars(), reason="Missing Astra DB env. vars")
