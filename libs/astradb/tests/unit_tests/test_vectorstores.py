@@ -2,6 +2,7 @@ from typing import List
 from unittest.mock import Mock
 
 import pytest
+from astrapy.info import CollectionVectorServiceOptions
 from langchain_core.embeddings import Embeddings
 
 from langchain_astradb.vectorstores import (
@@ -48,6 +49,30 @@ class TestAstraDB:
             collection_name="mock_coll_name",
             astra_db_client=mock_astra_db,
         )
+
+        # Test with server-side embeddings
+        vector_options = CollectionVectorServiceOptions(
+            provider="test", model_name="test"
+        )
+        AstraDBVectorStore(
+            collection_name="mock_coll_name",
+            astra_db_client=mock_astra_db,
+            collection_vector_service_options=vector_options,
+        )
+
+        with pytest.raises(ValueError):
+            AstraDBVectorStore(
+                embedding=embedding,
+                collection_name="mock_coll_name",
+                astra_db_client=mock_astra_db,
+                collection_vector_service_options=vector_options,
+            )
+
+        with pytest.raises(ValueError):
+            AstraDBVectorStore(
+                collection_name="mock_coll_name",
+                astra_db_client=mock_astra_db,
+            )
 
     def test_astradb_vectorstore_unit_indexing_normalization(self) -> None:
         """Unit test of the indexing policy normalization"""

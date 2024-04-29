@@ -1,3 +1,5 @@
+from astrapy.info import CollectionVectorServiceOptions
+
 from langchain_astradb.cache import AstraDBCache, AstraDBSemanticCache
 from langchain_astradb.chat_message_histories import AstraDBChatMessageHistory
 from langchain_astradb.document_loaders import AstraDBLoader
@@ -12,4 +14,5 @@ __all__ = [
     "AstraDBChatMessageHistory",
     "AstraDBLoader",
     "AstraDBVectorStore",
+    "CollectionVectorServiceOptions",
 ]

@@ -25,6 +25,7 @@ from astrapy.db import (
 from astrapy.db import (
     AsyncAstraDB as AsyncAstraDBClient,
 )
+from astrapy.info import CollectionVectorServiceOptions
 from langchain_core.documents import Document
 from langchain_core.embeddings import Embeddings
 from langchain_core.runnables.utils import gather_with_concurrency
@@ -135,8 +136,8 @@ class AstraDBVectorStore(VectorStore):
     def __init__(
         self,
         *,
-        embedding: Embeddings,
         collection_name: str,
+        embedding: Optional[Embeddings] = None,
         token: Optional[str] = None,
         api_endpoint: Optional[str] = None,
         astra_db_client: Optional[AstraDBClient] = None,
@@ -152,6 +153,9 @@ class AstraDBVectorStore(VectorStore):
         metadata_indexing_include: Optional[Iterable[str]] = None,
         metadata_indexing_exclude: Optional[Iterable[str]] = None,
         collection_indexing_policy: Optional[Dict[str, Any]] = None,
+        collection_vector_service_options: Optional[
+            CollectionVectorServiceOptions
+        ] = None,
     ) -> None:
         """Wrapper around DataStax Astra DB for vector-store workloads.
 
@@ -175,7 +179,10 @@ class AstraDBVectorStore(VectorStore):
                 results = vectorstore.similarity_search("Everything's ok", k=1)
 
         Args:
-            embedding: embedding function to use.
+            embedding: the embeddings function or service to use.
+                This enables client-side embedding functions or calls to external
+                embedding providers. Only one of `embedding` or
+                `collection_vector_service_options` can be provided.
             collection_name: name of the Astra DB collection to create/use.
             token: API token for Astra DB usage.
             api_endpoint: full URL to the API endpoint, such as
@@ -209,6 +216,11 @@ class AstraDBVectorStore(VectorStore):
                 This dict must conform to to the API specifications
                 (see docs.datastax.com/en/astra/astra-db-vector/api-reference/
                 data-api-commands.html#advanced-feature-indexing-clause-on-createcollection)
+            collection_vector_service_options: specifies the use of server-side
+                embeddings within Astra DB. Only one of `embedding` or
+                `collection_vector_service_options` can be provided.
+                NOTE: This feature is under current development.
+
 
         Note:
             For concurrency in synchronous :meth:`~add_texts`:, as a rule of thumb, on a
@@ -227,12 +239,27 @@ class AstraDBVectorStore(VectorStore):
             Remember you can pass concurrency settings to individual calls to
             :meth:`~add_texts` and :meth:`~add_documents` as well.
         """
+        # Embedding and collection_vector_service_options are mutually exclusive,
+        # as both specify how to produce embeddings
+        if embedding is None and collection_vector_service_options is None:
+            raise ValueError(
+                "Either an `embedding` or a `collection_vector_service_options`\
+                    must be provided."
+            )
+
+        if embedding is not None and collection_vector_service_options is not None:
+            raise ValueError(
+                "Only one of `embedding` or `collection_vector_service_options`\
+                    can be provided."
+            )
+
         self.embedding_dimension: Optional[int] = None
         self.embedding = embedding
         self.collection_name = collection_name
         self.token = token
         self.api_endpoint = api_endpoint
         self.namespace = namespace
+        self.collection_vector_service_options = collection_vector_service_options
         # Concurrency settings
         self.batch_size: int = batch_size or DEFAULT_BATCH_SIZE
         self.bulk_insert_batch_concurrency: int = (
@@ -248,10 +275,11 @@ class AstraDBVectorStore(VectorStore):
         # "vector-related" settings
         self.metric = metric
         embedding_dimension: Union[int, Awaitable[int], None] = None
-        if setup_mode == SetupMode.ASYNC:
-            embedding_dimension = self._aget_embedding_dimension()
-        elif setup_mode == SetupMode.SYNC or setup_mode == SetupMode.OFF:
-            embedding_dimension = self._get_embedding_dimension()
+        if self.embedding is not None:
+            if setup_mode == SetupMode.ASYNC:
+                embedding_dimension = self._aget_embedding_dimension()
+            elif setup_mode == SetupMode.SYNC or setup_mode == SetupMode.OFF:
+                embedding_dimension = self._get_embedding_dimension()
 
         # indexing policy setting
         self.indexing_policy: Dict[str, Any] = self._normalize_metadata_indexing_policy(
@@ -273,6 +301,7 @@ class AstraDBVectorStore(VectorStore):
             metric=metric,
             requested_indexing_policy=self.indexing_policy,
             default_indexing_policy=DEFAULT_INDEXING_OPTIONS,
+            collection_vector_service_options=collection_vector_service_options,
         )
         self.astra_db = self.astra_env.astra_db
         self.async_astra_db = self.astra_env.async_astra_db
@@ -280,6 +309,8 @@ class AstraDBVectorStore(VectorStore):
         self.async_collection = self.astra_env.async_collection
 
     def _get_embedding_dimension(self) -> int:
+        assert self.embedding is not None
+
         if self.embedding_dimension is None:
             self.embedding_dimension = len(
                 self.embedding.embed_query(text="This is a sample sentence.")
@@ -287,6 +318,8 @@ class AstraDBVectorStore(VectorStore):
         return self.embedding_dimension
 
     async def _aget_embedding_dimension(self) -> int:
+        assert self.embedding is not None
+
         if self.embedding_dimension is None:
             self.embedding_dimension = len(
                 await self.embedding.aembed_query(text="This is a sample sentence.")
@@ -294,8 +327,16 @@ class AstraDBVectorStore(VectorStore):
         return self.embedding_dimension
 
     @property
-    def embeddings(self) -> Embeddings:
+    def embeddings(self) -> Optional[Embeddings]:
+        """
+        Accesses the supplied embeddings object. If using server-side embeddings,
+        this will return None.
+        """
         return self.embedding
+
+    def _using_vectorize(self) -> bool:
+        """Indicates whether server-side embeddings are being used."""
+        return self.collection_vector_service_options is not None
 
     def _select_relevance_score_fn(self) -> Callable[[float], float]:
         """
@@ -475,6 +516,36 @@ class AstraDBVectorStore(VectorStore):
         return uniqued_documents_to_insert
 
     @staticmethod
+    def _get_vectorize_documents_to_insert(
+        texts: Iterable[str],
+        metadatas: Optional[List[dict]] = None,
+        ids: Optional[List[str]] = None,
+    ) -> List[DocDict]:
+        if ids is None:
+            ids = [uuid.uuid4().hex for _ in texts]
+        if metadatas is None:
+            metadatas = [{} for _ in texts]
+        #
+        documents_to_insert = [
+            {
+                "_id": b_id,
+                "$vectorize": b_txt,
+                "metadata": b_md,
+            }
+            for b_txt, b_id, b_md in zip(
+                texts,
+                ids,
+                metadatas,
+            )
+        ]
+        # make unique by id, keeping the last
+        uniqued_documents_to_insert = _unique_list(
+            documents_to_insert[::-1],
+            lambda document: document["_id"],
+        )[::-1]
+        return uniqued_documents_to_insert
+
+    @staticmethod
     def _get_missing_from_batch(
         document_batch: List[DocDict], insert_result: Dict[str, Any]
     ) -> Tuple[List[str], List[DocDict]]:
@@ -555,10 +626,16 @@ class AstraDBVectorStore(VectorStore):
             )
         self.astra_env.ensure_db_setup()
 
-        embedding_vectors = self.embedding.embed_documents(list(texts))
-        documents_to_insert = self._get_documents_to_insert(
-            texts, embedding_vectors, metadatas, ids
-        )
+        if self._using_vectorize():
+            documents_to_insert = self._get_vectorize_documents_to_insert(
+                texts, metadatas, ids
+            )
+        else:
+            assert self.embedding is not None
+            embedding_vectors = self.embedding.embed_documents(list(texts))
+            documents_to_insert = self._get_documents_to_insert(
+                texts, embedding_vectors, metadatas, ids
+            )
 
         def _handle_batch(document_batch: List[DocDict]) -> List[str]:
             # self.collection is not None (by _ensure_astra_db_client)
@@ -651,10 +728,17 @@ class AstraDBVectorStore(VectorStore):
             )
         await self.astra_env.aensure_db_setup()
 
-        embedding_vectors = await self.embedding.aembed_documents(list(texts))
-        documents_to_insert = self._get_documents_to_insert(
-            texts, embedding_vectors, metadatas, ids
-        )
+        if self._using_vectorize():
+            # using server-side embeddings
+            documents_to_insert = self._get_vectorize_documents_to_insert(
+                texts, metadatas, ids
+            )
+        else:
+            assert self.embedding is not None
+            embedding_vectors = await self.embedding.aembed_documents(list(texts))
+            documents_to_insert = self._get_documents_to_insert(
+                texts, embedding_vectors, metadatas, ids
+            )
 
         async def _handle_batch(document_batch: List[DocDict]) -> List[str]:
             # self.async_collection is not None here for sure
@@ -783,6 +867,81 @@ class AstraDBVectorStore(VectorStore):
             )
         ]
 
+    def _similarity_search_with_score_id_with_vectorize(
+        self,
+        query: str,
+        k: int = 4,
+        filter: Optional[Dict[str, Any]] = None,
+    ) -> List[Tuple[Document, float, str]]:
+        """Return docs most similar to the query with score and id using $vectorize.
+
+        This is only available when using server-side embeddings.
+        """
+        self.astra_env.ensure_db_setup()
+        metadata_parameter = self._filter_to_metadata(filter)
+        #
+        hits = list(
+            # self.collection is not None (by _ensure_astra_db_client)
+            self.collection.paginated_find(  # type: ignore[union-attr]
+                filter=metadata_parameter,
+                sort={"$vectorize": query},
+                options={"limit": k, "includeSimilarity": True},
+                projection={
+                    "_id": 1,
+                    "$vectorize": 1,
+                    "metadata": 1,
+                },
+            )
+        )
+        #
+        return [
+            (
+                Document(
+                    # text content is stored in $vectorize instead of content
+                    page_content=hit["$vectorize"],
+                    metadata=hit["metadata"],
+                ),
+                hit["$similarity"],
+                hit["_id"],
+            )
+            for hit in hits
+        ]
+
+    async def _asimilarity_search_with_score_id_with_vectorize(
+        self,
+        query: str,
+        k: int = 4,
+        filter: Optional[Dict[str, Any]] = None,
+    ) -> List[Tuple[Document, float, str]]:
+        """Return docs most similar to the query with score and id using $vectorize.
+
+        This is only available when using server-side embeddings.
+        """
+        await self.astra_env.aensure_db_setup()
+        metadata_parameter = self._filter_to_metadata(filter)
+        #
+        return [
+            (
+                Document(
+                    # text content is stored in $vectorize instead of content
+                    page_content=hit["$vectorize"],
+                    metadata=hit["metadata"],
+                ),
+                hit["$similarity"],
+                hit["_id"],
+            )
+            async for hit in self.async_collection.paginated_find(
+                filter=metadata_parameter,
+                sort={"$vectorize": query},
+                options={"limit": k, "includeSimilarity": True},
+                projection={
+                    "_id": 1,
+                    "$vectorize": 1,
+                    "metadata": 1,
+                },
+            )
+        ]
+
     def similarity_search_with_score_id(
         self,
         query: str,
@@ -799,12 +958,21 @@ class AstraDBVectorStore(VectorStore):
         Returns:
             The list of (Document, score, id), the most similar to the query.
         """
-        embedding_vector = self.embedding.embed_query(query)
-        return self.similarity_search_with_score_id_by_vector(
-            embedding=embedding_vector,
-            k=k,
-            filter=filter,
-        )
+
+        if self._using_vectorize():
+            return self._similarity_search_with_score_id_with_vectorize(
+                query=query,
+                k=k,
+                filter=filter,
+            )
+        else:
+            assert self.embedding is not None
+            embedding_vector = self.embedding.embed_query(query)
+            return self.similarity_search_with_score_id_by_vector(
+                embedding=embedding_vector,
+                k=k,
+                filter=filter,
+            )
 
     async def asimilarity_search_with_score_id(
         self,
@@ -822,12 +990,20 @@ class AstraDBVectorStore(VectorStore):
         Returns:
             The list of (Document, score, id), the most similar to the query.
         """
-        embedding_vector = await self.embedding.aembed_query(query)
-        return await self.asimilarity_search_with_score_id_by_vector(
-            embedding=embedding_vector,
-            k=k,
-            filter=filter,
-        )
+        if self._using_vectorize():
+            return await self._asimilarity_search_with_score_id_with_vectorize(
+                query=query,
+                k=k,
+                filter=filter,
+            )
+        else:
+            assert self.embedding is not None
+            embedding_vector = await self.embedding.aembed_query(query)
+            return await self.asimilarity_search_with_score_id_by_vector(
+                embedding=embedding_vector,
+                k=k,
+                filter=filter,
+            )
 
     def similarity_search_with_score_by_vector(
         self,
@@ -900,12 +1076,23 @@ class AstraDBVectorStore(VectorStore):
         Returns:
             The list of Documents most similar to the query.
         """
-        embedding_vector = self.embedding.embed_query(query)
-        return self.similarity_search_by_vector(
-            embedding_vector,
-            k,
-            filter=filter,
-        )
+        if self._using_vectorize():
+            return [
+                doc
+                for (doc, _, _) in self._similarity_search_with_score_id_with_vectorize(
+                    query,
+                    k,
+                    filter=filter,
+                )
+            ]
+        else:
+            assert self.embedding is not None
+            embedding_vector = self.embedding.embed_query(query)
+            return self.similarity_search_by_vector(
+                embedding_vector,
+                k,
+                filter=filter,
+            )
 
     async def asimilarity_search(
         self,
@@ -924,12 +1111,27 @@ class AstraDBVectorStore(VectorStore):
         Returns:
             The list of Documents most similar to the query.
         """
-        embedding_vector = await self.embedding.aembed_query(query)
-        return await self.asimilarity_search_by_vector(
-            embedding_vector,
-            k,
-            filter=filter,
-        )
+        if self._using_vectorize():
+            return [
+                doc
+                for (
+                    doc,
+                    _,
+                    _,
+                ) in await self._asimilarity_search_with_score_id_with_vectorize(
+                    query,
+                    k,
+                    filter=filter,
+                )
+            ]
+        else:
+            assert self.embedding is not None
+            embedding_vector = await self.embedding.aembed_query(query)
+            return await self.asimilarity_search_by_vector(
+                embedding_vector,
+                k,
+                filter=filter,
+            )
 
     def similarity_search_by_vector(
         self,
@@ -999,12 +1201,27 @@ class AstraDBVectorStore(VectorStore):
         Returns:
             The list of (Document, score), the most similar to the query vector.
         """
-        embedding_vector = self.embedding.embed_query(query)
-        return self.similarity_search_with_score_by_vector(
-            embedding_vector,
-            k,
-            filter=filter,
-        )
+        if self._using_vectorize():
+            return [
+                (doc, score)
+                for (
+                    doc,
+                    score,
+                    doc_id,
+                ) in self._similarity_search_with_score_id_with_vectorize(
+                    query=query,
+                    k=k,
+                    filter=filter,
+                )
+            ]
+        else:
+            assert self.embedding is not None
+            embedding_vector = self.embedding.embed_query(query)
+            return self.similarity_search_with_score_by_vector(
+                embedding_vector,
+                k,
+                filter=filter,
+            )
 
     async def asimilarity_search_with_score(
         self,
@@ -1022,12 +1239,27 @@ class AstraDBVectorStore(VectorStore):
         Returns:
             The list of (Document, score), the most similar to the query vector.
         """
-        embedding_vector = await self.embedding.aembed_query(query)
-        return await self.asimilarity_search_with_score_by_vector(
-            embedding_vector,
-            k,
-            filter=filter,
-        )
+        if self._using_vectorize():
+            return [
+                (doc, score)
+                for (
+                    doc,
+                    score,
+                    doc_id,
+                ) in await self._asimilarity_search_with_score_id_with_vectorize(
+                    query=query,
+                    k=k,
+                    filter=filter,
+                )
+            ]
+        else:
+            assert self.embedding is not None
+            embedding_vector = await self.embedding.aembed_query(query)
+            return await self.asimilarity_search_with_score_by_vector(
+                embedding_vector,
+                k,
+                filter=filter,
+            )
 
     @staticmethod
     def _get_mmr_hits(
@@ -1170,14 +1402,18 @@ class AstraDBVectorStore(VectorStore):
         Returns:
             The list of Documents selected by maximal marginal relevance.
         """
-        embedding_vector = self.embedding.embed_query(query)
-        return self.max_marginal_relevance_search_by_vector(
-            embedding_vector,
-            k,
-            fetch_k,
-            lambda_mult=lambda_mult,
-            filter=filter,
-        )
+        if self._using_vectorize():
+            raise ValueError("MMR search is unsupported for server-side embeddings.")
+        else:
+            assert self.embedding is not None
+            embedding_vector = self.embedding.embed_query(query)
+            return self.max_marginal_relevance_search_by_vector(
+                embedding_vector,
+                k,
+                fetch_k,
+                lambda_mult=lambda_mult,
+                filter=filter,
+            )
 
     async def amax_marginal_relevance_search(
         self,
@@ -1205,19 +1441,26 @@ class AstraDBVectorStore(VectorStore):
         Returns:
             The list of Documents selected by maximal marginal relevance.
         """
-        embedding_vector = await self.embedding.aembed_query(query)
-        return await self.amax_marginal_relevance_search_by_vector(
-            embedding_vector,
-            k,
-            fetch_k,
-            lambda_mult=lambda_mult,
-            filter=filter,
-        )
+        if self._using_vectorize():
+            raise ValueError("MMR search is unsupported for server-side embeddings.")
+        else:
+            assert self.embedding is not None
+            embedding_vector = await self.embedding.aembed_query(query)
+            return await self.amax_marginal_relevance_search_by_vector(
+                embedding_vector,
+                k,
+                fetch_k,
+                lambda_mult=lambda_mult,
+                filter=filter,
+            )
 
     @classmethod
     def _from_kwargs(
         cls: Type[AstraDBVectorStore],
-        embedding: Embeddings,
+        embedding: Optional[Embeddings] = None,
+        collection_vector_service_options: Optional[
+            CollectionVectorServiceOptions
+        ] = None,
         **kwargs: Any,
     ) -> AstraDBVectorStore:
         known_kwargs = {
@@ -1268,15 +1511,19 @@ class AstraDBVectorStore(VectorStore):
                 "bulk_insert_overwrite_concurrency"
             ),
             bulk_delete_concurrency=kwargs.get("bulk_delete_concurrency"),
+            collection_vector_service_options=collection_vector_service_options,
         )
 
     @classmethod
     def from_texts(
         cls: Type[AstraDBVectorStore],
         texts: List[str],
-        embedding: Embeddings,
+        embedding: Optional[Embeddings] = None,
         metadatas: Optional[List[dict]] = None,
         ids: Optional[List[str]] = None,
+        collection_vector_service_options: Optional[
+            CollectionVectorServiceOptions
+        ] = None,
         **kwargs: Any,
     ) -> AstraDBVectorStore:
         """Create an Astra DB vectorstore from raw texts.
@@ -1284,8 +1531,14 @@ class AstraDBVectorStore(VectorStore):
         Args:
             texts: the texts to insert.
             embedding: the embedding function to use in the store.
+                This enables client-side embedding functions or calls to external
+                embedding providers. Only one of `embedding` or
+                `collection_vector_service_options` can be provided.
             metadatas: metadata dicts for the texts.
             ids: ids to associate to the texts.
+            collection_vector_service_options: specifies the use of server-side
+                embeddings within Astra DB. Only one of `embedding` or
+                `collection_vector_service_options` can be provided.
             **kwargs: you can pass any argument that you would
                 to :meth:`~add_texts` and/or to the 'AstraDBVectorStore' constructor
                 (see these methods for details). These arguments will be
@@ -1294,7 +1547,11 @@ class AstraDBVectorStore(VectorStore):
         Returns:
             an `AstraDBVectorStore` vectorstore.
         """
-        astra_db_store = AstraDBVectorStore._from_kwargs(embedding, **kwargs)
+        astra_db_store = AstraDBVectorStore._from_kwargs(
+            embedding=embedding,
+            collection_vector_service_options=collection_vector_service_options,
+            **kwargs,
+        )
         astra_db_store.add_texts(
             texts=texts,
             metadatas=metadatas,
@@ -1309,9 +1566,12 @@ class AstraDBVectorStore(VectorStore):
     async def afrom_texts(
         cls: Type[AstraDBVectorStore],
         texts: List[str],
-        embedding: Embeddings,
+        embedding: Optional[Embeddings] = None,
         metadatas: Optional[List[dict]] = None,
         ids: Optional[List[str]] = None,
+        collection_vector_service_options: Optional[
+            CollectionVectorServiceOptions
+        ] = None,
         **kwargs: Any,
     ) -> AstraDBVectorStore:
         """Create an Astra DB vectorstore from raw texts.
@@ -1321,6 +1581,9 @@ class AstraDBVectorStore(VectorStore):
             embedding: the embedding function to use in the store.
             metadatas: metadata dicts for the texts.
             ids: ids to associate to the texts.
+            collection_vector_service_options: specifies the use of server-side
+                embeddings within Astra DB. Only one of `embedding` or
+                `collection_vector_service_options` can be provided.
             **kwargs: you can pass any argument that you would
                 to :meth:`~add_texts` and/or to the 'AstraDBVectorStore' constructor
                 (see these methods for details). These arguments will be
@@ -1329,7 +1592,11 @@ class AstraDBVectorStore(VectorStore):
         Returns:
             an `AstraDBVectorStore` vectorstore.
         """
-        astra_db_store = AstraDBVectorStore._from_kwargs(embedding, **kwargs)
+        astra_db_store = AstraDBVectorStore._from_kwargs(
+            embedding,
+            collection_vector_service_options=collection_vector_service_options,
+            **kwargs,
+        )
         await astra_db_store.aadd_texts(
             texts=texts,
             metadatas=metadatas,
@@ -1344,7 +1611,10 @@ class AstraDBVectorStore(VectorStore):
     def from_documents(
         cls: Type[AstraDBVectorStore],
         documents: List[Document],
-        embedding: Embeddings,
+        embedding: Optional[Embeddings] = None,
+        collection_vector_service_options: Optional[
+            CollectionVectorServiceOptions
+        ] = None,
         **kwargs: Any,
     ) -> AstraDBVectorStore:
         """Create an Astra DB vectorstore from a document list.
@@ -1357,4 +1627,42 @@ class AstraDBVectorStore(VectorStore):
         Returns:
             an `AstraDBVectorStore` vectorstore.
         """
-        return super().from_documents(documents, embedding, **kwargs)
+        texts = [d.page_content for d in documents]
+        metadatas = [d.metadata for d in documents]
+        return cls.from_texts(
+            texts,
+            embedding=embedding,
+            metadatas=metadatas,
+            collection_vector_service_options=collection_vector_service_options,
+            **kwargs,
+        )
+
+    @classmethod
+    async def afrom_documents(
+        cls: Type[AstraDBVectorStore],
+        documents: List[Document],
+        embedding: Optional[Embeddings] = None,
+        collection_vector_service_options: Optional[
+            CollectionVectorServiceOptions
+        ] = None,
+        **kwargs: Any,
+    ) -> AstraDBVectorStore:
+        """Create an Astra DB vectorstore from a document list.
+
+        Utility method that defers to 'afrom_texts' (see that one).
+
+        Args: see 'afrom_texts', except here you have to supply 'documents'
+            in place of 'texts' and 'metadatas'.
+
+        Returns:
+            an `AstraDBVectorStore` vectorstore.
+        """
+        texts = [d.page_content for d in documents]
+        metadatas = [d.metadata for d in documents]
+        return await cls.afrom_texts(
+            texts,
+            embedding=embedding,
+            metadatas=metadatas,
+            collection_vector_service_options=collection_vector_service_options,
+            **kwargs,
+        )
