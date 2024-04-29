@@ -821,7 +821,7 @@ class TestAstraDBVectorStore:
         )
         assert {doc.page_content for doc in res4} == {"q", "r"}
 
-    @pytest.mark.parametrize("vector_store", ["store_someemb", "vectorize_store"])
+    @pytest.mark.parametrize("vector_store", ["store_parseremb"])
     def test_astradb_vectorstore_similarity_scale(
         self, vector_store: str, request: pytest.FixtureRequest
     ) -> None:
@@ -842,7 +842,7 @@ class TestAstraDBVectorStore:
         sco_near, sco_far = scores
         assert abs(1 - sco_near) < MATCH_EPSILON and abs(sco_far) < MATCH_EPSILON
 
-    @pytest.mark.parametrize("vector_store", ["store_someemb", "vectorize_store"])
+    @pytest.mark.parametrize("vector_store", ["store_parseremb"])
     async def test_astradb_vectorstore_similarity_scale_async(
         self, vector_store: str, request: pytest.FixtureRequest
     ) -> None:
