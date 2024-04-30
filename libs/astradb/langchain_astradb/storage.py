@@ -57,7 +57,10 @@ class AstraDBBaseStore(Generic[V], BaseStore[str, V], ABC):
     def mget(self, keys: Sequence[str]) -> List[Optional[V]]:
         self.astra_env.ensure_db_setup()
         docs_dict = {}
-        for doc in self.collection.paginated_find(filter={"_id": {"$in": list(keys)}}):
+        for doc in self.collection.paginated_find(
+            filter={"_id": {"$in": list(keys)}},
+            projection={"*": True},
+        ):
             docs_dict[doc["_id"]] = doc.get("value")
         return [self.decode_value(docs_dict.get(key)) for key in keys]
 
@@ -65,7 +68,8 @@ class AstraDBBaseStore(Generic[V], BaseStore[str, V], ABC):
         await self.astra_env.aensure_db_setup()
         docs_dict = {}
         async for doc in self.async_collection.paginated_find(
-            filter={"_id": {"$in": list(keys)}}
+            filter={"_id": {"$in": list(keys)}},
+            projection={"*": True},
         ):
             docs_dict[doc["_id"]] = doc.get("value")
         return [self.decode_value(docs_dict.get(key)) for key in keys]

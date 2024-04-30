@@ -23,6 +23,8 @@ from langchain_astradb.utils.astradb import (
 
 logger = logging.getLogger(__name__)
 
+_NOT_SET = object()
+
 
 class AstraDBLoader(BaseLoader):
     def __init__(
@@ -35,7 +37,7 @@ class AstraDBLoader(BaseLoader):
         async_astra_db_client: Optional[AsyncAstraDB] = None,
         namespace: Optional[str] = None,
         filter_criteria: Optional[Dict[str, Any]] = None,
-        projection: Optional[Dict[str, Any]] = None,
+        projection: Optional[Dict[str, Any]] = _NOT_SET,  # type: ignore[assignment]
         find_options: Optional[Dict[str, Any]] = None,
         nb_prefetched: int = 1000,
         page_content_mapper: Callable[[Dict], str] = json.dumps,
@@ -55,7 +57,8 @@ class AstraDBLoader(BaseLoader):
             namespace: namespace (aka keyspace) where the
                 collection is. Defaults to the database's "default namespace".
             filter_criteria: Criteria to filter documents.
-            projection: Specifies the fields to return.
+            projection: Specifies the fields to return. If not provided, reads
+                fall back to the Data API default projection.
             find_options: Additional options for the query.
             nb_prefetched: Max number of documents to pre-fetch. Defaults to 1000.
             page_content_mapper: Function applied to collection documents to create
@@ -72,7 +75,9 @@ class AstraDBLoader(BaseLoader):
         )
         self.astra_db_env = astra_db_env
         self.filter = filter_criteria
-        self.projection = projection
+        self._projection: Optional[Dict[str, Any]] = (
+            projection if projection is not _NOT_SET else {"*": True}
+        )
         self.find_options = find_options or {}
         self.nb_prefetched = nb_prefetched
         self.page_content_mapper = page_content_mapper
@@ -94,7 +99,7 @@ class AstraDBLoader(BaseLoader):
         for doc in self.astra_db_env.collection.paginated_find(
             filter=self.filter,
             options=self.find_options,
-            projection=self.projection,
+            projection=self._projection,
             sort=None,
             prefetched=self.nb_prefetched,
         ):
@@ -108,7 +113,7 @@ class AstraDBLoader(BaseLoader):
         async for doc in self.astra_db_env.async_collection.paginated_find(
             filter=self.filter,
             options=self.find_options,
-            projection=self.projection,
+            projection=self._projection,
             sort=None,
             prefetched=self.nb_prefetched,
         ):
