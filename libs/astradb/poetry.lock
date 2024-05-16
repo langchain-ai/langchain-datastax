@@ -836,7 +836,7 @@ text-helpers = ["chardet (>=5.1.0,<6.0.0)"]
 type = "git"
 url = "https://github.com/langchain-ai/langchain.git"
 reference = "HEAD"
-resolved_reference = "cd1879f5e75fc9e6a8c04ac839909e0d6f2fb541"
+resolved_reference = "be15740084e31d6850808e08ccb005f652664a48"
 subdirectory = "libs/langchain"
 
 [[package]]
@@ -863,7 +863,7 @@ extended-testing = ["jinja2 (>=3,<4)"]
 type = "git"
 url = "https://github.com/langchain-ai/langchain.git"
 reference = "HEAD"
-resolved_reference = "cd1879f5e75fc9e6a8c04ac839909e0d6f2fb541"
+resolved_reference = "be15740084e31d6850808e08ccb005f652664a48"
 subdirectory = "libs/core"
 
 [[package]]
@@ -885,18 +885,18 @@ extended-testing = ["beautifulsoup4 (>=4.12.3,<5.0.0)", "lxml (>=4.9.3,<6.0)"]
 type = "git"
 url = "https://github.com/langchain-ai/langchain.git"
 reference = "HEAD"
-resolved_reference = "cd1879f5e75fc9e6a8c04ac839909e0d6f2fb541"
+resolved_reference = "be15740084e31d6850808e08ccb005f652664a48"
 subdirectory = "libs/text-splitters"
 
 [[package]]
 name = "langsmith"
-version = "0.1.57"
+version = "0.1.59"
 description = "Client library to connect to the LangSmith LLM Tracing and Evaluation Platform."
 optional = false
 python-versions = "<4.0,>=3.8.1"
 files = [
-    {file = "langsmith-0.1.57-py3-none-any.whl", hash = "sha256:dbd83b0944a2fbea4151f0aa053530d93fcf6784a580621bc60633cb890b57dc"},
-    {file = "langsmith-0.1.57.tar.gz", hash = "sha256:4682204de19f0218029c2b8445ce2cc3485c8d0df9796b31e2ce4c9051fce365"},
+    {file = "langsmith-0.1.59-py3-none-any.whl", hash = "sha256:445e3bc1d3baa1e5340cd979907a19483b9763a2ed37b863a01113d406f69345"},
+    {file = "langsmith-0.1.59.tar.gz", hash = "sha256:e748a89f4dd6aa441349143e49e546c03b5dfb43376a25bfef6a5ca792fe1437"},
 ]
 
 [package.dependencies]
