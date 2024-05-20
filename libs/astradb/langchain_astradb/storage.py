@@ -138,15 +138,18 @@ class AstraDBStore(AstraDBBaseStore[Any]):
 
         Args:
             collection_name: name of the Astra DB collection to create/use.
-            token: API token for Astra DB usage.
-            api_endpoint: full URL to the API endpoint,
-                such as `https://<DB-ID>-us-east1.apps.astra.datastax.com`.
+            token: API token for Astra DB usage. If not provided, the environment
+                variable ASTRA_DB_APPLICATION_TOKEN is inspected.
+            api_endpoint: full URL to the API endpoint, such as
+                `https://<DB-ID>-us-east1.apps.astra.datastax.com`. If not provided,
+                the environment variable ASTRA_DB_API_ENDPOINT is inspected.
             astra_db_client: *alternative to token+api_endpoint*,
                 you can pass an already-created 'astrapy.db.AstraDB' instance.
             async_astra_db_client: *alternative to token+api_endpoint*,
                 you can pass an already-created 'astrapy.db.AsyncAstraDB' instance.
-            namespace: namespace (aka keyspace) where the
-                collection is created. Defaults to the database's "default namespace".
+            namespace: namespace (aka keyspace) where the collection is created.
+                If not provided, the environment variable ASTRA_DB_KEYSPACE is
+                inspected. Defaults to the database's "default namespace".
             setup_mode: mode used to create the Astra DB collection (SYNC, ASYNC or
                 OFF).
             pre_delete_collection: whether to delete the collection
@@ -197,15 +200,18 @@ class AstraDBByteStore(AstraDBBaseStore[bytes], ByteStore):
 
         Args:
             collection_name: name of the Astra DB collection to create/use.
-            token: API token for Astra DB usage.
-            api_endpoint: full URL to the API endpoint,
-                such as `https://<DB-ID>-us-east1.apps.astra.datastax.com`.
+            token: API token for Astra DB usage. If not provided, the environment
+                variable ASTRA_DB_APPLICATION_TOKEN is inspected.
+            api_endpoint: full URL to the API endpoint, such as
+                `https://<DB-ID>-us-east1.apps.astra.datastax.com`. If not provided,
+                the environment variable ASTRA_DB_API_ENDPOINT is inspected.
             astra_db_client: *alternative to token+api_endpoint*,
                 you can pass an already-created 'astrapy.db.AstraDB' instance.
             async_astra_db_client: *alternative to token+api_endpoint*,
                 you can pass an already-created 'astrapy.db.AsyncAstraDB' instance.
-            namespace: namespace (aka keyspace) where the
-                collection is created. Defaults to the database's "default namespace".
+            namespace: namespace (aka keyspace) where the collection is created.
+                If not provided, the environment variable ASTRA_DB_KEYSPACE is
+                inspected. Defaults to the database's "default namespace".
             setup_mode: mode used to create the Astra DB collection (SYNC, ASYNC or
                 OFF).
             pre_delete_collection: whether to delete the collection
