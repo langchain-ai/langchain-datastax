@@ -3,6 +3,8 @@ from __future__ import annotations
 import asyncio
 import inspect
 import json
+import logging
+import os
 import warnings
 from asyncio import InvalidStateError, Task
 from enum import Enum
@@ -12,6 +14,12 @@ import langchain_core
 from astrapy.api import APIRequestError
 from astrapy.db import AstraDB, AstraDBCollection, AsyncAstraDB, AsyncAstraDBCollection
 from astrapy.info import CollectionVectorServiceOptions
+
+TOKEN_ENV_VAR = "ASTRA_DB_APPLICATION_TOKEN"
+API_ENDPOINT_ENV_VAR = "ASTRA_DB_API_ENDPOINT"
+NAMESPACE_ENV_VAR = "ASTRA_DB_KEYSPACE"
+
+logger = logging.getLogger()
 
 
 class SetupMode(Enum):
@@ -29,46 +37,78 @@ class _AstraDBEnvironment:
         async_astra_db_client: Optional[AsyncAstraDB] = None,
         namespace: Optional[str] = None,
     ) -> None:
-        self.token = token
-        self.api_endpoint = api_endpoint
-        astra_db = astra_db_client
-        async_astra_db = async_astra_db_client
-        self.namespace = namespace
+        self.token: Optional[str]
+        self.api_endpoint: Optional[str]
+        self.namespace: Optional[str]
 
-        # Conflicting-arg checks:
         if astra_db_client is not None or async_astra_db_client is not None:
             if token is not None or api_endpoint is not None:
                 raise ValueError(
                     "You cannot pass 'astra_db_client' or 'async_astra_db_client' to "
                     "AstraDBEnvironment if passing 'token' and 'api_endpoint'."
                 )
-
-        if token and api_endpoint:
-            astra_db = AstraDB(
-                token=token,
-                api_endpoint=api_endpoint,
-                namespace=self.namespace,
-            )
-            async_astra_db = AsyncAstraDB(
-                token=token,
-                api_endpoint=api_endpoint,
-                namespace=self.namespace,
-            )
-
-        if astra_db:
-            self.astra_db = astra_db.copy()
-            if async_astra_db:
-                self.async_astra_db = async_astra_db.copy()
+            if astra_db_client is not None:
+                _astra_db = astra_db_client.copy()
             else:
-                self.async_astra_db = self.astra_db.to_async()
-        elif async_astra_db:
-            self.async_astra_db = async_astra_db.copy()
-            self.astra_db = self.async_astra_db.to_sync()
+                _astra_db = None
+            if async_astra_db_client is not None:
+                _async_astra_db = async_astra_db_client.copy()
+            else:
+                _async_astra_db = None
+
+            self.token = token
+            self.api_endpoint = api_endpoint
+            self.namespace = namespace
         else:
-            raise ValueError(
-                "Must provide 'astra_db_client' or 'async_astra_db_client' or "
-                "'token' and 'api_endpoint'"
-            )
+            # secrets-based initialization
+            if token is None:
+                logger.info(
+                    "Attempting to fetch token from environment "
+                    f"variable '{TOKEN_ENV_VAR}'"
+                )
+                _token = os.environ.get(TOKEN_ENV_VAR)
+            else:
+                _token = token
+            if api_endpoint is None:
+                logger.info(
+                    "Attempting to fetch API endpoint from environment "
+                    f"variable '{API_ENDPOINT_ENV_VAR}'"
+                )
+                _api_endpoint = os.environ.get(API_ENDPOINT_ENV_VAR)
+            else:
+                _api_endpoint = api_endpoint
+            if namespace is None:
+                _namespace = os.environ.get(NAMESPACE_ENV_VAR)
+            else:
+                _namespace = namespace
+
+            self.token = _token
+            self.api_endpoint = _api_endpoint
+            self.namespace = _namespace
+            #
+            if _token and _api_endpoint:
+                _astra_db = AstraDB(
+                    token=_token,
+                    api_endpoint=_api_endpoint,
+                    namespace=_namespace,
+                )
+                _async_astra_db = None
+            else:
+                raise ValueError(
+                    "API endpoint and/or token for Astra DB not provided. "
+                    "Either pass them explicitly to the object constructor "
+                    f"or set the {API_ENDPOINT_ENV_VAR}, {TOKEN_ENV_VAR} "
+                    "environment variables."
+                )
+
+        # complete sync/async with the other if necessary
+        if _astra_db is None:
+            _astra_db = _async_astra_db.to_sync()  # type: ignore[union-attr]
+        if _async_astra_db is None:
+            _async_astra_db = _astra_db.to_async()
+
+        self.astra_db = _astra_db
+        self.async_astra_db = _async_astra_db
 
         self.astra_db.set_caller(
             caller_name="langchain",
