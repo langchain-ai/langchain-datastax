@@ -184,15 +184,18 @@ class AstraDBVectorStore(VectorStore):
                 embedding providers. Only one of `embedding` or
                 `collection_vector_service_options` can be provided.
             collection_name: name of the Astra DB collection to create/use.
-            token: API token for Astra DB usage.
+            token: API token for Astra DB usage. If not provided, the environment
+                variable ASTRA_DB_APPLICATION_TOKEN is inspected.
             api_endpoint: full URL to the API endpoint, such as
-                `https://<DB-ID>-us-east1.apps.astra.datastax.com`.
+                `https://<DB-ID>-us-east1.apps.astra.datastax.com`. If not provided,
+                the environment variable ASTRA_DB_API_ENDPOINT is inspected.
             astra_db_client: *alternative to token+api_endpoint*,
                 you can pass an already-created 'astrapy.db.AstraDB' instance.
             async_astra_db_client: *alternative to token+api_endpoint*,
                 you can pass an already-created 'astrapy.db.AsyncAstraDB' instance.
             namespace: namespace (aka keyspace) where the collection is created.
-                Defaults to the database's "default namespace".
+                If not provided, the environment variable ASTRA_DB_KEYSPACE is
+                inspected. Defaults to the database's "default namespace".
             metric: similarity function to use out of those available in Astra DB.
                 If left out, it will use Astra DB API's defaults (i.e. "cosine" - but,
                 for performance reasons, "dot_product" is suggested if embeddings are
