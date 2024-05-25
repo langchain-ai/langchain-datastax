@@ -44,10 +44,10 @@ format format_diff:
 	poetry run ruff --select I --fix $(PYTHON_FILES)
 
 spell_check:
-	poetry run codespell --toml pyproject.toml
+	poetry run codespell --toml pyproject.toml -I codespell_ignore_words.txt
 
 spell_fix:
-	poetry run codespell --toml pyproject.toml -w
+	poetry run codespell --toml pyproject.toml -w -I codespell_ignore_words.txt
 
 check_imports: $(shell find langchain_astradb -name '*.py')
 	poetry run python ./scripts/check_imports.py $^

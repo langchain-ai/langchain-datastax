@@ -34,16 +34,60 @@ SKIP_COLLECTION_DELETE = (
 
 COLLECTION_NAME_DIM2 = "lc_test_d2"
 COLLECTION_NAME_DIM2_EUCLIDEAN = "lc_test_d2_eucl"
-COLLECTION_NAME_VECTORIZE = "lc_test_vectorize"
+COLLECTION_NAME_VECTORIZE_OPENAI = "lc_test_vec_openai"
+COLLECTION_NAME_VECTORIZE_OPENAI_HEADER = "lc_test_vec_openai_h"
+COLLECTION_NAME_VECTORIZE_NVIDIA = "lc_test_nvidia"
 
 MATCH_EPSILON = 0.0001
 
+# For the time being, prod-regions described only
+OPENAI_VECTORIZE_REGIONS_MAP = {
+    "prod": {"us-east-2", "westus3", "us-east1"},  # resp. aws, azure, gcp
+}
 
-def is_vector_service_available() -> bool:
+openAIVectorizeOptions = CollectionVectorServiceOptions(
+    provider="openai",
+    model_name="text-embedding-3-small",
+    authentication={
+        "providerKey": f"{os.environ.get('SHARED_SECRET_NAME_OPENAI', '')}.providerKey",
+    },
+)
+openAIVectorizeOptionsHeader = CollectionVectorServiceOptions(
+    provider="openai",
+    model_name="text-embedding-3-small",
+)
+nvidiaVectorizeOptions = CollectionVectorServiceOptions(
+    provider="nvidia",
+    model_name="NV-Embed-QA",
+)
+
+
+def is_nvidia_vector_service_available() -> bool:
+    # For the time being, this is manually controlled
+    if "NVIDIA_VECTORIZE_AVAILABLE" in os.environ:
+        try:
+            return int(os.environ["NVIDIA_VECTORIZE_AVAILABLE"]) != 0
+        except Exception:
+            return False
+    else:
+        return False
+
+
+def is_openai_vector_service_available() -> bool:
+    env: str
+    if "astra.datastax.com" in os.environ.get("ASTRA_DB_API_ENDPOINT", ""):
+        env = "prod"
+    else:
+        env = "other"
+    openai_vectorize_regions = OPENAI_VECTORIZE_REGIONS_MAP.get(env, set())
     return all(
         [
-            "us-west-2" in os.environ.get("ASTRA_DB_API_ENDPOINT", ""),
-            "astra-dev.datastax.com" in os.environ.get("ASTRA_DB_API_ENDPOINT", ""),
+            any(
+                openai_region in os.environ.get("ASTRA_DB_API_ENDPOINT", "")
+                for openai_region in openai_vectorize_regions
+            ),
+            "astra.datastax.com" in os.environ.get("ASTRA_DB_API_ENDPOINT", ""),
+            "SHARED_SECRET_NAME_OPENAI" in os.environ,
         ]
     )
 
@@ -176,31 +220,77 @@ def vectorize_store(
     astradb_credentials: AstraDBCredentials,
 ) -> Iterable[AstraDBVectorStore]:
     """
-    astra db vector store with server-side embeddings using the nvidia model
+    astra db vector store with server-side embeddings using openai + shared_secret
     """
-    # Only available in dev us-west-2 now
-    if not is_vector_service_available():
-        pytest.skip("vectorize unavailable")
+    if not is_openai_vector_service_available():
+        pytest.skip("vectorize/openai unavailable")
 
-    options = CollectionVectorServiceOptions(
-        provider="nvidia", model_name="NV-Embed-QA"
-    )
     v_store = AstraDBVectorStore(
-        collection_vector_service_options=options,
-        collection_name=COLLECTION_NAME_VECTORIZE,
+        collection_vector_service_options=openAIVectorizeOptions,
+        collection_name=COLLECTION_NAME_VECTORIZE_OPENAI,
         **astradb_credentials,
     )
     v_store.clear()
 
     yield v_store
 
-    # explicilty delete the collection to avoid max collection limit
+    # explicitly delete the collection to avoid max collection limit
+    v_store.delete_collection()
+
+
+@pytest.fixture(scope="function")
+def vectorize_store_w_header(
+    astradb_credentials: AstraDBCredentials,
+) -> Iterable[AstraDBVectorStore]:
+    """
+    astra db vector store with server-side embeddings using openai + header
+    """
+    if not is_openai_vector_service_available():
+        pytest.skip("vectorize/openai unavailable")
+
+    if "OPENAI_API_KEY" not in os.environ:
+        pytest.skip("OpenAI key not available")
+
+    v_store = AstraDBVectorStore(
+        collection_vector_service_options=openAIVectorizeOptionsHeader,
+        collection_name=COLLECTION_NAME_VECTORIZE_OPENAI_HEADER,
+        collection_embedding_api_key=os.environ["OPENAI_API_KEY"],
+        **astradb_credentials,
+    )
+    v_store.clear()
+
+    yield v_store
+
+    # explicitly delete the collection to avoid max collection limit
+    v_store.delete_collection()
+
+
+@pytest.fixture(scope="function")
+def vectorize_store_nvidia(
+    astradb_credentials: AstraDBCredentials,
+) -> Iterable[AstraDBVectorStore]:
+    """
+    astra db vector store with server-side embeddings using the nvidia model
+    """
+    if not is_nvidia_vector_service_available():
+        pytest.skip("vectorize/nvidia unavailable")
+
+    v_store = AstraDBVectorStore(
+        collection_vector_service_options=nvidiaVectorizeOptions,
+        collection_name=COLLECTION_NAME_VECTORIZE_NVIDIA,
+        **astradb_credentials,
+    )
+    v_store.clear()
+
+    yield v_store
+
+    # explicitly delete the collection to avoid max collection limit
     v_store.delete_collection()
 
 
 @pytest.mark.skipif(not _has_env_vars(), reason="Missing Astra DB env. vars")
 class TestAstraDBVectorStore:
-    def test_astradb_vectorstore_create_delete(
+    def test_astradb_vectorstore_create_delete_sync(
         self, astradb_credentials: AstraDBCredentials
     ) -> None:
         """Create and delete."""
@@ -235,18 +325,15 @@ class TestAstraDBVectorStore:
             v_store_2.clear()
 
     @pytest.mark.skipif(
-        not is_vector_service_available(), reason="vectorize unavailable"
+        not is_openai_vector_service_available(), reason="vectorize unavailable"
     )
-    def test_astradb_vectorstore_create_delete_vectorize(
+    def test_astradb_vectorstore_create_delete_vectorize_sync(
         self, astradb_credentials: AstraDBCredentials
     ) -> None:
         """Create and delete with vectorize option."""
-        options = CollectionVectorServiceOptions(
-            provider="nvidia", model_name="NV-Embed-QA"
-        )
         v_store = AstraDBVectorStore(
-            collection_vector_service_options=options,
-            collection_name=COLLECTION_NAME_VECTORIZE,
+            collection_vector_service_options=openAIVectorizeOptions,
+            collection_name=COLLECTION_NAME_VECTORIZE_OPENAI,
             **astradb_credentials,
         )
         v_store.add_texts(["Sample 1"])
@@ -280,18 +367,15 @@ class TestAstraDBVectorStore:
             await v_store_2.aclear()
 
     @pytest.mark.skipif(
-        not is_vector_service_available(), reason="vectorize unavailable"
+        not is_openai_vector_service_available(), reason="vectorize unavailable"
     )
     async def test_astradb_vectorstore_create_delete_vectorize_async(
         self, astradb_credentials: AstraDBCredentials
     ) -> None:
         """Create and delete with vectorize option."""
-        options = CollectionVectorServiceOptions(
-            provider="nvidia", model_name="NV-Embed-QA"
-        )
         v_store = AstraDBVectorStore(
-            collection_vector_service_options=options,
-            collection_name=COLLECTION_NAME_VECTORIZE,
+            collection_vector_service_options=openAIVectorizeOptions,
+            collection_name=COLLECTION_NAME_VECTORIZE_OPENAI,
             **astradb_credentials,
         )
         await v_store.adelete_collection()
@@ -300,7 +384,7 @@ class TestAstraDBVectorStore:
         SKIP_COLLECTION_DELETE,
         reason="Collection-deletion tests are suppressed",
     )
-    def test_astradb_vectorstore_pre_delete_collection(
+    def test_astradb_vectorstore_pre_delete_collection_sync(
         self, astradb_credentials: AstraDBCredentials
     ) -> None:
         """Use of the pre_delete_collection flag."""
@@ -369,7 +453,7 @@ class TestAstraDBVectorStore:
         finally:
             await v_store.adelete_collection()
 
-    def test_astradb_vectorstore_from_x(
+    def test_astradb_vectorstore_from_x_sync(
         self, astradb_credentials: AstraDBCredentials
     ) -> None:
         """from_texts and from_documents methods."""
@@ -414,27 +498,23 @@ class TestAstraDBVectorStore:
                 v_store_2.clear()
 
     @pytest.mark.skipif(
-        not is_vector_service_available(), reason="vectorize unavailable"
+        not is_openai_vector_service_available(), reason="vectorize unavailable"
     )
-    def test_astradb_vectorstore_from_x_vectorize(
+    def test_astradb_vectorstore_from_x_vectorize_sync(
         self, astradb_credentials: AstraDBCredentials
     ) -> None:
         """from_texts and from_documents methods with vectorize."""
-        options = CollectionVectorServiceOptions(
-            provider="nvidia", model_name="NV-Embed-QA"
-        )
-
         AstraDBVectorStore(
-            collection_vector_service_options=options,
-            collection_name=COLLECTION_NAME_VECTORIZE,
+            collection_vector_service_options=openAIVectorizeOptions,
+            collection_name=COLLECTION_NAME_VECTORIZE_OPENAI,
             **astradb_credentials,
         ).clear()
 
         # from_texts
         v_store = AstraDBVectorStore.from_texts(
             texts=["Hi", "Ho"],
-            collection_vector_service_options=options,
-            collection_name=COLLECTION_NAME_VECTORIZE,
+            collection_vector_service_options=openAIVectorizeOptions,
+            collection_name=COLLECTION_NAME_VECTORIZE_OPENAI,
             **astradb_credentials,
         )
         try:
@@ -448,8 +528,8 @@ class TestAstraDBVectorStore:
                 Document(page_content="Hee"),
                 Document(page_content="Hoi"),
             ],
-            collection_vector_service_options=options,
-            collection_name=COLLECTION_NAME_VECTORIZE,
+            collection_vector_service_options=openAIVectorizeOptions,
+            collection_name=COLLECTION_NAME_VECTORIZE_OPENAI,
             **astradb_credentials,
         )
         try:
@@ -504,20 +584,17 @@ class TestAstraDBVectorStore:
                 await v_store_2.aclear()
 
     @pytest.mark.skipif(
-        not is_vector_service_available(), reason="vectorize unavailable"
+        not is_openai_vector_service_available(), reason="vectorize unavailable"
     )
-    async def test_astradb_vectorstore_from_x_async_vectorize(
+    async def test_astradb_vectorstore_from_x_vectorize_async(
         self, astradb_credentials: AstraDBCredentials
     ) -> None:
         """from_texts and from_documents methods with vectorize."""
         # from_text with vectorize
-        options = CollectionVectorServiceOptions(
-            provider="nvidia", model_name="NV-Embed-QA"
-        )
         v_store = await AstraDBVectorStore.afrom_texts(
             texts=["Haa", "Huu"],
-            collection_vector_service_options=options,
-            collection_name=COLLECTION_NAME_VECTORIZE,
+            collection_vector_service_options=openAIVectorizeOptions,
+            collection_name=COLLECTION_NAME_VECTORIZE_OPENAI,
             **astradb_credentials,
         )
         try:
@@ -533,8 +610,8 @@ class TestAstraDBVectorStore:
                 Document(page_content="HeeH"),
                 Document(page_content="HooH"),
             ],
-            collection_vector_service_options=options,
-            collection_name=COLLECTION_NAME_VECTORIZE,
+            collection_vector_service_options=openAIVectorizeOptions,
+            collection_name=COLLECTION_NAME_VECTORIZE_OPENAI,
             **astradb_credentials,
         )
         try:
@@ -544,8 +621,16 @@ class TestAstraDBVectorStore:
         finally:
             await v_store_2.adelete_collection()
 
-    @pytest.mark.parametrize("vector_store", ["store_someemb", "vectorize_store"])
-    def test_astradb_vectorstore_crud(
+    @pytest.mark.parametrize(
+        "vector_store",
+        [
+            "store_someemb",
+            "vectorize_store",
+            "vectorize_store_w_header",
+            "vectorize_store_nvidia",
+        ],
+    )
+    def test_astradb_vectorstore_crud_sync(
         self, vector_store: str, request: pytest.FixtureRequest
     ) -> None:
         """Basic add/delete/update behaviour."""
@@ -605,7 +690,15 @@ class TestAstraDBVectorStore:
         res4 = vstore.similarity_search("ww", k=1, filter={"k": "w"})
         assert res4[0].metadata["ord"] == 205
 
-    @pytest.mark.parametrize("vector_store", ["store_someemb", "vectorize_store"])
+    @pytest.mark.parametrize(
+        "vector_store",
+        [
+            "store_someemb",
+            "vectorize_store",
+            "vectorize_store_w_header",
+            "vectorize_store_nvidia",
+        ],
+    )
     async def test_astradb_vectorstore_crud_async(
         self, vector_store: str, request: pytest.FixtureRequest
     ) -> None:
@@ -666,7 +759,9 @@ class TestAstraDBVectorStore:
         res4 = await vstore.asimilarity_search("ww", k=1, filter={"k": "w"})
         assert res4[0].metadata["ord"] == 205
 
-    def test_astradb_vectorstore_mmr(self, store_parseremb: AstraDBVectorStore) -> None:
+    def test_astradb_vectorstore_mmr_sync(
+        self, store_parseremb: AstraDBVectorStore
+    ) -> None:
         """
         MMR testing. We work on the unit circle with angle multiples
         of 2*pi/20 and prepare a store with known vectors for a controlled
@@ -719,7 +814,7 @@ class TestAstraDBVectorStore:
         res_i_vals = {doc.metadata["i"] for doc in res1}
         assert res_i_vals == {0, 4}
 
-    def test_astradb_vectorstore_mmr_vectorize_unsupported(
+    def test_astradb_vectorstore_mmr_vectorize_unsupported_sync(
         self, vectorize_store: AstraDBVectorStore
     ) -> None:
         """
@@ -737,7 +832,15 @@ class TestAstraDBVectorStore:
         with pytest.raises(ValueError):
             await vectorize_store.amax_marginal_relevance_search("aa", k=2, fetch_k=3)
 
-    @pytest.mark.parametrize("vector_store", ["store_someemb", "vectorize_store"])
+    @pytest.mark.parametrize(
+        "vector_store",
+        [
+            "store_someemb",
+            "vectorize_store",
+            "vectorize_store_w_header",
+            "vectorize_store_nvidia",
+        ],
+    )
     def test_astradb_vectorstore_metadata(
         self, vector_store: str, request: pytest.FixtureRequest
     ) -> None:
@@ -804,7 +907,7 @@ class TestAstraDBVectorStore:
         assert {doc.page_content for doc in res4} == {"q", "r"}
 
     @pytest.mark.parametrize("vector_store", ["store_parseremb"])
-    def test_astradb_vectorstore_similarity_scale(
+    def test_astradb_vectorstore_similarity_scale_sync(
         self, vector_store: str, request: pytest.FixtureRequest
     ) -> None:
         """Scale of the similarity scores."""
@@ -845,7 +948,15 @@ class TestAstraDBVectorStore:
         sco_near, sco_far = scores
         assert abs(1 - sco_near) < MATCH_EPSILON and abs(sco_far) < MATCH_EPSILON
 
-    @pytest.mark.parametrize("vector_store", ["store_someemb", "vectorize_store"])
+    @pytest.mark.parametrize(
+        "vector_store",
+        [
+            "store_someemb",
+            "vectorize_store",
+            "vectorize_store_w_header",
+            "vectorize_store_nvidia",
+        ],
+    )
     def test_astradb_vectorstore_massive_delete(
         self, vector_store: str, request: pytest.FixtureRequest
     ) -> None:
@@ -894,7 +1005,7 @@ class TestAstraDBVectorStore:
         with pytest.raises(ValueError):
             _ = v_store.similarity_search("hah", k=10)
 
-    def test_astradb_vectorstore_custom_params(
+    def test_astradb_vectorstore_custom_params_sync(
         self, astradb_credentials: AstraDBCredentials
     ) -> None:
         """Custom batch size and concurrency params."""
@@ -1057,7 +1168,7 @@ class TestAstraDBVectorStore:
             else:
                 vstore_euc.clear()
 
-    def test_astradb_vectorstore_indexing(self) -> None:
+    def test_astradb_vectorstore_indexing_sync(self) -> None:
         """
         Test that the right errors/warnings are issued depending
         on the compatibility of on-DB indexing settings and the requested ones.

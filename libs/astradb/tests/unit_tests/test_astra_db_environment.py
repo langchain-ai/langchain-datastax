@@ -17,7 +17,7 @@ class TestAstraDBEnvironment:
 
         # clean environment
         if TOKEN_ENV_VAR in os.environ:
-            del os.environ["TOKEN_ENV_VAR"]
+            del os.environ[TOKEN_ENV_VAR]
         if API_ENDPOINT_ENV_VAR in os.environ:
             del os.environ[API_ENDPOINT_ENV_VAR]
         if NAMESPACE_ENV_VAR in os.environ:
