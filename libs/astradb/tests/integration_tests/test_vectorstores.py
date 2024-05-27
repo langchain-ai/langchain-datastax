@@ -64,7 +64,7 @@ nvidiaVectorizeOptions = CollectionVectorServiceOptions(
 
 def is_nvidia_vector_service_available() -> bool:
     # For the time being, this is manually controlled
-    if "NVIDIA_VECTORIZE_AVAILABLE" in os.environ:
+    if os.environ.get("NVIDIA_VECTORIZE_AVAILABLE"):
         try:
             return int(os.environ["NVIDIA_VECTORIZE_AVAILABLE"]) != 0
         except Exception:
@@ -87,7 +87,7 @@ def is_openai_vector_service_available() -> bool:
                 for openai_region in openai_vectorize_regions
             ),
             "astra.datastax.com" in os.environ.get("ASTRA_DB_API_ENDPOINT", ""),
-            "SHARED_SECRET_NAME_OPENAI" in os.environ,
+            os.environ.get("SHARED_SECRET_NAME_OPENAI"),
         ]
     )
 
@@ -246,9 +246,9 @@ def vectorize_store_w_header(
     astra db vector store with server-side embeddings using openai + header
     """
     if not is_openai_vector_service_available():
-        pytest.skip("vectorize/openai unavailable")
+        pytest.skip("vectorize/openai service unavailable")
 
-    if "OPENAI_API_KEY" not in os.environ:
+    if not os.environ.get("OPENAI_API_KEY"):
         pytest.skip("OpenAI key not available")
 
     v_store = AstraDBVectorStore(
