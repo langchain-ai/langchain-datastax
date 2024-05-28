@@ -19,6 +19,8 @@ TOKEN_ENV_VAR = "ASTRA_DB_APPLICATION_TOKEN"
 API_ENDPOINT_ENV_VAR = "ASTRA_DB_API_ENDPOINT"
 NAMESPACE_ENV_VAR = "ASTRA_DB_KEYSPACE"
 
+DEFAULT_VECTORIZE_SECRET_HEADER = "x-embedding-api-key"
+
 logger = logging.getLogger()
 
 
@@ -138,19 +140,29 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
         collection_vector_service_options: Optional[
             CollectionVectorServiceOptions
         ] = None,
+        collection_embedding_api_key: Optional[str] = None,
     ) -> None:
         super().__init__(
             token, api_endpoint, astra_db_client, async_astra_db_client, namespace
         )
+        embedding_key_header = {
+            k: v
+            for k, v in {
+                DEFAULT_VECTORIZE_SECRET_HEADER: collection_embedding_api_key,
+            }.items()
+            if v is not None
+        }
         self.collection_name = collection_name
         self.collection = AstraDBCollection(
             collection_name=collection_name,
             astra_db=self.astra_db,
+            additional_headers=embedding_key_header,
         )
 
         self.async_collection = AsyncAstraDBCollection(
             collection_name=collection_name,
             astra_db=self.async_astra_db,
+            additional_headers=embedding_key_header,
         )
 
         if requested_indexing_policy is not None:

@@ -156,6 +156,7 @@ class AstraDBVectorStore(VectorStore):
         collection_vector_service_options: Optional[
             CollectionVectorServiceOptions
         ] = None,
+        collection_embedding_api_key: Optional[str] = None,
     ) -> None:
         """Wrapper around DataStax Astra DB for vector-store workloads.
 
@@ -181,8 +182,9 @@ class AstraDBVectorStore(VectorStore):
         Args:
             embedding: the embeddings function or service to use.
                 This enables client-side embedding functions or calls to external
-                embedding providers. Only one of `embedding` or
-                `collection_vector_service_options` can be provided.
+                embedding providers. If `embedding` is provided, arguments
+                `collection_vector_service_options` and
+                `collection_embedding_api_key` cannot be provided.
             collection_name: name of the Astra DB collection to create/use.
             token: API token for Astra DB usage. If not provided, the environment
                 variable ASTRA_DB_APPLICATION_TOKEN is inspected.
@@ -220,10 +222,16 @@ class AstraDBVectorStore(VectorStore):
                 (see docs.datastax.com/en/astra/astra-db-vector/api-reference/
                 data-api-commands.html#advanced-feature-indexing-clause-on-createcollection)
             collection_vector_service_options: specifies the use of server-side
-                embeddings within Astra DB. Only one of `embedding` or
-                `collection_vector_service_options` can be provided.
-                NOTE: This feature is under current development.
-
+                embeddings within Astra DB. If passing this parameter, `embedding`
+                cannot be provided.
+            collection_embedding_api_key: for usage of server-side embeddings
+                within Astra DB, with this parameter one can supply an API Key
+                that will be passed to Astra DB with each data request.
+                This is useful when the service is configured for the collection,
+                but no corresponding secret is stored within
+                Astra's key management system.
+                This parameter cannot be provided without
+                specifying `collection_vector_service_options`.
 
         Note:
             For concurrency in synchronous :meth:`~add_texts`:, as a rule of thumb, on a
@@ -242,7 +250,7 @@ class AstraDBVectorStore(VectorStore):
             Remember you can pass concurrency settings to individual calls to
             :meth:`~add_texts` and :meth:`~add_documents` as well.
         """
-        # Embedding and collection_vector_service_options are mutually exclusive,
+        # Embedding and the server-side embeddings are mutually exclusive,
         # as both specify how to produce embeddings
         if embedding is None and collection_vector_service_options is None:
             raise ValueError(
@@ -256,6 +264,15 @@ class AstraDBVectorStore(VectorStore):
                     can be provided."
             )
 
+        if (
+            collection_vector_service_options is None
+            and collection_embedding_api_key is not None
+        ):
+            raise ValueError(
+                "`collection_embedding_api_key` cannot be provided unless"
+                " `collection_vector_service_options` is also passed."
+            )
+
         self.embedding_dimension: Optional[int] = None
         self.embedding = embedding
         self.collection_name = collection_name
@@ -263,6 +280,7 @@ class AstraDBVectorStore(VectorStore):
         self.api_endpoint = api_endpoint
         self.namespace = namespace
         self.collection_vector_service_options = collection_vector_service_options
+        self.collection_embedding_api_key = collection_embedding_api_key
         # Concurrency settings
         self.batch_size: int = batch_size or DEFAULT_BATCH_SIZE
         self.bulk_insert_batch_concurrency: int = (
@@ -305,6 +323,7 @@ class AstraDBVectorStore(VectorStore):
             requested_indexing_policy=self.indexing_policy,
             default_indexing_policy=DEFAULT_INDEXING_OPTIONS,
             collection_vector_service_options=collection_vector_service_options,
+            collection_embedding_api_key=collection_embedding_api_key,
         )
         self.astra_db = self.astra_env.astra_db
         self.async_astra_db = self.astra_env.async_astra_db

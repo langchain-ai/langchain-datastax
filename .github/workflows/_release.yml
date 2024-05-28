@@ -156,13 +156,15 @@ jobs:
         run: make tests
         working-directory: ${{ inputs.working-directory }}
 
-#      - name: Run integration tests
-#        env:
-#          ASTRA_DB_API_ENDPOINT: ${{ secrets.ASTRA_DB_API_ENDPOINT }}
-#          ASTRA_DB_APPLICATION_TOKEN: ${{ secrets.ASTRA_DB_APPLICATION_TOKEN }}
-#          ASTRA_DB_KEYSPACE: ${{ secrets.ASTRA_DB_KEYSPACE }}
-#        run: make integration_tests
-#        working-directory: ${{ inputs.working-directory }}
+      - name: Run integration tests
+        env:
+          ASTRA_DB_API_ENDPOINT: ${{ secrets.ASTRA_DB_API_ENDPOINT }}
+          ASTRA_DB_APPLICATION_TOKEN: ${{ secrets.ASTRA_DB_APPLICATION_TOKEN }}
+          ASTRA_DB_KEYSPACE: ${{ secrets.ASTRA_DB_KEYSPACE }}
+          SHARED_SECRET_NAME_OPENAI: ${{ secrets.SHARED_SECRET_NAME_OPENAI }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: make integration_tests
+        working-directory: ${{ inputs.working-directory }}
 
       - name: Get minimum versions
         working-directory: ${{ inputs.working-directory }}
