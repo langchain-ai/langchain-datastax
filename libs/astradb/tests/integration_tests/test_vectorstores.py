@@ -45,18 +45,18 @@ OPENAI_VECTORIZE_REGIONS_MAP = {
     "prod": {"us-east-2", "westus3", "us-east1"},  # resp. aws, azure, gcp
 }
 
-openAIVectorizeOptions = CollectionVectorServiceOptions(
+openai_vectorize_options = CollectionVectorServiceOptions(
     provider="openai",
     model_name="text-embedding-3-small",
     authentication={
         "providerKey": f"{os.environ.get('SHARED_SECRET_NAME_OPENAI', '')}.providerKey",
     },
 )
-openAIVectorizeOptionsHeader = CollectionVectorServiceOptions(
+openai_vectorize_options_header = CollectionVectorServiceOptions(
     provider="openai",
     model_name="text-embedding-3-small",
 )
-nvidiaVectorizeOptions = CollectionVectorServiceOptions(
+nvidia_vectorize_options = CollectionVectorServiceOptions(
     provider="nvidia",
     model_name="NV-Embed-QA",
 )
@@ -226,7 +226,7 @@ def vectorize_store(
         pytest.skip("vectorize/openai unavailable")
 
     v_store = AstraDBVectorStore(
-        collection_vector_service_options=openAIVectorizeOptions,
+        collection_vector_service_options=openai_vectorize_options,
         collection_name=COLLECTION_NAME_VECTORIZE_OPENAI,
         **astradb_credentials,
     )
@@ -252,7 +252,7 @@ def vectorize_store_w_header(
         pytest.skip("OpenAI key not available")
 
     v_store = AstraDBVectorStore(
-        collection_vector_service_options=openAIVectorizeOptionsHeader,
+        collection_vector_service_options=openai_vectorize_options_header,
         collection_name=COLLECTION_NAME_VECTORIZE_OPENAI_HEADER,
         collection_embedding_api_key=os.environ["OPENAI_API_KEY"],
         **astradb_credentials,
@@ -276,7 +276,7 @@ def vectorize_store_nvidia(
         pytest.skip("vectorize/nvidia unavailable")
 
     v_store = AstraDBVectorStore(
-        collection_vector_service_options=nvidiaVectorizeOptions,
+        collection_vector_service_options=nvidia_vectorize_options,
         collection_name=COLLECTION_NAME_VECTORIZE_NVIDIA,
         **astradb_credentials,
     )
@@ -332,7 +332,7 @@ class TestAstraDBVectorStore:
     ) -> None:
         """Create and delete with vectorize option."""
         v_store = AstraDBVectorStore(
-            collection_vector_service_options=openAIVectorizeOptions,
+            collection_vector_service_options=openai_vectorize_options,
             collection_name=COLLECTION_NAME_VECTORIZE_OPENAI,
             **astradb_credentials,
         )
@@ -374,7 +374,7 @@ class TestAstraDBVectorStore:
     ) -> None:
         """Create and delete with vectorize option."""
         v_store = AstraDBVectorStore(
-            collection_vector_service_options=openAIVectorizeOptions,
+            collection_vector_service_options=openai_vectorize_options,
             collection_name=COLLECTION_NAME_VECTORIZE_OPENAI,
             **astradb_credentials,
         )
@@ -505,7 +505,7 @@ class TestAstraDBVectorStore:
     ) -> None:
         """from_texts and from_documents methods with vectorize."""
         AstraDBVectorStore(
-            collection_vector_service_options=openAIVectorizeOptions,
+            collection_vector_service_options=openai_vectorize_options,
             collection_name=COLLECTION_NAME_VECTORIZE_OPENAI,
             **astradb_credentials,
         ).clear()
@@ -513,7 +513,7 @@ class TestAstraDBVectorStore:
         # from_texts
         v_store = AstraDBVectorStore.from_texts(
             texts=["Hi", "Ho"],
-            collection_vector_service_options=openAIVectorizeOptions,
+            collection_vector_service_options=openai_vectorize_options,
             collection_name=COLLECTION_NAME_VECTORIZE_OPENAI,
             **astradb_credentials,
         )
@@ -528,7 +528,7 @@ class TestAstraDBVectorStore:
                 Document(page_content="Hee"),
                 Document(page_content="Hoi"),
             ],
-            collection_vector_service_options=openAIVectorizeOptions,
+            collection_vector_service_options=openai_vectorize_options,
             collection_name=COLLECTION_NAME_VECTORIZE_OPENAI,
             **astradb_credentials,
         )
@@ -593,7 +593,7 @@ class TestAstraDBVectorStore:
         # from_text with vectorize
         v_store = await AstraDBVectorStore.afrom_texts(
             texts=["Haa", "Huu"],
-            collection_vector_service_options=openAIVectorizeOptions,
+            collection_vector_service_options=openai_vectorize_options,
             collection_name=COLLECTION_NAME_VECTORIZE_OPENAI,
             **astradb_credentials,
         )
@@ -610,7 +610,7 @@ class TestAstraDBVectorStore:
                 Document(page_content="HeeH"),
                 Document(page_content="HooH"),
             ],
-            collection_vector_service_options=openAIVectorizeOptions,
+            collection_vector_service_options=openai_vectorize_options,
             collection_name=COLLECTION_NAME_VECTORIZE_OPENAI,
             **astradb_credentials,
         )
