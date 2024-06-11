@@ -42,7 +42,7 @@ message_history = AstraDBChatMessageHistory(
 )
 ```
 
-## LLM Cache
+### LLM Cache
 
 ```python
 from langchain_astradb import AstraDBCache
@@ -53,7 +53,7 @@ cache = AstraDBCache(
 )
 ```
 
-## Semantic LLM Cache
+### Semantic LLM Cache
 
 ```python
 from langchain_astradb import AstraDBSemanticCache
@@ -65,7 +65,7 @@ cache = AstraDBSemanticCache(
 )
 ```
 
-## Document loader
+### Document loader
 
 ```python
 from langchain_astradb import AstraDBLoader
@@ -100,3 +100,25 @@ store = AstraDBByteStore(
     token="AstraCS:...",
 )
 ```
+
+## Warnings about indexing
+
+When creating an Astra DB object in LangChain, such as an `AstraDBVectorStore`, you may see a warning similar to the following:
+
+> Astra DB collection '...' is detected as having indexing turned on for all fields (either created manually or by older versions of this plugin). This implies stricter limitations on the amount of text each string in a document can store. Consider reindexing anew on a fresh collection to be able to store longer texts.
+
+The reason for the warning is that the requested collection already exists on the database, and it is configured to [index all of its fields for search](https://docs.datastax.com/en/astra-db-serverless/api-reference/collections.html#the-indexing-option), possibly implicitly, by default. When the LangChain object tries to create it, it attempts to enforce, instead, an indexing policy tailored to the prospected usage. For example, the LangChain vector store will index the metadata but leave the textual content out: this is both to enable storing very long texts and to avoid pointless indexing of fields that will never be used in filtering a search.
+
+Typically there are two reasons why you may encounter the warning:
+
+1. you have created a collection by other means than letting the `AstraDBVectorStore` do it for you: for example, through the Astra UI;
+2. you have created the collection with an old version of the Astra DB plugin (i.e. prior to the `langchain-astradb` partner package).
+
+Keep in mind that this is a warning and your application will continue running just fine, unless you need to store very long texts.
+For instance, should you need to add, to the vector store, a `Document` whose `page_content` exceeds ~8K in length, you will trigger a database error.
+
+You have several options:
+
+- you can ignore the warning because you know your application will never need to store very long textual contents;
+- you can ignore the warning and explicitly instruct the plugin _not to_ create the collection, assuming it exists already (which suppresses the warning): `store = AstraDBVectorStore(..., setup_mode=langchain_astradb.utils.astradb.SetupMode.OFF)`;
+- if you can afford re-populating the collection anew, you can drop it and re-run the LangChain application: the collection will be created with the optimized indexing settings. **This is the recommended option, when possible**.
