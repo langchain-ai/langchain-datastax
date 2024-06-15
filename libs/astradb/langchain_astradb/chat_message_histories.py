@@ -65,7 +65,7 @@ class AstraDBChatMessageHistory(BaseChatMessageHistory):
             namespace=namespace,
             setup_mode=setup_mode,
             pre_delete_collection=pre_delete_collection,
-            default_indexing_policy=DEFAULT_COLLECTION_NAME,
+            default_indexing_policy=DEFAULT_INDEXING_OPTIONS,
         )
 
         self.collection = self.astra_env.collection
