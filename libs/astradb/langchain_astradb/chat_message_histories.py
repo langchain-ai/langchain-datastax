@@ -18,6 +18,8 @@ from langchain_astradb.utils.astradb import (
     _AstraDBCollectionEnvironment,
 )
 
+# indexing options when creating a collection
+DEFAULT_INDEXING_OPTIONS = {"allow": ["metadata"]}
 DEFAULT_COLLECTION_NAME = "langchain_message_store"
 
 
@@ -63,6 +65,7 @@ class AstraDBChatMessageHistory(BaseChatMessageHistory):
             namespace=namespace,
             setup_mode=setup_mode,
             pre_delete_collection=pre_delete_collection,
+            default_indexing_policy=DEFAULT_COLLECTION_NAME,
         )
 
         self.collection = self.astra_env.collection
