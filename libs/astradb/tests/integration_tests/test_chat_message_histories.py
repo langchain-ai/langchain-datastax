@@ -34,16 +34,21 @@ def history1() -> Iterable[AstraDBChatMessageHistory]:
 
 
 @pytest.fixture(scope="function")
-def history2() -> Iterable[AstraDBChatMessageHistory]:
+def history2(
+    history1: AstraDBChatMessageHistory,
+) -> Iterable[AstraDBChatMessageHistory]:
     history2 = AstraDBChatMessageHistory(
         session_id="session-test-2",
-        collection_name="langchain_cmh_test",
+        collection_name=history1.collection_name,
         token=os.environ["ASTRA_DB_APPLICATION_TOKEN"],
         api_endpoint=os.environ["ASTRA_DB_API_ENDPOINT"],
         namespace=os.environ.get("ASTRA_DB_KEYSPACE"),
+        # this, with the dependency from history1, ensures
+        # no two createCollection calls at once are issued:
+        setup_mode=SetupMode.OFF,
     )
     yield history2
-    history2.collection.astra_db.delete_collection("langchain_cmh_test")
+    # no deletion here, this is riding on history1
 
 
 @pytest.fixture
@@ -61,17 +66,21 @@ async def async_history1() -> AsyncIterable[AstraDBChatMessageHistory]:
 
 
 @pytest.fixture(scope="function")
-async def async_history2() -> AsyncIterable[AstraDBChatMessageHistory]:
+async def async_history2(
+    history1: AstraDBChatMessageHistory,
+) -> AsyncIterable[AstraDBChatMessageHistory]:
     history2 = AstraDBChatMessageHistory(
         session_id="async-session-test-2",
-        collection_name="langchain_cmh_test",
+        collection_name=history1.collection_name,
         token=os.environ["ASTRA_DB_APPLICATION_TOKEN"],
         api_endpoint=os.environ["ASTRA_DB_API_ENDPOINT"],
         namespace=os.environ.get("ASTRA_DB_KEYSPACE"),
-        setup_mode=SetupMode.ASYNC,
+        # this, with the dependency from history1, ensures
+        # no two createCollection calls at once are issued:
+        setup_mode=SetupMode.OFF,
     )
     yield history2
-    await history2.async_collection.astra_db.delete_collection("langchain_cmh_test")
+    # no deletion here, this is riding on history1
 
 
 @pytest.mark.skipif(not _has_env_vars(), reason="Missing Astra DB env. vars")
