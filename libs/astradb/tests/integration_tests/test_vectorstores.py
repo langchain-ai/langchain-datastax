@@ -40,10 +40,6 @@ COLLECTION_NAME_VECTORIZE_NVIDIA = "lc_test_nvidia"
 
 MATCH_EPSILON = 0.0001
 
-# For the time being, prod-regions described only
-OPENAI_VECTORIZE_REGIONS_MAP = {
-    "prod": {"us-east-2", "westus3", "us-east1"},  # resp. aws, azure, gcp
-}
 
 openai_vectorize_options = CollectionVectorServiceOptions(
     provider="openai",
@@ -79,14 +75,9 @@ def is_openai_vector_service_available() -> bool:
         env = "prod"
     else:
         env = "other"
-    openai_vectorize_regions = OPENAI_VECTORIZE_REGIONS_MAP.get(env, set())
     return all(
         [
-            any(
-                openai_region in os.environ.get("ASTRA_DB_API_ENDPOINT", "")
-                for openai_region in openai_vectorize_regions
-            ),
-            "astra.datastax.com" in os.environ.get("ASTRA_DB_API_ENDPOINT", ""),
+            env == "prod",
             os.environ.get("SHARED_SECRET_NAME_OPENAI"),
         ]
     )
