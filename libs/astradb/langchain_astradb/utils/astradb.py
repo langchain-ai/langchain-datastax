@@ -317,8 +317,11 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
                             "fields (either created manually or by older "
                             "versions of this plugin). This implies stricter "
                             "limitations on the amount of text each string in a "
-                            "document can store. Consider reindexing anew on a "
-                            "fresh collection to be able to store longer texts."
+                            "document can store. Consider indexing anew on a "
+                            "fresh collection to be able to store longer texts. "
+                            "See https://github.com/langchain-ai/langchain-"
+                            "datastax/blob/main/libs/astradb/README.md#"
+                            "warnings-about-indexing for more details."
                         ),
                         UserWarning,
                         stacklevel=2,
@@ -330,7 +333,7 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
                         "fields (either created manually or by older "
                         "versions of this plugin). This is incompatible with "
                         "the requested indexing policy for this object. "
-                        "Consider reindexing anew on a fresh "
+                        "Consider indexing anew on a fresh "
                         "collection with the requested indexing "
                         "policy, or alternatively leave the indexing "
                         "settings for this object to their defaults "
@@ -348,7 +351,7 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
                     "detected as having the following indexing policy: "
                     f"{options_json}{default_desc}. This is incompatible "
                     "with the requested indexing policy for this object. "
-                    "Consider reindexing anew on a fresh "
+                    "Consider indexing anew on a fresh "
                     "collection with the requested indexing "
                     "policy, or alternatively align the requested "
                     "indexing settings to the collection to keep using it."
