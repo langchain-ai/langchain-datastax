@@ -805,23 +805,47 @@ class TestAstraDBVectorStore:
         res_i_vals = {doc.metadata["i"] for doc in res1}
         assert res_i_vals == {0, 4}
 
-    def test_astradb_vectorstore_mmr_vectorize_unsupported_sync(
+    def test_astradb_vectorstore_mmr_vectorize_sync(
         self, vectorize_store: AstraDBVectorStore
     ) -> None:
         """
-        MMR testing with vectorize, currently unsupported.
+        MMR testing with vectorize, sync.
         """
-        with pytest.raises(ValueError):
-            vectorize_store.max_marginal_relevance_search("aa", k=2, fetch_k=3)
+        vectorize_store.add_texts(
+            [
+                "Dog",
+                "Wolf",
+                "Ant",
+                "Sunshine and piadina",
+            ],
+            ids=["d", "w", "a", "s"],
+        )
 
-    async def test_astradb_vectorstore_mmr_vectorize_unsupported_async(
+        hits = vectorize_store.max_marginal_relevance_search("Dingo", k=2, fetch_k=3)
+        assert {doc.page_content for doc in hits} == {"Dog", "Ant"}
+
+    async def test_astradb_vectorstore_mmr_vectorize_async(
         self, vectorize_store: AstraDBVectorStore
     ) -> None:
         """
-        MMR async testing with vectorize, currently unsupported.
+        MMR async testing with vectorize, async.
         """
-        with pytest.raises(ValueError):
-            await vectorize_store.amax_marginal_relevance_search("aa", k=2, fetch_k=3)
+        await vectorize_store.aadd_texts(
+            [
+                "Dog",
+                "Wolf",
+                "Ant",
+                "Sunshine and piadina",
+            ],
+            ids=["d", "w", "a", "s"],
+        )
+
+        hits = await vectorize_store.amax_marginal_relevance_search(
+            "Dingo",
+            k=2,
+            fetch_k=3,
+        )
+        assert {doc.page_content for doc in hits} == {"Dog", "Ant"}
 
     @pytest.mark.parametrize(
         "vector_store",
