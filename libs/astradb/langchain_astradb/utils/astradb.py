@@ -11,9 +11,10 @@ from enum import Enum
 from typing import Any, Awaitable, Dict, List, Optional, Union
 
 import langchain_core
-from astrapy.api import APIRequestError
-from astrapy.db import AstraDB, AstraDBCollection, AsyncAstraDB, AsyncAstraDBCollection
-from astrapy.info import CollectionVectorServiceOptions
+from astrapy import AsyncDatabase, DataAPIClient, Database
+from astrapy.db import AstraDB, AsyncAstraDB  # 'core' astrapy imports
+from astrapy.exceptions import DataAPIException
+from astrapy.info import CollectionDescriptor, CollectionVectorServiceOptions
 
 TOKEN_ENV_VAR = "ASTRA_DB_APPLICATION_TOKEN"
 API_ENDPOINT_ENV_VAR = "ASTRA_DB_API_ENDPOINT"
@@ -35,6 +36,7 @@ class _AstraDBEnvironment:
         self,
         token: Optional[str] = None,
         api_endpoint: Optional[str] = None,
+        environment: Optional[str] = None,
         astra_db_client: Optional[AstraDB] = None,
         async_astra_db_client: Optional[AsyncAstraDB] = None,
         namespace: Optional[str] = None,
@@ -42,12 +44,18 @@ class _AstraDBEnvironment:
         self.token: Optional[str]
         self.api_endpoint: Optional[str]
         self.namespace: Optional[str]
+        self.environment: Optional[str]
+
+        self.data_api_client: DataAPIClient
+        self.database: Database
+        self.async_database: AsyncDatabase
 
         if astra_db_client is not None or async_astra_db_client is not None:
-            if token is not None or api_endpoint is not None:
+            if token is not None or api_endpoint is not None or environment is not None:
                 raise ValueError(
-                    "You cannot pass 'astra_db_client' or 'async_astra_db_client' to "
-                    "AstraDBEnvironment if passing 'token' and 'api_endpoint'."
+                    "You cannot pass 'astra_db_client' or 'async_astra_db_client' "
+                    "to AstraDBEnvironment if passing 'token', 'api_endpoint' or "
+                    "'environment'."
                 )
             if astra_db_client is not None:
                 _astra_db = astra_db_client.copy()
@@ -58,9 +66,56 @@ class _AstraDBEnvironment:
             else:
                 _async_astra_db = None
 
-            self.token = token
-            self.api_endpoint = api_endpoint
-            self.namespace = namespace
+            # deprecation of the 'core classes' in constructor and conversion
+            # to token/endpoint(-environment) based init, with checks
+            # at least one of the two (core) clients is not None:
+            warnings.warn(
+                (
+                    "Initializing Astra DB LangChain classes by passing "
+                    "AstraDB/AsyncAstraDB ready clients is deprecated starting "
+                    "with langchain-astradb==0.3.5. Please switch to passing "
+                    "'token', 'api_endpoint' (and optionally 'environment') "
+                    "instead."
+                ),
+                DeprecationWarning,
+            )
+            _tokens = list({
+                klient.token
+                for klient in [astra_db_client, async_astra_db_client]
+                if klient is not None
+            })
+            _api_endpoints = list({
+                klient.api_endpoint
+                for klient in [astra_db_client, async_astra_db_client]
+                if klient is not None
+            })
+            _namespaces = list({
+                klient.namespace
+                for klient in [astra_db_client, async_astra_db_client]
+                if klient is not None
+            })
+            if len(_tokens) != 1:
+                raise ValueError(
+                    "Conflicting tokens found in the sync and async AstraDB "
+                    "constructor parameters. Please check the tokens and "
+                    "ensure they match."
+                )
+            if len(_api_endpoints) != 1:
+                raise ValueError(
+                    "Conflicting API endpoints found in the sync and async "
+                    "AstraDB constructor parameters. Please check the tokens "
+                    "and ensure they match."
+                )
+            if len(_namespaces) != 1:
+                raise ValueError(
+                    "Conflicting namespaces found in the sync and async "
+                    "AstraDB constructor parameters. Please check the tokens "
+                    "and ensure they match."
+                )
+            # all good: these are 1-element lists here
+            self.token = _tokens[0]
+            self.api_endpoint = _api_endpoints[0]
+            self.namespace = _namespaces[0]
         else:
             # secrets-based initialization
             if token is None:
@@ -87,39 +142,33 @@ class _AstraDBEnvironment:
             self.token = _token
             self.api_endpoint = _api_endpoint
             self.namespace = _namespace
-            #
-            if _token and _api_endpoint:
-                _astra_db = AstraDB(
-                    token=_token,
-                    api_endpoint=_api_endpoint,
-                    namespace=_namespace,
-                )
-                _async_astra_db = None
-            else:
-                raise ValueError(
-                    "API endpoint and/or token for Astra DB not provided. "
-                    "Either pass them explicitly to the object constructor "
-                    f"or set the {API_ENDPOINT_ENV_VAR}, {TOKEN_ENV_VAR} "
-                    "environment variables."
-                )
 
-        # complete sync/async with the other if necessary
-        if _astra_db is None:
-            _astra_db = _async_astra_db.to_sync()  # type: ignore[union-attr]
-        if _async_astra_db is None:
-            _async_astra_db = _astra_db.to_async()
+        self.environment = environment
 
-        self.astra_db = _astra_db
-        self.async_astra_db = _async_astra_db
+        # init parameters are normalized to self.{token, api_endpoint, namespace}.
+        # Proceed. Namespace and token can be None (resp. on Astra DB and non-Astra)
+        if self.api_endpoint is None:
+            raise ValueError(
+                "API endpoint for Data API not provided. "
+                "Either pass it explicitly to the object constructor "
+                f"or set the {API_ENDPOINT_ENV_VAR} environment variable."
+            )
 
-        self.astra_db.set_caller(
-            caller_name="langchain",
-            caller_version=getattr(langchain_core, "__version__", None),
+        # create the clients
+        caller_name="langchain"
+        caller_version=getattr(langchain_core, "__version__", None)
+
+        self.data_api_client = DataAPIClient(
+            environment=self.environment,
+            caller_name=caller_name,
+            caller_version=caller_version,
         )
-        self.async_astra_db.set_caller(
-            caller_name="langchain",
-            caller_version=getattr(langchain_core, "__version__", None),
+        self.database = self.data_api_client.get_database(
+            api_endpoint=self.api_endpoint,
+            token=self.token,
+            namespace=self.namespace,
         )
+        self.async_database = self.database.to_async()
 
 
 class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
@@ -128,6 +177,7 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
         collection_name: str,
         token: Optional[str] = None,
         api_endpoint: Optional[str] = None,
+        environment: Optional[str] = None,
         astra_db_client: Optional[AstraDB] = None,
         async_astra_db_client: Optional[AsyncAstraDB] = None,
         namespace: Optional[str] = None,
@@ -143,69 +193,55 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
         collection_embedding_api_key: Optional[str] = None,
     ) -> None:
         super().__init__(
-            token, api_endpoint, astra_db_client, async_astra_db_client, namespace
+            token=token,
+            api_endpoint=api_endpoint,
+            environment=environment,
+            astra_db_client=astra_db_client,
+            async_astra_db_client=async_astra_db_client,
+            namespace=namespace,
         )
-        embedding_key_header = {
-            k: v
-            for k, v in {
-                DEFAULT_VECTORIZE_SECRET_HEADER: collection_embedding_api_key,
-            }.items()
-            if v is not None
-        }
         self.collection_name = collection_name
-        self.collection = AstraDBCollection(
-            collection_name=collection_name,
-            astra_db=self.astra_db,
-            additional_headers=embedding_key_header,
+        self.collection = self.database.get_collection(
+            name=self.collection_name,
+            embedding_api_key=collection_embedding_api_key,
         )
-
-        self.async_collection = AsyncAstraDBCollection(
-            collection_name=collection_name,
-            astra_db=self.async_astra_db,
-            additional_headers=embedding_key_header,
+        self.async_collection = self.database.get_collection(
+            name=self.collection_name,
+            embedding_api_key=collection_embedding_api_key,
         )
-
-        if requested_indexing_policy is not None:
-            _options = {"indexing": requested_indexing_policy}
-        else:
-            _options = None
 
         self.async_setup_db_task: Optional[Task] = None
         if setup_mode == SetupMode.ASYNC:
-            async_astra_db = self.async_astra_db
+
+            async_database = self.async_database
 
             async def _setup_db() -> None:
                 if pre_delete_collection:
-                    await async_astra_db.delete_collection(collection_name)
+                    await async_database.drop_collection(collection_name)
                 if inspect.isawaitable(embedding_dimension):
                     dimension = await embedding_dimension
                 else:
                     dimension = embedding_dimension
 
-                # Used for enabling $vectorize on the collection
-                service_dict: Optional[Dict[str, Any]] = None
-                if collection_vector_service_options is not None:
-                    service_dict = collection_vector_service_options.as_dict()
-
                 try:
-                    await async_astra_db.create_collection(
-                        collection_name,
+                    await async_database.create_collection(
+                        name=collection_name,
                         dimension=dimension,
                         metric=metric,
-                        options=_options,
-                        service_dict=service_dict,
+                        indexing=requested_indexing_policy,
+                        # Used for enabling $vectorize on the collection
+                        service=collection_vector_service_options,
+                        check_exists=False,
                     )
-                except (APIRequestError, ValueError):
+                except DataAPIException:
                     # possibly the collection is preexisting and may have legacy,
                     # or custom, indexing settings: verify
-                    get_coll_response = await async_astra_db.get_collections(
-                        options={"explain": True}
-                    )
-                    collections = (get_coll_response["status"] or {}).get(
-                        "collections"
-                    ) or []
+                    collection_descriptors = [
+                        coll_desc
+                        async for coll_desc in await async_database.list_collections()
+                    ]
                     if not self._validate_indexing_policy(
-                        detected_collections=collections,
+                        collection_descriptors=collection_descriptors,
                         collection_name=self.collection_name,
                         requested_indexing_policy=requested_indexing_policy,
                         default_indexing_policy=default_indexing_policy,
@@ -216,37 +252,29 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
             self.async_setup_db_task = asyncio.create_task(_setup_db())
         elif setup_mode == SetupMode.SYNC:
             if pre_delete_collection:
-                self.astra_db.delete_collection(collection_name)
+                self.database.drop_collection(collection_name)
             if inspect.isawaitable(embedding_dimension):
                 raise ValueError(
                     "Cannot use an awaitable embedding_dimension with async_setup "
                     "set to False"
                 )
             else:
-                # Used for enabling $vectorize on the collection
-                service_dict: Optional[Dict[str, Any]] = None
-                if collection_vector_service_options is not None:
-                    service_dict = collection_vector_service_options.as_dict()
-
                 try:
-                    self.astra_db.create_collection(
-                        collection_name,
+                    self.database.create_collection(
+                        name=collection_name,
                         dimension=embedding_dimension,  # type: ignore[arg-type]
                         metric=metric,
-                        options=_options,
-                        service_dict=service_dict,
+                        indexing=requested_indexing_policy,
+                        # Used for enabling $vectorize on the collection
+                        service=collection_vector_service_options,
+                        check_exists=False,
                     )
-                except (APIRequestError, ValueError):
+                except DataAPIException:
                     # possibly the collection is preexisting and may have legacy,
                     # or custom, indexing settings: verify
-                    get_coll_response = self.astra_db.get_collections(  # type: ignore[union-attr]
-                        options={"explain": True}
-                    )
-                    collections = (get_coll_response["status"] or {}).get(
-                        "collections"
-                    ) or []
+                    collection_descriptors = list(self.database.list_collections())
                     if not self._validate_indexing_policy(
-                        detected_collections=collections,
+                        collection_descriptors=collection_descriptors,
                         collection_name=self.collection_name,
                         requested_indexing_policy=requested_indexing_policy,
                         default_indexing_policy=default_indexing_policy,
@@ -254,9 +282,10 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
                         # other reasons for the exception
                         raise
 
+
     @staticmethod
     def _validate_indexing_policy(
-        detected_collections: List[Dict[str, Any]],
+        collection_descriptors: List[CollectionDescriptor],
         collection_name: str,
         requested_indexing_policy: Optional[Dict[str, Any]],
         default_indexing_policy: Optional[Dict[str, Any]],
@@ -266,7 +295,7 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
         call has failed.
 
         Args:
-            detected_collection (List[Dict[str, Any]]):
+            detected_collection (List[CollectionDescriptor]):
                 the list of collection items returned by astrapy
             collection_name (str): the name of the collection whose attempted
                 creation failed
@@ -300,14 +329,14 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
 
         preexisting = [
             collection
-            for collection in detected_collections
-            if collection["name"] == collection_name
+            for collection in collection_descriptors
+            if collection.name == collection_name
         ]
         if preexisting:
             pre_collection = preexisting[0]
             # if it has no "indexing", it is a legacy collection
-            pre_col_options = pre_collection.get("options") or {}
-            if "indexing" not in pre_col_options:
+            pre_col_options = pre_collection.options
+            if not pre_col_options.indexing:
                 # legacy collection on DB
                 if requested_indexing_policy == default_indexing_policy:
                     warnings.warn(
@@ -339,10 +368,10 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
                         "settings for this object to their defaults "
                         "to keep using this collection."
                     )
-            elif pre_col_options["indexing"] != requested_indexing_policy:
+            elif pre_col_options.indexing != requested_indexing_policy:
                 # collection on DB has indexing settings, but different
-                options_json = json.dumps(pre_col_options["indexing"])
-                if pre_col_options["indexing"] == default_indexing_policy:
+                options_json = json.dumps(pre_col_options.indexing)
+                if pre_col_options.indexing == default_indexing_policy:
                     default_desc = " (default setting)"
                 else:
                     default_desc = ""
@@ -372,7 +401,7 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
             except InvalidStateError:
                 raise ValueError(
                     "Asynchronous setup of the DB not finished. "
-                    "NB: AstraDB components sync methods shouldn't be called from the "
+                    "NB: Astra DB components sync methods shouldn't be called from the "
                     "event loop. Consider using their async equivalents."
                 )
 

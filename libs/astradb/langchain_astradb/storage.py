@@ -26,7 +26,7 @@ V = TypeVar("V")
 
 
 class AstraDBBaseStore(Generic[V], BaseStore[str, V], ABC):
-    """Base class for the DataStax AstraDB data store."""
+    """Base class for the DataStax Astra DB data store."""
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         if "requested_indexing_policy" in kwargs:
