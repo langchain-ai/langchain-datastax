@@ -23,9 +23,9 @@ from astrapy.results import UpdateResult
 from langchain_core.stores import BaseStore, ByteStore
 
 from langchain_astradb.utils.astradb import (
+    REPLACE_DOCUMENTS_MAX_THREADS,
     SetupMode,
     _AstraDBCollectionEnvironment,
-    REPLACE_DOCUMENTS_MAX_THREADS,
 )
 
 V = TypeVar("V")

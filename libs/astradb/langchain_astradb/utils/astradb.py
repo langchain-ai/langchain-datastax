@@ -235,7 +235,7 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
                     # or custom, indexing settings: verify
                     collection_descriptors = [
                         coll_desc
-                        async for coll_desc in await async_database.list_collections()
+                        async for coll_desc in async_database.list_collections()
                     ]
                     if not self._validate_indexing_policy(
                         collection_descriptors=collection_descriptors,
