@@ -1283,9 +1283,107 @@ class AstraDBVectorStore(VectorStore):
                 filter=filter,
             )
 
+    def _run_mmr_query_by_sort(
+        self,
+        sort: Dict[str, Any],
+        k: int,
+        fetch_k: int,
+        lambda_mult: float,
+        metadata_parameter: Dict[str, Any],
+        **kwargs: Any,
+    ) -> List[Document]:
+        query_vector_l: List[Optional[List[float]]] = [None]
+
+        def _response_setter(
+            resp: Dict[str, Any],
+            qvl: List[Optional[List[float]]] = query_vector_l,
+        ) -> None:
+            qvl[0] = resp["status"]["sortVector"]
+
+        prefetch_hits = list(
+            # self.collection is not None (by _ensure_astra_db_client)
+            self.collection.paginated_find(  # type: ignore[union-attr]
+                filter=metadata_parameter,
+                sort=sort,
+                options={
+                    "limit": fetch_k,
+                    "includeSimilarity": True,
+                    "includeSortVector": True,
+                },
+                projection={
+                    "_id": 1,
+                    "content": 1,
+                    "metadata": 1,
+                    "$vector": 1,
+                    "$vectorize": 1,
+                },
+                raw_response_callback=_response_setter,
+            )
+        )
+        query_vector = query_vector_l[0]
+        # the callback has surely filled query_vector:
+        return self._get_mmr_hits(
+            embedding=query_vector,  # type: ignore[arg-type]
+            k=k,
+            lambda_mult=lambda_mult,
+            prefetch_hits=prefetch_hits,
+            content_field="$vectorize" if self._using_vectorize() else "content",
+        )
+
+    async def _arun_mmr_query_by_sort(
+        self,
+        sort: Dict[str, Any],
+        k: int,
+        fetch_k: int,
+        lambda_mult: float,
+        metadata_parameter: Dict[str, Any],
+        **kwargs: Any,
+    ) -> List[Document]:
+        query_vector_l: List[Optional[List[float]]] = [None]
+
+        def _response_setter(
+            resp: Dict[str, Any],
+            qvl: List[Optional[List[float]]] = query_vector_l,
+        ) -> None:
+            qvl[0] = resp["status"]["sortVector"]
+
+        prefetch_hits = [
+            hit
+            async for hit in self.async_collection.paginated_find(
+                filter=metadata_parameter,
+                sort=sort,
+                options={
+                    "limit": fetch_k,
+                    "includeSimilarity": True,
+                    "includeSortVector": True,
+                },
+                projection={
+                    "_id": 1,
+                    "content": 1,
+                    "metadata": 1,
+                    "$vector": 1,
+                    "$vectorize": 1,
+                },
+                raw_response_callback=_response_setter,
+            )
+        ]
+        # the callback has surely filled query_vector:
+        query_vector = query_vector_l[0]
+        return self._get_mmr_hits(
+            embedding=query_vector,  # type: ignore[arg-type]
+            k=k,
+            lambda_mult=lambda_mult,
+            prefetch_hits=prefetch_hits,
+            content_field="$vectorize" if self._using_vectorize() else "content",
+        )
+
     @staticmethod
     def _get_mmr_hits(
-        embedding: List[float], k: int, lambda_mult: float, prefetch_hits: List[DocDict]
+        embedding: List[float],
+        k: int,
+        lambda_mult: float,
+        prefetch_hits: List[DocDict],
+        content_field: str,
     ) -> List[Document]:
         mmr_chosen_indices = maximal_marginal_relevance(
             np.array(embedding, dtype=np.float32),
@@ -1300,7 +1398,7 @@ class AstraDBVectorStore(VectorStore):
         ]
         return [
             Document(
-                page_content=hit["content"],
+                page_content=hit[content_field],
                 metadata=hit["metadata"],
             )
             for hit in mmr_hits
@@ -1335,22 +1433,13 @@ class AstraDBVectorStore(VectorStore):
         self.astra_env.ensure_db_setup()
         metadata_parameter = self._filter_to_metadata(filter)
 
-        prefetch_hits = list(
-            # self.collection is not None (by _ensure_astra_db_client)
-            self.collection.paginated_find(  # type: ignore[union-attr]
-                filter=metadata_parameter,
-                sort={"$vector": embedding},
-                options={"limit": fetch_k, "includeSimilarity": True},
-                projection={
-                    "_id": 1,
-                    "content": 1,
-                    "metadata": 1,
-                    "$vector": 1,
-                },
-            )
+        return self._run_mmr_query_by_sort(
+            sort={"$vector": embedding},
+            k=k,
+            fetch_k=fetch_k,
+            lambda_mult=lambda_mult,
+            metadata_parameter=metadata_parameter,
         )
-
-        return self._get_mmr_hits(embedding, k, lambda_mult, prefetch_hits)
 
     async def amax_marginal_relevance_search_by_vector(
         self,
@@ -1381,22 +1470,13 @@ class AstraDBVectorStore(VectorStore):
         await self.astra_env.aensure_db_setup()
         metadata_parameter = self._filter_to_metadata(filter)
 
-        prefetch_hits = [
-            hit
-            async for hit in self.async_collection.paginated_find(
-                filter=metadata_parameter,
-                sort={"$vector": embedding},
-                options={"limit": fetch_k, "includeSimilarity": True},
-                projection={
-                    "_id": 1,
-                    "content": 1,
-                    "metadata": 1,
-                    "$vector": 1,
-                },
-            )
-        ]
-
-        return self._get_mmr_hits(embedding, k, lambda_mult, prefetch_hits)
+        return await self._arun_mmr_query_by_sort(
+            sort={"$vector": embedding},
+            k=k,
+            fetch_k=fetch_k,
+            lambda_mult=lambda_mult,
+            metadata_parameter=metadata_parameter,
+        )
 
     def max_marginal_relevance_search(
         self,
@@ -1425,7 +1505,17 @@ class AstraDBVectorStore(VectorStore):
             The list of Documents selected by maximal marginal relevance.
         """
         if self._using_vectorize():
-            raise ValueError("MMR search is unsupported for server-side embeddings.")
+            # this case goes directly to the "_by_sort" method
+            # (and does its own filter normalization, as it cannot
+            #  use the path for the with-embedding mmr querying)
+            metadata_parameter = self._filter_to_metadata(filter)
+            return self._run_mmr_query_by_sort(
+                sort={"$vectorize": query},
+                k=k,
+                fetch_k=fetch_k,
+                lambda_mult=lambda_mult,
+                metadata_parameter=metadata_parameter,
+            )
         else:
             assert self.embedding is not None
             embedding_vector = self.embedding.embed_query(query)
@@ -1464,7 +1554,17 @@ class AstraDBVectorStore(VectorStore):
             The list of Documents selected by maximal marginal relevance.
         """
         if self._using_vectorize():
-            raise ValueError("MMR search is unsupported for server-side embeddings.")
+            # this case goes directly to the "_by_sort" method
+            # (and does its own filter normalization, as it cannot
+            #  use the path for the with-embedding mmr querying)
+            metadata_parameter = self._filter_to_metadata(filter)
+            return await self._arun_mmr_query_by_sort(
+                sort={"$vectorize": query},
+                k=k,
+                fetch_k=fetch_k,
+                lambda_mult=lambda_mult,
+                metadata_parameter=metadata_parameter,
+            )
         else:
             assert self.embedding is not None
             embedding_vector = await self.embedding.aembed_query(query)

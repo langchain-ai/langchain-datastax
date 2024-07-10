@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "langchain-astradb"
-version = "0.3.3"
+version = "0.3.4"
 description = "An integration package connecting Astra DB and LangChain"
 authors = []
 readme = "README.md"
@@ -13,7 +13,7 @@ license = "MIT"
 [tool.poetry.dependencies]
 python = ">=3.8.1,<4.0"
 langchain-core = ">=0.1.31,<0.3"
-astrapy = "^1.2"
+astrapy = "^1.3"
 numpy = "^1"
 
 [tool.poetry.group.test]
