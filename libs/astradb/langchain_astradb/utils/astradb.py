@@ -20,7 +20,7 @@ TOKEN_ENV_VAR = "ASTRA_DB_APPLICATION_TOKEN"
 API_ENDPOINT_ENV_VAR = "ASTRA_DB_API_ENDPOINT"
 NAMESPACE_ENV_VAR = "ASTRA_DB_KEYSPACE"
 
-DEFAULT_VECTORIZE_SECRET_HEADER = "x-embedding-api-key"
+REPLACE_DOCUMENTS_MAX_THREADS = 20
 
 logger = logging.getLogger()
 
@@ -205,10 +205,7 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
             name=self.collection_name,
             embedding_api_key=collection_embedding_api_key,
         )
-        self.async_collection = self.database.get_collection(
-            name=self.collection_name,
-            embedding_api_key=collection_embedding_api_key,
-        )
+        self.async_collection = self.collection.to_async()
 
         self.async_setup_db_task: Optional[Task] = None
         if setup_mode == SetupMode.ASYNC:
