@@ -11,43 +11,7 @@ from astrapy.db import AstraDB
 from langchain_astradb.storage import AstraDBByteStore, AstraDBStore
 from langchain_astradb.utils.astradb import SetupMode
 
-
-def _has_env_vars() -> bool:
-    return all(
-        [
-            "ASTRA_DB_APPLICATION_TOKEN" in os.environ,
-            "ASTRA_DB_API_ENDPOINT" in os.environ,
-        ]
-    )
-
-
-@pytest.fixture
-def astra_db_credentials() -> Dict[str, Optional[str]]:
-    return {
-        "token": os.environ["ASTRA_DB_APPLICATION_TOKEN"],
-        "api_endpoint": os.environ["ASTRA_DB_API_ENDPOINT"],
-        "namespace": os.environ.get("ASTRA_DB_KEYSPACE"),
-        "environment": os.environ.get("ASTRA_DB_ENVIRONMENT"),
-    }
-
-
-@pytest.fixture
-def database(astra_db_credentials: Dict[str, Optional[str]]) -> Database:
-    return Database(
-        token=astra_db_credentials["token"],
-        api_endpoint=astra_db_credentials["api_endpoint"],  # type: ignore[arg-type]
-        namespace=astra_db_credentials["namespace"],
-        environment=astra_db_credentials["environment"],
-    )
-
-
-@pytest.fixture
-def core_astra_db(astra_db_credentials: Dict[str, Optional[str]]) -> AstraDB:
-    return AstraDB(
-        token=astra_db_credentials["token"],
-        api_endpoint=astra_db_credentials["api_endpoint"],  # type: ignore[arg-type]
-        namespace=astra_db_credentials["namespace"],
-    )
+from .conftest import _has_env_vars
 
 
 def init_store(
@@ -310,8 +274,8 @@ class TestAstraDBStore:
                     collection_name=collection_name,
                     astra_db_client=core_astra_db,
                 )
-                assert len(rec_warnings) == 1
-                assert store_init_core.mget(["key"]) == ["val123"]
+            assert len(rec_warnings) == 1
+            assert store_init_core.mget(["key"]) == ["val123"]
         finally:
             store_init_ok.astra_env.database.drop_collection(collection_name)
 
@@ -342,7 +306,9 @@ class TestAstraDBStore:
                     astra_db_client=core_astra_db,
                     setup_mode=SetupMode.ASYNC,
                 )
-                assert len(rec_warnings) == 1
-                assert await store_init_core.amget(["key"]) == ["val123"]
+            assert len(rec_warnings) == 1
+            assert await store_init_core.amget(["key"]) == ["val123"]
         finally:
-            await store_init_ok.astra_env.async_database.drop_collection(collection_name)
+            await store_init_ok.astra_env.async_database.drop_collection(
+                collection_name
+            )
