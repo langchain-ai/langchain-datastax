@@ -174,13 +174,13 @@ async def async_astradb_semantic_cache(
 
 @pytest.mark.skipif(not _has_env_vars(), reason="Missing Astra DB env. vars")
 class TestAstraDBCaches:
-    def test_astradb_cache(self, astradb_cache: AstraDBCache) -> None:
+    def test_astradb_cache_sync(self, astradb_cache: AstraDBCache) -> None:
         self.do_cache_test(FakeLLM(), astradb_cache, "foo")
 
     async def test_astradb_cache_async(self, async_astradb_cache: AstraDBCache) -> None:
         await self.ado_cache_test(FakeLLM(), async_astradb_cache, "foo")
 
-    def test_astradb_semantic_cache(
+    def test_astradb_semantic_cache_sync(
         self, astradb_semantic_cache: AstraDBSemanticCache
     ) -> None:
         llm = FakeLLM()
@@ -256,7 +256,7 @@ class TestAstraDBCaches:
                 namespace=astra_db_credentials["namespace"],
             )
             cache_init_ok.update("pr", "llms", test_gens)
-            # create an equivalent store with core AstraDB in init
+            # create an equivalent cache with core AstraDB in init
             with pytest.warns(DeprecationWarning) as rec_warnings:
                 cache_init_core = AstraDBCache(
                     collection_name=collection_name,
@@ -288,7 +288,7 @@ class TestAstraDBCaches:
                 setup_mode=SetupMode.ASYNC,
             )
             await cache_init_ok.aupdate("pr", "llms", test_gens)
-            # create an equivalent store with core AstraDB in init
+            # create an equivalent cache with core AstraDB in init
             with pytest.warns(DeprecationWarning) as rec_warnings:
                 cache_init_core = AstraDBCache(
                     collection_name=collection_name,
@@ -301,10 +301,6 @@ class TestAstraDBCaches:
             await cache_init_ok.astra_env.async_database.drop_collection(
                 collection_name
             )
-
-
-
-
 
     @pytest.mark.skipif(
         os.environ.get("ASTRA_DB_ENVIRONMENT", "prod").upper() != "PROD",
@@ -328,7 +324,7 @@ class TestAstraDBCaches:
                 embedding=fake_embe,
             )
             cache_init_ok.update("pr", "llms", test_gens)
-            # create an equivalent store with core AstraDB in init
+            # create an equivalent cache with core AstraDB in init
             with pytest.warns(DeprecationWarning) as rec_warnings:
                 cache_init_core = AstraDBSemanticCache(
                     collection_name=collection_name,
@@ -363,7 +359,7 @@ class TestAstraDBCaches:
                 embedding=fake_embe,
             )
             await cache_init_ok.aupdate("pr", "llms", test_gens)
-            # create an equivalent store with core AstraDB in init
+            # create an equivalent cache with core AstraDB in init
             with pytest.warns(DeprecationWarning) as rec_warnings:
                 cache_init_core = AstraDBSemanticCache(
                     collection_name=collection_name,
