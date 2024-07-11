@@ -121,7 +121,7 @@ def astradb_cache() -> Iterator[AstraDBCache]:
         namespace=os.environ.get("ASTRA_DB_KEYSPACE"),
     )
     yield cache
-    cache.collection.astra_db.delete_collection("lc_integration_test_cache")
+    cache.collection.drop()
 
 
 @pytest.fixture
@@ -134,9 +134,7 @@ async def async_astradb_cache() -> AsyncIterator[AstraDBCache]:
         setup_mode=SetupMode.ASYNC,
     )
     yield cache
-    await cache.async_collection.astra_db.delete_collection(
-        "lc_integration_test_cache_async"
-    )
+    await cache.async_collection.drop()
 
 
 @pytest.fixture(scope="module")
@@ -150,7 +148,7 @@ def astradb_semantic_cache() -> Iterator[AstraDBSemanticCache]:
         embedding=fake_embe,
     )
     yield sem_cache
-    sem_cache.collection.astra_db.delete_collection("lc_integration_test_sem_cache")
+    sem_cache.collection.drop()
 
 
 @pytest.fixture
@@ -165,9 +163,7 @@ async def async_astradb_semantic_cache() -> AsyncIterator[AstraDBSemanticCache]:
         setup_mode=SetupMode.ASYNC,
     )
     yield sem_cache
-    sem_cache.collection.astra_db.delete_collection(
-        "lc_integration_test_sem_cache_async"
-    )
+    sem_cache.collection.drop()
 
 
 @pytest.mark.skipif(not _has_env_vars(), reason="Missing Astra DB env. vars")

@@ -95,6 +95,7 @@ class AstraDBCache(BaseCache):
         collection_name: str = ASTRA_DB_CACHE_DEFAULT_COLLECTION_NAME,
         token: Optional[str] = None,
         api_endpoint: Optional[str] = None,
+        environment: Optional[str] = None,
         astra_db_client: Optional[AstraDB] = None,
         async_astra_db_client: Optional[AsyncAstraDB] = None,
         namespace: Optional[str] = None,
@@ -117,10 +118,19 @@ class AstraDBCache(BaseCache):
             api_endpoint: full URL to the API endpoint, such as
                 `https://<DB-ID>-us-east1.apps.astra.datastax.com`. If not provided,
                 the environment variable ASTRA_DB_API_ENDPOINT is inspected.
-            astra_db_client: *alternative to token+api_endpoint*,
-                you can pass an already-created 'astrapy.db.AstraDB' instance.
-            async_astra_db_client: *alternative to token+api_endpoint*,
-                you can pass an already-created 'astrapy.db.AsyncAstraDB' instance.
+            environment: a string specifying the environment of the target Data API.
+                If omitted, defaults to "prod" (Astra DB production).
+                Other values are in `astrapy.constants.Environment` enum class.
+            astra_db_client:
+                *DEPRECATED starting from version 0.3.5.*
+                *Please use 'token', 'api_endpoint' and optionally 'environment'.*
+                you can pass an already-created 'astrapy.db.AstraDB' instance
+                (alternatively to 'token', 'api_endpoint' and 'environment').
+            async_astra_db_client:
+                *DEPRECATED starting from version 0.3.5.*
+                *Please use 'token', 'api_endpoint' and optionally 'environment'.*
+                you can pass an already-created 'astrapy.db.AsyncAstraDB' instance
+                (alternatively to 'token', 'api_endpoint' and 'environment').
             namespace: namespace (aka keyspace) where the collection is created.
                 If not provided, the environment variable ASTRA_DB_KEYSPACE is
                 inspected. Defaults to the database's "default namespace".
@@ -134,6 +144,7 @@ class AstraDBCache(BaseCache):
             collection_name=collection_name,
             token=token,
             api_endpoint=api_endpoint,
+            environment=environment,
             astra_db_client=astra_db_client,
             async_astra_db_client=async_astra_db_client,
             namespace=namespace,
@@ -153,7 +164,7 @@ class AstraDBCache(BaseCache):
             projection={
                 "body_blob": 1,
             },
-        )["data"]["document"]
+        )
         return _loads_generations(item["body_blob"]) if item is not None else None
 
     async def alookup(self, prompt: str, llm_string: str) -> Optional[RETURN_VAL_TYPE]:
@@ -168,18 +179,20 @@ class AstraDBCache(BaseCache):
                     "body_blob": 1,
                 },
             )
-        )["data"]["document"]
+        )
         return _loads_generations(item["body_blob"]) if item is not None else None
 
     def update(self, prompt: str, llm_string: str, return_val: RETURN_VAL_TYPE) -> None:
         self.astra_env.ensure_db_setup()
         doc_id = self._make_id(prompt, llm_string)
         blob = _dumps_generations(return_val)
-        self.collection.upsert_one(
+        self.collection.find_one_and_replace(
+            {"_id": doc_id},
             {
                 "_id": doc_id,
                 "body_blob": blob,
             },
+            upsert=True,
         )
 
     async def aupdate(
@@ -188,11 +201,13 @@ class AstraDBCache(BaseCache):
         await self.astra_env.aensure_db_setup()
         doc_id = self._make_id(prompt, llm_string)
         blob = _dumps_generations(return_val)
-        await self.async_collection.upsert_one(
+        await self.async_collection.find_one_and_replace(
+            {"_id": doc_id},
             {
                 "_id": doc_id,
                 "body_blob": blob,
             },
+            upsert=True,
         )
 
     def delete_through_llm(
@@ -227,21 +242,21 @@ class AstraDBCache(BaseCache):
         """Evict from cache if there's an entry."""
         self.astra_env.ensure_db_setup()
         doc_id = self._make_id(prompt, llm_string)
-        self.collection.delete_one(doc_id)
+        self.collection.delete_one({"_id": doc_id})
 
     async def adelete(self, prompt: str, llm_string: str) -> None:
         """Evict from cache if there's an entry."""
         await self.astra_env.aensure_db_setup()
         doc_id = self._make_id(prompt, llm_string)
-        await self.async_collection.delete_one(doc_id)
+        await self.async_collection.delete_one({"_id": doc_id})
 
     def clear(self, **kwargs: Any) -> None:
         self.astra_env.ensure_db_setup()
-        self.collection.clear()
+        self.collection.delete_many({})
 
     async def aclear(self, **kwargs: Any) -> None:
         await self.astra_env.aensure_db_setup()
-        await self.async_collection.clear()
+        await self.async_collection.delete_many({})
 
 
 _unset = ["unset"]
@@ -287,6 +302,7 @@ class AstraDBSemanticCache(BaseCache):
         collection_name: str = ASTRA_DB_SEMANTIC_CACHE_DEFAULT_COLLECTION_NAME,
         token: Optional[str] = None,
         api_endpoint: Optional[str] = None,
+        environment: Optional[str] = None,
         astra_db_client: Optional[AstraDB] = None,
         async_astra_db_client: Optional[AsyncAstraDB] = None,
         namespace: Optional[str] = None,
@@ -315,10 +331,19 @@ class AstraDBSemanticCache(BaseCache):
             api_endpoint: full URL to the API endpoint, such as
                 `https://<DB-ID>-us-east1.apps.astra.datastax.com`. If not provided,
                 the environment variable ASTRA_DB_API_ENDPOINT is inspected.
-            astra_db_client: *alternative to token+api_endpoint*,
-                you can pass an already-created 'astrapy.db.AstraDB' instance.
-            async_astra_db_client: *alternative to token+api_endpoint*,
-                you can pass an already-created 'astrapy.db.AsyncAstraDB' instance.
+            environment: a string specifying the environment of the target Data API.
+                If omitted, defaults to "prod" (Astra DB production).
+                Other values are in `astrapy.constants.Environment` enum class.
+            astra_db_client:
+                *DEPRECATED starting from version 0.3.5.*
+                *Please use 'token', 'api_endpoint' and optionally 'environment'.*
+                you can pass an already-created 'astrapy.db.AstraDB' instance
+                (alternatively to 'token', 'api_endpoint' and 'environment').
+            async_astra_db_client:
+                *DEPRECATED starting from version 0.3.5.*
+                *Please use 'token', 'api_endpoint' and optionally 'environment'.*
+                you can pass an already-created 'astrapy.db.AsyncAstraDB' instance
+                (alternatively to 'token', 'api_endpoint' and 'environment').
             namespace: namespace (aka keyspace) where the collection is created.
                 If not provided, the environment variable ASTRA_DB_KEYSPACE is
                 inspected. Defaults to the database's "default namespace".
@@ -365,6 +390,7 @@ class AstraDBSemanticCache(BaseCache):
             collection_name=collection_name,
             token=token,
             api_endpoint=api_endpoint,
+            environment=environment,
             astra_db_client=astra_db_client,
             async_astra_db_client=async_astra_db_client,
             namespace=namespace,
@@ -393,13 +419,15 @@ class AstraDBSemanticCache(BaseCache):
         embedding_vector = self._get_embedding(text=prompt)
         body = _dumps_generations(return_val)
         #
-        self.collection.upsert_one(
+        self.collection.find_one_and_replace(
+            {"_id": doc_id},
             {
                 "_id": doc_id,
                 "body_blob": body,
                 "llm_string_hash": llm_string_hash,
                 "$vector": embedding_vector,
-            }
+            },
+            upsert=True,
         )
 
     async def aupdate(
@@ -411,13 +439,15 @@ class AstraDBSemanticCache(BaseCache):
         embedding_vector = await self._aget_embedding(text=prompt)
         body = _dumps_generations(return_val)
         #
-        await self.async_collection.upsert_one(
+        await self.async_collection.find_one_and_replace(
+            {"_id": doc_id},
             {
                 "_id": doc_id,
                 "body_blob": body,
                 "llm_string_hash": llm_string_hash,
                 "$vector": embedding_vector,
-            }
+            },
+            upsert=True,
         )
 
     def lookup(self, prompt: str, llm_string: str) -> Optional[RETURN_VAL_TYPE]:
@@ -445,12 +475,12 @@ class AstraDBSemanticCache(BaseCache):
         prompt_embedding: List[float] = self._get_embedding(text=prompt)
         llm_string_hash = _hash(llm_string)
 
-        hit = self.collection.vector_find_one(
-            vector=prompt_embedding,
+        hit = self.collection.find_one(
             filter={
                 "llm_string_hash": llm_string_hash,
             },
-            fields=["body_blob", "_id"],
+            sort={"$vector": prompt_embedding},
+            projection={"body_blob": True, "_id": True},
             include_similarity=True,
         )
 
@@ -475,12 +505,12 @@ class AstraDBSemanticCache(BaseCache):
         prompt_embedding: List[float] = await self._aget_embedding(text=prompt)
         llm_string_hash = _hash(llm_string)
 
-        hit = await self.async_collection.vector_find_one(
-            vector=prompt_embedding,
+        hit = await self.async_collection.find_one(
             filter={
                 "llm_string_hash": llm_string_hash,
             },
-            fields=["body_blob", "_id"],
+            sort={"$vector": prompt_embedding},
+            projection={"body_blob": True, "_id": True},
             include_similarity=True,
         )
 
@@ -521,7 +551,7 @@ class AstraDBSemanticCache(BaseCache):
         with that ID. This is for the second step.
         """
         self.astra_env.ensure_db_setup()
-        self.collection.delete_one(document_id)
+        self.collection.delete_one({"_id": document_id})
 
     async def adelete_by_document_id(self, document_id: str) -> None:
         """
@@ -530,12 +560,12 @@ class AstraDBSemanticCache(BaseCache):
         with that ID. This is for the second step.
         """
         await self.astra_env.aensure_db_setup()
-        await self.async_collection.delete_one(document_id)
+        await self.async_collection.delete_one({"_id": document_id})
 
     def clear(self, **kwargs: Any) -> None:
         self.astra_env.ensure_db_setup()
-        self.collection.clear()
+        self.collection.delete_many({})
 
     async def aclear(self, **kwargs: Any) -> None:
         await self.astra_env.aensure_db_setup()
-        await self.async_collection.clear()
+        await self.async_collection.delete_many({})
