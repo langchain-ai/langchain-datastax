@@ -27,6 +27,7 @@ from typing import Dict, Iterable, Optional
 
 import pytest
 from astrapy import Database
+from astrapy.authentication import EmbeddingAPIKeyHeaderProvider, StaticTokenProvider
 from astrapy.db import AstraDB
 from astrapy.info import CollectionVectorServiceOptions
 from langchain_core.documents import Document
@@ -103,6 +104,30 @@ def store_someemb(
 
 
 @pytest.fixture(scope="function")
+def store_someemb_tokenprovider(
+    astra_db_credentials: AstraDBCredentials,
+) -> Iterable[AstraDBVectorStore]:
+    """A variant of the store_someemb using a TokenProvider for DB auth."""
+    emb = SomeEmbeddings(dimension=2)
+    v_store = AstraDBVectorStore(
+        embedding=emb,
+        collection_name=COLLECTION_NAME_DIM2,
+        token=StaticTokenProvider(astra_db_credentials["token"]),
+        api_endpoint=astra_db_credentials["api_endpoint"],
+        namespace=astra_db_credentials["namespace"],
+        environment=astra_db_credentials["environment"],
+    )
+    v_store.clear()
+
+    yield v_store
+
+    if not SKIP_COLLECTION_DELETE:
+        v_store.delete_collection()
+    else:
+        v_store.clear()
+
+
+@pytest.fixture(scope="function")
 def store_parseremb(
     astra_db_credentials: AstraDBCredentials,
 ) -> Iterable[AstraDBVectorStore]:
@@ -162,6 +187,36 @@ def vectorize_store_w_header(
         collection_vector_service_options=openai_vectorize_options_header,
         collection_name=COLLECTION_NAME_VECTORIZE_OPENAI_HEADER,
         collection_embedding_api_key=os.environ["OPENAI_API_KEY"],
+        token=astra_db_credentials["token"],
+        api_endpoint=astra_db_credentials["api_endpoint"],
+        namespace=astra_db_credentials["namespace"],
+        environment=astra_db_credentials["environment"],
+    )
+    v_store.clear()
+
+    yield v_store
+
+    # explicitly delete the collection to avoid max collection limit
+    v_store.delete_collection()
+
+
+@pytest.fixture(scope="function")
+def vectorize_store_w_header_and_provider(
+    astra_db_credentials: AstraDBCredentials,
+) -> Iterable[AstraDBVectorStore]:
+    """
+    astra db vector store with server-side embeddings using openai + header
+    Variant initialized with a EmbeddingHeadersProvider instance for the header
+    """
+    if not os.environ.get("OPENAI_API_KEY"):
+        pytest.skip("OpenAI key not available")
+
+    v_store = AstraDBVectorStore(
+        collection_vector_service_options=openai_vectorize_options_header,
+        collection_name=COLLECTION_NAME_VECTORIZE_OPENAI_HEADER,
+        collection_embedding_api_key=EmbeddingAPIKeyHeaderProvider(
+            os.environ["OPENAI_API_KEY"],
+        ),
         token=astra_db_credentials["token"],
         api_endpoint=astra_db_credentials["api_endpoint"],
         namespace=astra_db_credentials["namespace"],
@@ -547,8 +602,10 @@ class TestAstraDBVectorStore:
         "vector_store",
         [
             "store_someemb",
+            "store_someemb_tokenprovider",
             "vectorize_store",
             "vectorize_store_w_header",
+            "vectorize_store_w_header_and_provider",
             "vectorize_store_nvidia",
         ],
     )

@@ -3,6 +3,7 @@ import json
 from functools import lru_cache, wraps
 from typing import Any, Awaitable, Callable, Generator, List, Optional, Tuple, Union
 
+from astrapy.authentication import TokenProvider
 from astrapy.db import AstraDB, AsyncAstraDB, logger
 from langchain_core.caches import RETURN_VAL_TYPE, BaseCache
 from langchain_core.embeddings import Embeddings
@@ -93,7 +94,7 @@ class AstraDBCache(BaseCache):
         self,
         *,
         collection_name: str = ASTRA_DB_CACHE_DEFAULT_COLLECTION_NAME,
-        token: Optional[str] = None,
+        token: Optional[Union[str, TokenProvider]] = None,
         api_endpoint: Optional[str] = None,
         environment: Optional[str] = None,
         astra_db_client: Optional[AstraDB] = None,
@@ -113,8 +114,10 @@ class AstraDBCache(BaseCache):
 
         Args:
             collection_name: name of the Astra DB collection to create/use.
-            token: API token for Astra DB usage. If not provided, the environment
-                variable ASTRA_DB_APPLICATION_TOKEN is inspected.
+            token: API token for Astra DB usage, either in the form of a string
+                or a subclass of `astrapy.authentication.TokenProvider`.
+                If not provided, the environment variable
+                ASTRA_DB_APPLICATION_TOKEN is inspected.
             api_endpoint: full URL to the API endpoint, such as
                 `https://<DB-ID>-us-east1.apps.astra.datastax.com`. If not provided,
                 the environment variable ASTRA_DB_API_ENDPOINT is inspected.
@@ -298,7 +301,7 @@ class AstraDBSemanticCache(BaseCache):
         self,
         *,
         collection_name: str = ASTRA_DB_SEMANTIC_CACHE_DEFAULT_COLLECTION_NAME,
-        token: Optional[str] = None,
+        token: Optional[Union[str, TokenProvider]] = None,
         api_endpoint: Optional[str] = None,
         environment: Optional[str] = None,
         astra_db_client: Optional[AstraDB] = None,
@@ -324,8 +327,10 @@ class AstraDBSemanticCache(BaseCache):
 
         Args:
             collection_name: name of the Astra DB collection to create/use.
-            token: API token for Astra DB usage. If not provided, the environment
-                variable ASTRA_DB_APPLICATION_TOKEN is inspected.
+            token: API token for Astra DB usage, either in the form of a string
+                or a subclass of `astrapy.authentication.TokenProvider`.
+                If not provided, the environment variable
+                ASTRA_DB_APPLICATION_TOKEN is inspected.
             api_endpoint: full URL to the API endpoint, such as
                 `https://<DB-ID>-us-east1.apps.astra.datastax.com`. If not provided,
                 the environment variable ASTRA_DB_API_ENDPOINT is inspected.

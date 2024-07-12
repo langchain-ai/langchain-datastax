@@ -12,6 +12,7 @@ from typing import Any, Awaitable, Dict, List, Optional, Union
 
 import langchain_core
 from astrapy import AsyncDatabase, DataAPIClient, Database
+from astrapy.authentication import EmbeddingHeadersProvider, TokenProvider
 from astrapy.db import AstraDB, AsyncAstraDB  # 'core' astrapy imports
 from astrapy.exceptions import DataAPIException
 from astrapy.info import CollectionDescriptor, CollectionVectorServiceOptions
@@ -42,14 +43,14 @@ class SetupMode(Enum):
 class _AstraDBEnvironment:
     def __init__(
         self,
-        token: Optional[str] = None,
+        token: Optional[Union[str, TokenProvider]] = None,
         api_endpoint: Optional[str] = None,
         environment: Optional[str] = None,
         astra_db_client: Optional[AstraDB] = None,
         async_astra_db_client: Optional[AsyncAstraDB] = None,
         namespace: Optional[str] = None,
     ) -> None:
-        self.token: Optional[str]
+        self.token: Optional[Union[str, TokenProvider]]
         self.api_endpoint: Optional[str]
         self.namespace: Optional[str]
         self.environment: Optional[str]
@@ -131,6 +132,7 @@ class _AstraDBEnvironment:
             self.api_endpoint = _api_endpoints[0]
             self.namespace = _namespaces[0]
         else:
+            _token: Optional[Union[str, TokenProvider]]
             # secrets-based initialization
             if token is None:
                 logger.info(
@@ -189,7 +191,7 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
     def __init__(
         self,
         collection_name: str,
-        token: Optional[str] = None,
+        token: Optional[Union[str, TokenProvider]] = None,
         api_endpoint: Optional[str] = None,
         environment: Optional[str] = None,
         astra_db_client: Optional[AstraDB] = None,
@@ -204,7 +206,9 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
         collection_vector_service_options: Optional[
             CollectionVectorServiceOptions
         ] = None,
-        collection_embedding_api_key: Optional[str] = None,
+        collection_embedding_api_key: Optional[
+            Union[str, EmbeddingHeadersProvider]
+        ] = None,
     ) -> None:
         super().__init__(
             token=token,

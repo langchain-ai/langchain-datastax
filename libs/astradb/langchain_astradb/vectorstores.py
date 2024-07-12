@@ -21,6 +21,7 @@ from typing import (
 )
 
 import numpy as np
+from astrapy.authentication import EmbeddingHeadersProvider, TokenProvider
 from astrapy.db import (
     AstraDB as AstraDBClient,
 )
@@ -134,7 +135,7 @@ class AstraDBVectorStore(VectorStore):
         *,
         collection_name: str,
         embedding: Optional[Embeddings] = None,
-        token: Optional[str] = None,
+        token: Optional[Union[str, TokenProvider]] = None,
         api_endpoint: Optional[str] = None,
         environment: Optional[str] = None,
         astra_db_client: Optional[AstraDBClient] = None,
@@ -153,7 +154,9 @@ class AstraDBVectorStore(VectorStore):
         collection_vector_service_options: Optional[
             CollectionVectorServiceOptions
         ] = None,
-        collection_embedding_api_key: Optional[str] = None,
+        collection_embedding_api_key: Optional[
+            Union[str, EmbeddingHeadersProvider]
+        ] = None,
     ) -> None:
         """Wrapper around DataStax Astra DB for vector-store workloads.
 
@@ -183,8 +186,10 @@ class AstraDBVectorStore(VectorStore):
                 `collection_vector_service_options` and
                 `collection_embedding_api_key` cannot be provided.
             collection_name: name of the Astra DB collection to create/use.
-            token: API token for Astra DB usage. If not provided, the environment
-                variable ASTRA_DB_APPLICATION_TOKEN is inspected.
+            token: API token for Astra DB usage, either in the form of a string
+                or a subclass of `astrapy.authentication.TokenProvider`.
+                If not provided, the environment variable
+                ASTRA_DB_APPLICATION_TOKEN is inspected.
             api_endpoint: full URL to the API endpoint, such as
                 `https://<DB-ID>-us-east1.apps.astra.datastax.com`. If not provided,
                 the environment variable ASTRA_DB_API_ENDPOINT is inspected.
@@ -232,8 +237,10 @@ class AstraDBVectorStore(VectorStore):
                 embeddings within Astra DB. If passing this parameter, `embedding`
                 cannot be provided.
             collection_embedding_api_key: for usage of server-side embeddings
-                within Astra DB, with this parameter one can supply an API Key
+                within Astra DB. With this parameter one can supply an API Key
                 that will be passed to Astra DB with each data request.
+                This parameter can be either a string or a subclass of
+                `astrapy.authentication.EmbeddingHeadersProvider`.
                 This is useful when the service is configured for the collection,
                 but no corresponding secret is stored within
                 Astra's key management system.
@@ -285,6 +292,7 @@ class AstraDBVectorStore(VectorStore):
         self.collection_name = collection_name
         self.token = token
         self.api_endpoint = api_endpoint
+        self.environment = environment
         self.namespace = namespace
         self.collection_vector_service_options = collection_vector_service_options
         self.collection_embedding_api_key = collection_embedding_api_key
@@ -301,12 +309,12 @@ class AstraDBVectorStore(VectorStore):
         )
         # "vector-related" settings
         self.metric = metric
-        embedding_dimension: Union[int, Awaitable[int], None] = None
+        embedding_dimension_m: Union[int, Awaitable[int], None] = None
         if self.embedding is not None:
             if setup_mode == SetupMode.ASYNC:
-                embedding_dimension = self._aget_embedding_dimension()
+                embedding_dimension_m = self._aget_embedding_dimension()
             elif setup_mode == SetupMode.SYNC or setup_mode == SetupMode.OFF:
-                embedding_dimension = self._get_embedding_dimension()
+                embedding_dimension_m = self._get_embedding_dimension()
 
         # indexing policy setting
         self.indexing_policy: Dict[str, Any] = self._normalize_metadata_indexing_policy(
@@ -317,20 +325,20 @@ class AstraDBVectorStore(VectorStore):
 
         self.astra_env = _AstraDBCollectionEnvironment(
             collection_name=collection_name,
-            token=token,
-            api_endpoint=api_endpoint,
-            environment=environment,
+            token=self.token,
+            api_endpoint=self.api_endpoint,
+            environment=self.environment,
             astra_db_client=astra_db_client,
             async_astra_db_client=async_astra_db_client,
-            namespace=namespace,
+            namespace=self.namespace,
             setup_mode=setup_mode,
             pre_delete_collection=pre_delete_collection,
-            embedding_dimension=embedding_dimension,
-            metric=metric,
+            embedding_dimension=embedding_dimension_m,
+            metric=self.metric,
             requested_indexing_policy=self.indexing_policy,
             default_indexing_policy=DEFAULT_INDEXING_OPTIONS,
-            collection_vector_service_options=collection_vector_service_options,
-            collection_embedding_api_key=collection_embedding_api_key,
+            collection_vector_service_options=self.collection_vector_service_options,
+            collection_embedding_api_key=self.collection_embedding_api_key,
         )
 
     def _get_embedding_dimension(self) -> int:

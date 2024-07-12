@@ -11,8 +11,10 @@ from typing import (
     Iterator,
     List,
     Optional,
+    Union,
 )
 
+from astrapy.authentication import TokenProvider
 from astrapy.db import AstraDB, AsyncAstraDB
 from langchain_core.document_loaders import BaseLoader
 from langchain_core.documents import Document
@@ -32,7 +34,7 @@ class AstraDBLoader(BaseLoader):
         self,
         collection_name: str,
         *,
-        token: Optional[str] = None,
+        token: Optional[Union[str, TokenProvider]] = None,
         api_endpoint: Optional[str] = None,
         environment: Optional[str] = None,
         astra_db_client: Optional[AstraDB] = None,
@@ -50,8 +52,10 @@ class AstraDBLoader(BaseLoader):
 
         Args:
             collection_name: name of the Astra DB collection to use.
-            token: API token for Astra DB usage. If not provided, the environment
-                variable ASTRA_DB_APPLICATION_TOKEN is inspected.
+            token: API token for Astra DB usage, either in the form of a string
+                or a subclass of `astrapy.authentication.TokenProvider`.
+                If not provided, the environment variable
+                ASTRA_DB_APPLICATION_TOKEN is inspected.
             api_endpoint: full URL to the API endpoint, such as
                 `https://<DB-ID>-us-east1.apps.astra.datastax.com`. If not provided,
                 the environment variable ASTRA_DB_API_ENDPOINT is inspected.

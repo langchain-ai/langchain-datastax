@@ -15,8 +15,10 @@ from typing import (
     Sequence,
     Tuple,
     TypeVar,
+    Union,
 )
 
+from astrapy.authentication import TokenProvider
 from astrapy.db import AstraDB, AsyncAstraDB
 from astrapy.exceptions import InsertManyException
 from astrapy.results import UpdateResult
@@ -220,7 +222,7 @@ class AstraDBStore(AstraDBBaseStore[Any]):
         self,
         collection_name: str,
         *,
-        token: Optional[str] = None,
+        token: Optional[Union[str, TokenProvider]] = None,
         api_endpoint: Optional[str] = None,
         environment: Optional[str] = None,
         astra_db_client: Optional[AstraDB] = None,
@@ -244,8 +246,10 @@ class AstraDBStore(AstraDBBaseStore[Any]):
 
         Args:
             collection_name: name of the Astra DB collection to create/use.
-            token: API token for Astra DB usage. If not provided, the environment
-                variable ASTRA_DB_APPLICATION_TOKEN is inspected.
+            token: API token for Astra DB usage, either in the form of a string
+                or a subclass of `astrapy.authentication.TokenProvider`.
+                If not provided, the environment variable
+                ASTRA_DB_APPLICATION_TOKEN is inspected.
             api_endpoint: full URL to the API endpoint, such as
                 `https://<DB-ID>-us-east1.apps.astra.datastax.com`. If not provided,
                 the environment variable ASTRA_DB_API_ENDPOINT is inspected.
@@ -295,7 +299,7 @@ class AstraDBByteStore(AstraDBBaseStore[bytes], ByteStore):
         self,
         *,
         collection_name: str,
-        token: Optional[str] = None,
+        token: Optional[Union[str, TokenProvider]] = None,
         api_endpoint: Optional[str] = None,
         environment: Optional[str] = None,
         astra_db_client: Optional[AstraDB] = None,
@@ -317,8 +321,10 @@ class AstraDBByteStore(AstraDBBaseStore[bytes], ByteStore):
 
         Args:
             collection_name: name of the Astra DB collection to create/use.
-            token: API token for Astra DB usage. If not provided, the environment
-                variable ASTRA_DB_APPLICATION_TOKEN is inspected.
+            token: API token for Astra DB usage, either in the form of a string
+                or a subclass of `astrapy.authentication.TokenProvider`.
+                If not provided, the environment variable
+                ASTRA_DB_APPLICATION_TOKEN is inspected.
             api_endpoint: full URL to the API endpoint, such as
                 `https://<DB-ID>-us-east1.apps.astra.datastax.com`. If not provided,
                 the environment variable ASTRA_DB_API_ENDPOINT is inspected.

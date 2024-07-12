@@ -3,8 +3,9 @@ from __future__ import annotations
 
 import json
 import time
-from typing import List, Optional, Sequence
+from typing import List, Optional, Sequence, Union
 
+from astrapy.authentication import TokenProvider
 from astrapy.db import AstraDB, AsyncAstraDB
 from langchain_core.chat_history import BaseChatMessageHistory
 from langchain_core.messages import (
@@ -27,7 +28,7 @@ class AstraDBChatMessageHistory(BaseChatMessageHistory):
         *,
         session_id: str,
         collection_name: str = DEFAULT_COLLECTION_NAME,
-        token: Optional[str] = None,
+        token: Optional[Union[str, TokenProvider]] = None,
         api_endpoint: Optional[str] = None,
         environment: Optional[str] = None,
         astra_db_client: Optional[AstraDB] = None,
@@ -42,8 +43,10 @@ class AstraDBChatMessageHistory(BaseChatMessageHistory):
             session_id: arbitrary key that is used to store the messages
                 of a single chat session.
             collection_name: name of the Astra DB collection to create/use.
-            token: API token for Astra DB usage. If not provided, the environment
-                variable ASTRA_DB_APPLICATION_TOKEN is inspected.
+            token: API token for Astra DB usage, either in the form of a string
+                or a subclass of `astrapy.authentication.TokenProvider`.
+                If not provided, the environment variable
+                ASTRA_DB_APPLICATION_TOKEN is inspected.
             api_endpoint: full URL to the API endpoint, such as
                 `https://<DB-ID>-us-east1.apps.astra.datastax.com`. If not provided,
                 the environment variable ASTRA_DB_API_ENDPOINT is inspected.
