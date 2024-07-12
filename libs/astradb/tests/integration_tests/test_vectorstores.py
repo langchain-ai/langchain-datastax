@@ -157,6 +157,9 @@ def vectorize_store(
     """
     astra db vector store with server-side embeddings using openai + shared_secret
     """
+    if "SHARED_SECRET_NAME_OPENAI" not in os.environ:
+        pytest.skip("OpenAI SHARED_SECRET key not set for KMS vectorize")
+
     v_store = AstraDBVectorStore(
         collection_vector_service_options=openai_vectorize_options,
         collection_name=COLLECTION_NAME_VECTORIZE_OPENAI,
