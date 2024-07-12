@@ -287,12 +287,13 @@ class TestAstraDBVectorStore:
     ) -> None:
         """Create and delete with vectorize option."""
         v_store = AstraDBVectorStore(
-            collection_vector_service_options=openai_vectorize_options,
-            collection_name=COLLECTION_NAME_VECTORIZE_OPENAI,
+            collection_vector_service_options=openai_vectorize_options_header,
+            collection_name=COLLECTION_NAME_VECTORIZE_OPENAI_HEADER,
             token=astra_db_credentials["token"],
             api_endpoint=astra_db_credentials["api_endpoint"],
             namespace=astra_db_credentials["namespace"],
             environment=astra_db_credentials["environment"],
+            collection_embedding_api_key=os.environ["OPENAI_API_KEY"],
         )
         v_store.add_texts(["Sample 1"])
         v_store.delete_collection()
@@ -464,8 +465,9 @@ class TestAstraDBVectorStore:
     ) -> None:
         """from_texts and from_documents methods with vectorize."""
         AstraDBVectorStore(
-            collection_vector_service_options=openai_vectorize_options,
-            collection_name=COLLECTION_NAME_VECTORIZE_OPENAI,
+            collection_vector_service_options=openai_vectorize_options_header,
+            collection_embedding_api_key=os.environ["OPENAI_API_KEY"],
+            collection_name=COLLECTION_NAME_VECTORIZE_OPENAI_HEADER,
             token=astra_db_credentials["token"],
             api_endpoint=astra_db_credentials["api_endpoint"],
             namespace=astra_db_credentials["namespace"],
@@ -475,8 +477,9 @@ class TestAstraDBVectorStore:
         # from_texts
         v_store = AstraDBVectorStore.from_texts(
             texts=["Hi", "Ho"],
-            collection_vector_service_options=openai_vectorize_options,
-            collection_name=COLLECTION_NAME_VECTORIZE_OPENAI,
+            collection_vector_service_options=openai_vectorize_options_header,
+            collection_embedding_api_key=os.environ["OPENAI_API_KEY"],
+            collection_name=COLLECTION_NAME_VECTORIZE_OPENAI_HEADER,
             token=astra_db_credentials["token"],
             api_endpoint=astra_db_credentials["api_endpoint"],
             namespace=astra_db_credentials["namespace"],
@@ -493,8 +496,9 @@ class TestAstraDBVectorStore:
                 Document(page_content="Hee"),
                 Document(page_content="Hoi"),
             ],
-            collection_vector_service_options=openai_vectorize_options,
-            collection_name=COLLECTION_NAME_VECTORIZE_OPENAI,
+            collection_vector_service_options=openai_vectorize_options_header,
+            collection_embedding_api_key=os.environ["OPENAI_API_KEY"],
+            collection_name=COLLECTION_NAME_VECTORIZE_OPENAI_HEADER,
             token=astra_db_credentials["token"],
             api_endpoint=astra_db_credentials["api_endpoint"],
             namespace=astra_db_credentials["namespace"],
@@ -567,8 +571,9 @@ class TestAstraDBVectorStore:
         # from_text with vectorize
         v_store = await AstraDBVectorStore.afrom_texts(
             texts=["Haa", "Huu"],
-            collection_vector_service_options=openai_vectorize_options,
-            collection_name=COLLECTION_NAME_VECTORIZE_OPENAI,
+            collection_vector_service_options=openai_vectorize_options_header,
+            collection_embedding_api_key=os.environ["OPENAI_API_KEY"],
+            collection_name=COLLECTION_NAME_VECTORIZE_OPENAI_HEADER,
             token=astra_db_credentials["token"],
             api_endpoint=astra_db_credentials["api_endpoint"],
             namespace=astra_db_credentials["namespace"],
@@ -587,8 +592,9 @@ class TestAstraDBVectorStore:
                 Document(page_content="HeeH"),
                 Document(page_content="HooH"),
             ],
-            collection_vector_service_options=openai_vectorize_options,
-            collection_name=COLLECTION_NAME_VECTORIZE_OPENAI,
+            collection_vector_service_options=openai_vectorize_options_header,
+            collection_embedding_api_key=os.environ["OPENAI_API_KEY"],
+            collection_name=COLLECTION_NAME_VECTORIZE_OPENAI_HEADER,
             token=astra_db_credentials["token"],
             api_endpoint=astra_db_credentials["api_endpoint"],
             namespace=astra_db_credentials["namespace"],

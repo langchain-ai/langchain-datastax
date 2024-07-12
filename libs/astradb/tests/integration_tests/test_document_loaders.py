@@ -239,6 +239,7 @@ class TestAstraDB:
             token=astra_db_credentials["token"],
             api_endpoint=astra_db_credentials["api_endpoint"],
             namespace=astra_db_credentials["namespace"],
+            environment=astra_db_credentials["environment"],
             limit=1,
         )
         docs0 = loader0.load()
@@ -249,6 +250,7 @@ class TestAstraDB:
                 token=astra_db_credentials["token"],
                 api_endpoint=astra_db_credentials["api_endpoint"],
                 namespace=astra_db_credentials["namespace"],
+                environment=astra_db_credentials["environment"],
                 find_options={"limit": 1},
             )
         assert len(rec_warnings) == 1
@@ -260,6 +262,7 @@ class TestAstraDB:
                 token=astra_db_credentials["token"],
                 api_endpoint=astra_db_credentials["api_endpoint"],
                 namespace=astra_db_credentials["namespace"],
+                environment=astra_db_credentials["environment"],
                 limit=1,
                 find_options={"limit": 1},
             )
@@ -270,6 +273,7 @@ class TestAstraDB:
                 token=astra_db_credentials["token"],
                 api_endpoint=astra_db_credentials["api_endpoint"],
                 namespace=astra_db_credentials["namespace"],
+                environment=astra_db_credentials["environment"],
                 find_options={"planets": 8, "spiders": 40000},
                 limit=1,
             )
