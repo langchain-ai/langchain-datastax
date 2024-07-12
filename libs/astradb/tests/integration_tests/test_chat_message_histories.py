@@ -16,7 +16,7 @@ from .conftest import AstraDBCredentials, _has_env_vars
 
 @pytest.fixture(scope="function")
 def history1(
-    astra_db_credentials: AstraDBCredentials
+    astra_db_credentials: AstraDBCredentials,
 ) -> Iterable[AstraDBChatMessageHistory]:
     history1 = AstraDBChatMessageHistory(
         session_id="session-test-1",
@@ -52,7 +52,7 @@ def history2(
 
 @pytest.fixture
 async def async_history1(
-    astra_db_credentials: AstraDBCredentials
+    astra_db_credentials: AstraDBCredentials,
 ) -> AsyncIterable[AstraDBChatMessageHistory]:
     history1 = AstraDBChatMessageHistory(
         session_id="async-session-test-1",
@@ -211,7 +211,7 @@ class TestAstraDBChatMessageHistories:
     ) -> None:
         """A deprecation warning from passing a (core) AstraDB, but it works."""
         collection_name = "lc_test_cmh_coreclsync"
-        test_messages=[AIMessage(content="Meow.")]
+        test_messages = [AIMessage(content="Meow.")]
         try:
             chatmh_init_ok = AstraDBChatMessageHistory(
                 session_id="gattini",
@@ -244,7 +244,7 @@ class TestAstraDBChatMessageHistories:
     ) -> None:
         """A deprecation warning from passing a (core) AstraDB, but it works."""
         collection_name = "lc_test_cmh_coreclasync"
-        test_messages=[AIMessage(content="Ameow.")]
+        test_messages = [AIMessage(content="Ameow.")]
         try:
             chatmh_init_ok = AstraDBChatMessageHistory(
                 session_id="gattini",

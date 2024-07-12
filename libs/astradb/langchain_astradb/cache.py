@@ -170,15 +170,13 @@ class AstraDBCache(BaseCache):
     async def alookup(self, prompt: str, llm_string: str) -> Optional[RETURN_VAL_TYPE]:
         await self.astra_env.aensure_db_setup()
         doc_id = self._make_id(prompt, llm_string)
-        item = (
-            await self.async_collection.find_one(
-                filter={
-                    "_id": doc_id,
-                },
-                projection={
-                    "body_blob": 1,
-                },
-            )
+        item = await self.async_collection.find_one(
+            filter={
+                "_id": doc_id,
+            },
+            projection={
+                "body_blob": 1,
+            },
         )
         return _loads_generations(item["body_blob"]) if item is not None else None
 

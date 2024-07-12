@@ -294,8 +294,7 @@ class AstraDBVectorStore(VectorStore):
             bulk_insert_batch_concurrency or INSERT_DOCUMENT_MAX_THREADS
         )
         self.bulk_insert_overwrite_concurrency: int = (
-            bulk_insert_overwrite_concurrency
-            or REPLACE_DOCUMENTS_MAX_THREADS
+            bulk_insert_overwrite_concurrency or REPLACE_DOCUMENTS_MAX_THREADS
         )
         self.bulk_delete_concurrency: int = (
             bulk_delete_concurrency or DELETE_DOCUMENTS_MAX_THREADS
@@ -701,9 +700,11 @@ class AstraDBVectorStore(VectorStore):
                         document,
                     ), document["_id"]
 
-                replace_results = executor.map(
-                    _replace_document,
-                    documents_to_replace,
+                replace_results = list(
+                    executor.map(
+                        _replace_document,
+                        documents_to_replace,
+                    )
                 )
 
             replaced_count = sum(r_res.update_info["n"] for r_res, _ in replace_results)
@@ -810,6 +811,7 @@ class AstraDBVectorStore(VectorStore):
             )
 
             _async_collection = self.astra_env.async_collection
+
             async def _replace_document(
                 document: Dict[str, Any],
             ) -> Tuple[UpdateResult, str]:
@@ -820,9 +822,7 @@ class AstraDBVectorStore(VectorStore):
                     ), document["_id"]
 
             tasks = [
-                asyncio.create_task(
-                    _replace_document(document)
-                )
+                asyncio.create_task(_replace_document(document))
                 for document in documents_to_replace
             ]
 

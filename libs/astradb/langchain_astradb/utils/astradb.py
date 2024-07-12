@@ -87,21 +87,27 @@ class _AstraDBEnvironment:
                 ),
                 DeprecationWarning,
             )
-            _tokens = list({
-                klient.token
-                for klient in [astra_db_client, async_astra_db_client]
-                if klient is not None
-            })
-            _api_endpoints = list({
-                klient.api_endpoint
-                for klient in [astra_db_client, async_astra_db_client]
-                if klient is not None
-            })
-            _namespaces = list({
-                klient.namespace
-                for klient in [astra_db_client, async_astra_db_client]
-                if klient is not None
-            })
+            _tokens = list(
+                {
+                    klient.token
+                    for klient in [astra_db_client, async_astra_db_client]
+                    if klient is not None
+                }
+            )
+            _api_endpoints = list(
+                {
+                    klient.api_endpoint
+                    for klient in [astra_db_client, async_astra_db_client]
+                    if klient is not None
+                }
+            )
+            _namespaces = list(
+                {
+                    klient.namespace
+                    for klient in [astra_db_client, async_astra_db_client]
+                    if klient is not None
+                }
+            )
             if len(_tokens) != 1:
                 raise ValueError(
                     "Conflicting tokens found in the sync and async AstraDB "
@@ -163,8 +169,8 @@ class _AstraDBEnvironment:
             )
 
         # create the clients
-        caller_name="langchain"
-        caller_version=getattr(langchain_core, "__version__", None)
+        caller_name = "langchain"
+        caller_version = getattr(langchain_core, "__version__", None)
 
         self.data_api_client = DataAPIClient(
             environment=self.environment,
@@ -217,7 +223,6 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
 
         self.async_setup_db_task: Optional[Task] = None
         if setup_mode == SetupMode.ASYNC:
-
             async_database = self.async_database
 
             async def _setup_db() -> None:
@@ -286,7 +291,6 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
                     ):
                         # other reasons for the exception
                         raise
-
 
     @staticmethod
     def _validate_indexing_policy(

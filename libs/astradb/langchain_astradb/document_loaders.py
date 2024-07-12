@@ -118,7 +118,7 @@ class AstraDBLoader(BaseLoader):
                 _limit = (find_options or {})["limit"]
         else:
             _limit = limit
-        self.limit =_limit
+        self.limit = _limit
         _other_option_keys = set((find_options or {}).keys()) - {"limit"}
         if _other_option_keys:
             warnings.warn(

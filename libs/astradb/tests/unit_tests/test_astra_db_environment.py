@@ -41,9 +41,7 @@ class TestAstraDBEnvironment:
                 ]
                 del os.environ[API_ENDPOINT_ENV_VAR]
             if NAMESPACE_ENV_VAR in os.environ:
-                ENV_VARS_TO_RESTORE[NAMESPACE_ENV_VAR] = os.environ[
-                    NAMESPACE_ENV_VAR
-                ]
+                ENV_VARS_TO_RESTORE[NAMESPACE_ENV_VAR] = os.environ[NAMESPACE_ENV_VAR]
                 del os.environ[NAMESPACE_ENV_VAR]
 
             # token+endpoint

@@ -257,7 +257,9 @@ class TestAstraDB:
         with pytest.raises(ValueError):
             AstraDBLoader(
                 collection_name=collection.name,
-                astra_db_client=core_astra_db,
+                token=astra_db_credentials["token"],
+                api_endpoint=astra_db_credentials["api_endpoint"],
+                namespace=astra_db_credentials["namespace"],
                 limit=1,
                 find_options={"limit": 1},
             )

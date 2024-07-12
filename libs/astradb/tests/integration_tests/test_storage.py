@@ -115,6 +115,135 @@ class TestAstraDBStore:
         finally:
             await store.astra_env.async_database.drop_collection(collection_name)
 
+    def test_store_massive_mset_with_replace(
+        self,
+        astra_db_credentials: Dict[str, Optional[str]],
+    ) -> None:
+        """Testing the insert-many-and-replace-some patterns thoroughly."""
+        FULL_SIZE = 300
+        FIRST_GROUP_SIZE = 150
+        SECOND_GROUP_SLICER = [30, 100, 2]
+        MAX_VALUES_IN_IN = 100
+        collection_name = "lc_test_store_massive_mset"
+
+        ids_and_texts = [
+            (
+                f"doc_{idx}",
+                f"document number {idx}",
+            )
+            for idx in range(FULL_SIZE)
+        ]
+        try:
+            store = AstraDBStore(
+                collection_name=collection_name,
+                token=astra_db_credentials["token"],
+                api_endpoint=astra_db_credentials["api_endpoint"],
+                namespace=astra_db_credentials["namespace"],
+                environment=astra_db_credentials["environment"],
+            )
+
+            # massive insertion on empty (zip and rezip for uniformity with later)
+            group0_ids, group0_texts = list(zip(*ids_and_texts[0:FIRST_GROUP_SIZE]))
+            store.mset(list(zip(group0_ids, group0_texts)))
+
+            # massive insertion with many overwrites scattered through
+            # (we change the text to later check on DB for successful update)
+            _s, _e, _st = SECOND_GROUP_SLICER
+            group1_ids, group1_texts_pre = list(
+                zip(
+                    *(
+                        ids_and_texts[_s:_e:_st]
+                        + ids_and_texts[FIRST_GROUP_SIZE:FULL_SIZE]
+                    )
+                )
+            )
+            group1_texts = [txt.upper() for txt in group1_texts_pre]
+            store.mset(list(zip(group1_ids, group1_texts)))
+
+            # final read (we want the IDs to do a full check)
+            expected_text_by_id = {
+                **{d_id: d_tx for d_id, d_tx in zip(group0_ids, group0_texts)},
+                **{d_id: d_tx for d_id, d_tx in zip(group1_ids, group1_texts)},
+            }
+            all_ids = [doc_id for doc_id, _ in ids_and_texts]
+            # The Data API can handle at most MAX_VALUES_IN_IN entries, let's chunk
+            all_vals = [
+                val
+                for chunk_start in range(0, FULL_SIZE, MAX_VALUES_IN_IN)
+                for val in store.mget(
+                    all_ids[chunk_start : chunk_start + MAX_VALUES_IN_IN]
+                )
+            ]
+            for val, doc_id in zip(all_vals, all_ids):
+                assert val == expected_text_by_id[doc_id]
+        finally:
+            store.astra_env.database.drop_collection(collection_name)
+
+    async def test_store_massive_amset_with_replace(
+        self,
+        astra_db_credentials: Dict[str, Optional[str]],
+    ) -> None:
+        """Testing the insert-many-and-replace-some patterns thoroughly."""
+        FULL_SIZE = 300
+        FIRST_GROUP_SIZE = 150
+        SECOND_GROUP_SLICER = [30, 100, 2]
+        MAX_VALUES_IN_IN = 100
+        collection_name = "lc_test_store_massive_amset"
+
+        ids_and_texts = [
+            (
+                f"doc_{idx}",
+                f"document number {idx}",
+            )
+            for idx in range(FULL_SIZE)
+        ]
+
+        try:
+            store = AstraDBStore(
+                collection_name=collection_name,
+                token=astra_db_credentials["token"],
+                api_endpoint=astra_db_credentials["api_endpoint"],
+                namespace=astra_db_credentials["namespace"],
+                environment=astra_db_credentials["environment"],
+            )
+
+            # massive insertion on empty (zip and rezip for uniformity with later)
+            group0_ids, group0_texts = list(zip(*ids_and_texts[0:FIRST_GROUP_SIZE]))
+            await store.amset(list(zip(group0_ids, group0_texts)))
+
+            # massive insertion with many overwrites scattered through
+            # (we change the text to later check on DB for successful update)
+            _s, _e, _st = SECOND_GROUP_SLICER
+            group1_ids, group1_texts_pre = list(
+                zip(
+                    *(
+                        ids_and_texts[_s:_e:_st]
+                        + ids_and_texts[FIRST_GROUP_SIZE:FULL_SIZE]
+                    )
+                )
+            )
+            group1_texts = [txt.upper() for txt in group1_texts_pre]
+            await store.amset(list(zip(group1_ids, group1_texts)))
+
+            # final read (we want the IDs to do a full check)
+            expected_text_by_id = {
+                **{d_id: d_tx for d_id, d_tx in zip(group0_ids, group0_texts)},
+                **{d_id: d_tx for d_id, d_tx in zip(group1_ids, group1_texts)},
+            }
+            all_ids = [doc_id for doc_id, _ in ids_and_texts]
+            # The Data API can handle at most MAX_VALUES_IN_IN entries, let's chunk
+            all_vals = [
+                val
+                for chunk_start in range(0, FULL_SIZE, MAX_VALUES_IN_IN)
+                for val in await store.amget(
+                    all_ids[chunk_start : chunk_start + MAX_VALUES_IN_IN]
+                )
+            ]
+            for val, doc_id in zip(all_vals, all_ids):
+                assert val == expected_text_by_id[doc_id]
+        finally:
+            store.astra_env.database.drop_collection(collection_name)
+
     def test_mdelete(
         self,
         astra_db_credentials: Dict[str, Optional[str]],

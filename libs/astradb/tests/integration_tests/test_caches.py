@@ -107,9 +107,7 @@ class FakeLLM(LLM):
 
 
 @pytest.fixture(scope="module")
-def astradb_cache(
-    astra_db_credentials: AstraDBCredentials
-) -> Iterator[AstraDBCache]:
+def astradb_cache(astra_db_credentials: AstraDBCredentials) -> Iterator[AstraDBCache]:
     cache = AstraDBCache(
         collection_name="lc_integration_test_cache",
         token=astra_db_credentials["token"],
@@ -123,7 +121,7 @@ def astradb_cache(
 
 @pytest.fixture(scope="function")
 async def async_astradb_cache(
-    astra_db_credentials: AstraDBCredentials
+    astra_db_credentials: AstraDBCredentials,
 ) -> AsyncIterator[AstraDBCache]:
     cache = AstraDBCache(
         collection_name="lc_integration_test_cache_async",
@@ -139,7 +137,7 @@ async def async_astradb_cache(
 
 @pytest.fixture(scope="module")
 def astradb_semantic_cache(
-    astra_db_credentials: AstraDBCredentials
+    astra_db_credentials: AstraDBCredentials,
 ) -> Iterator[AstraDBSemanticCache]:
     fake_embe = FakeEmbeddings()
     sem_cache = AstraDBSemanticCache(
@@ -156,7 +154,7 @@ def astradb_semantic_cache(
 
 @pytest.fixture(scope="function")
 async def async_astradb_semantic_cache(
-    astra_db_credentials: AstraDBCredentials
+    astra_db_credentials: AstraDBCredentials,
 ) -> AsyncIterator[AstraDBSemanticCache]:
     fake_embe = FakeEmbeddings()
     sem_cache = AstraDBSemanticCache(

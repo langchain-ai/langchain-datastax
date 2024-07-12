@@ -22,6 +22,7 @@ Required to run this test:
 import json
 import math
 import os
+import warnings
 from typing import Dict, Iterable, Optional
 
 import pytest
@@ -680,6 +681,97 @@ class TestAstraDBVectorStore:
         res4 = await vstore.asimilarity_search("ww", k=1, filter={"k": "w"})
         assert res4[0].metadata["ord"] == 205
 
+    def test_astradb_vectorstore_massive_insert_replace_sync(
+        self,
+        store_someemb: AstraDBVectorStore,
+    ) -> None:
+        """Testing the insert-many-and-replace-some patterns thoroughly."""
+        FULL_SIZE = 300
+        FIRST_GROUP_SIZE = 150
+        SECOND_GROUP_SLICER = [30, 100, 2]
+
+        all_ids = [f"doc_{idx}" for idx in range(FULL_SIZE)]
+        all_texts = [f"document number {idx}" for idx in range(FULL_SIZE)]
+
+        # massive insertion on empty
+        group0_ids = all_ids[0:FIRST_GROUP_SIZE]
+        group0_texts = all_texts[0:FIRST_GROUP_SIZE]
+        inserted_ids0 = store_someemb.add_texts(
+            texts=group0_texts,
+            ids=group0_ids,
+        )
+        assert set(inserted_ids0) == set(group0_ids)
+        # massive insertion with many overwrites scattered through
+        # (we change the text to later check on DB for successful update)
+        _s, _e, _st = SECOND_GROUP_SLICER
+        group1_ids = all_ids[_s:_e:_st] + all_ids[FIRST_GROUP_SIZE:FULL_SIZE]
+        group1_texts = [
+            txt.upper()
+            for txt in (all_texts[_s:_e:_st] + all_texts[FIRST_GROUP_SIZE:FULL_SIZE])
+        ]
+        inserted_ids1 = store_someemb.add_texts(
+            texts=group1_texts,
+            ids=group1_ids,
+        )
+        assert set(inserted_ids1) == set(group1_ids)
+        # final read (we want the IDs to do a full check)
+        expected_text_by_id = {
+            **{d_id: d_tx for d_id, d_tx in zip(group0_ids, group0_texts)},
+            **{d_id: d_tx for d_id, d_tx in zip(group1_ids, group1_texts)},
+        }
+        full_results = store_someemb.similarity_search_with_score_id_by_vector(
+            embedding=[1.0, 1.0],
+            k=FULL_SIZE,
+        )
+        for doc, _, doc_id in full_results:
+            assert doc.page_content == expected_text_by_id[doc_id]
+
+    async def test_astradb_vectorstore_massive_insert_replace_async(
+        self,
+        store_someemb: AstraDBVectorStore,
+    ) -> None:
+        """Testing the insert-many-and-replace-some patterns thoroughly."""
+        FULL_SIZE = 300
+        FIRST_GROUP_SIZE = 150
+        SECOND_GROUP_SLICER = [30, 100, 2]
+
+        all_ids = [f"doc_{idx}" for idx in range(FULL_SIZE)]
+        all_texts = [f"document number {idx}" for idx in range(FULL_SIZE)]
+
+        # massive insertion on empty
+        group0_ids = all_ids[0:FIRST_GROUP_SIZE]
+        group0_texts = all_texts[0:FIRST_GROUP_SIZE]
+
+        inserted_ids0 = await store_someemb.aadd_texts(
+            texts=group0_texts,
+            ids=group0_ids,
+        )
+        assert set(inserted_ids0) == set(group0_ids)
+        # massive insertion with many overwrites scattered through
+        # (we change the text to later check on DB for successful update)
+        _s, _e, _st = SECOND_GROUP_SLICER
+        group1_ids = all_ids[_s:_e:_st] + all_ids[FIRST_GROUP_SIZE:FULL_SIZE]
+        group1_texts = [
+            txt.upper()
+            for txt in (all_texts[_s:_e:_st] + all_texts[FIRST_GROUP_SIZE:FULL_SIZE])
+        ]
+        inserted_ids1 = await store_someemb.aadd_texts(
+            texts=group1_texts,
+            ids=group1_ids,
+        )
+        assert set(inserted_ids1) == set(group1_ids)
+        # final read (we want the IDs to do a full check)
+        expected_text_by_id = {
+            **{d_id: d_tx for d_id, d_tx in zip(group0_ids, group0_texts)},
+            **{d_id: d_tx for d_id, d_tx in zip(group1_ids, group1_texts)},
+        }
+        full_results = await store_someemb.asimilarity_search_with_score_id_by_vector(
+            embedding=[1.0, 1.0],
+            k=FULL_SIZE,
+        )
+        for doc, _, doc_id in full_results:
+            assert doc.page_content == expected_text_by_id[doc_id]
+
     def test_astradb_vectorstore_mmr_sync(
         self, store_parseremb: AstraDBVectorStore
     ) -> None:
@@ -907,7 +999,7 @@ class TestAstraDBVectorStore:
     ) -> None:
         """Larger-scale bulk deletes."""
         vstore: AstraDBVectorStore = request.getfixturevalue(vector_store)
-        M = 50
+        M = 150
         texts = [str(i + 1 / 7.0) for i in range(2 * M)]
         ids0 = ["doc_%i" % i for i in range(M)]
         ids1 = ["doc_%i" % (i + M) for i in range(M)]
@@ -1175,10 +1267,8 @@ class TestAstraDBVectorStore:
         )
 
         # these invocations should just work without warnings
-        # Note: mypy complains but the None argument seems the only way to
-        # count zero warnings without having to do global settings sucn as
-        # `warnings.simplefilter(...)`.
-        with pytest.warns(None) as rec_warnings:  # type: ignore[call-overload]
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
             AstraDBVectorStore(
                 collection_name="lc_default_idx",
                 embedding=embe,
@@ -1196,7 +1286,6 @@ class TestAstraDBVectorStore:
                 environment=astra_db_credentials["environment"],
                 metadata_indexing_exclude={"long_summary", "the_divine_comedy"},
             )
-        assert len(rec_warnings) == 0
 
         # some are to throw an error:
         with pytest.raises(ValueError):
@@ -1293,10 +1382,8 @@ class TestAstraDBVectorStore:
         ).asimilarity_search("boo")
 
         # these invocations should just work without warnings
-        # Note: mypy complains but the None argument seems the only way to
-        # count zero warnings without having to do global settings sucn as
-        # `warnings.simplefilter(...)`.
-        with pytest.warns(None) as rec_warnings:  # type: ignore[call-overload]
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
             def_store = AstraDBVectorStore(
                 collection_name="lc_default_idx",
                 embedding=embe,
@@ -1318,16 +1405,6 @@ class TestAstraDBVectorStore:
                 setup_mode=SetupMode.ASYNC,
             )
             await cus_store.aadd_texts(["All good."])
-        """
-        the above leaves some unclosed network resources and fills the rec_warnings
-        with "unclosed <socket..." and "unclosed transport ...". Clean them out.
-        """
-        nonresource_warnings = [
-            r_w
-            for r_w in rec_warnings
-            if r_w.category != ResourceWarning
-        ]
-        assert len(nonresource_warnings) == 0
 
         # some are to throw an error:
         with pytest.raises(ValueError):
@@ -1414,7 +1491,7 @@ class TestAstraDBVectorStore:
         emb = SomeEmbeddings(dimension=2)
 
         try:
-            v_store_init_ok= AstraDBVectorStore(
+            v_store_init_ok = AstraDBVectorStore(
                 embedding=emb,
                 collection_name=collection_name,
                 token=astra_db_credentials["token"],
@@ -1455,7 +1532,7 @@ class TestAstraDBVectorStore:
         emb = SomeEmbeddings(dimension=2)
 
         try:
-            v_store_init_ok= AstraDBVectorStore(
+            v_store_init_ok = AstraDBVectorStore(
                 embedding=emb,
                 collection_name=collection_name,
                 token=astra_db_credentials["token"],

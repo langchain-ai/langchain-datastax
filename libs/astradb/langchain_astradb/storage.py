@@ -84,8 +84,7 @@ class AstraDBBaseStore(Generic[V], BaseStore[str, V], ABC):
     def mset(self, key_value_pairs: Sequence[Tuple[str, V]]) -> None:
         self.astra_env.ensure_db_setup()
         documents_to_insert = [
-            {"_id": k, "value": self.encode_value(v)}
-            for k, v in key_value_pairs
+            {"_id": k, "value": self.encode_value(v)} for k, v in key_value_pairs
         ]
         # perform an AstraPy insert_many, catching exceptions for overwriting docs
         ids_to_replace: List[int]
@@ -122,9 +121,11 @@ class AstraDBBaseStore(Generic[V], BaseStore[str, V], ABC):
                         document,
                     )
 
-                replace_results = executor.map(
-                    _replace_document,
-                    documents_to_replace,
+                replace_results = list(
+                    executor.map(
+                        _replace_document,
+                        documents_to_replace,
+                    )
                 )
 
             replaced_count = sum(r_res.update_info["n"] for r_res in replace_results)
@@ -138,8 +139,7 @@ class AstraDBBaseStore(Generic[V], BaseStore[str, V], ABC):
     async def amset(self, key_value_pairs: Sequence[Tuple[str, V]]) -> None:
         await self.astra_env.aensure_db_setup()
         documents_to_insert = [
-            {"_id": k, "value": self.encode_value(v)}
-            for k, v in key_value_pairs
+            {"_id": k, "value": self.encode_value(v)} for k, v in key_value_pairs
         ]
         # perform an AstraPy insert_many, catching exceptions for overwriting docs
         ids_to_replace: List[int]
@@ -168,6 +168,7 @@ class AstraDBBaseStore(Generic[V], BaseStore[str, V], ABC):
             sem = asyncio.Semaphore(REPLACE_DOCUMENTS_MAX_THREADS)
 
             _async_collection = self.async_collection
+
             async def _replace_document(document: Dict[str, Any]) -> UpdateResult:
                 async with sem:
                     return await _async_collection.replace_one(
@@ -176,9 +177,7 @@ class AstraDBBaseStore(Generic[V], BaseStore[str, V], ABC):
                     )
 
             tasks = [
-                asyncio.create_task(
-                    _replace_document(document)
-                )
+                asyncio.create_task(_replace_document(document))
                 for document in documents_to_replace
             ]
 
