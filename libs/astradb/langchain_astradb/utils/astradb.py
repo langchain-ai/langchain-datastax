@@ -20,7 +20,15 @@ TOKEN_ENV_VAR = "ASTRA_DB_APPLICATION_TOKEN"
 API_ENDPOINT_ENV_VAR = "ASTRA_DB_API_ENDPOINT"
 NAMESPACE_ENV_VAR = "ASTRA_DB_KEYSPACE"
 
+# Default settings for API data operations (concurrency & similar):
+# Chunk size for many-document insertions (None meaning defer to astrapy):
+DEFAULT_DOCUMENT_CHUNK_SIZE = None
+# thread/coroutine count for bulk inserts
+INSERT_DOCUMENT_MAX_THREADS = 20
+# Thread/coroutine count for one-doc-at-a-time overwrites
 REPLACE_DOCUMENTS_MAX_THREADS = 20
+# Thread/coroutine count for one-doc-at-a-time deletes:
+DELETE_DOCUMENTS_MAX_THREADS = 20
 
 logger = logging.getLogger()
 

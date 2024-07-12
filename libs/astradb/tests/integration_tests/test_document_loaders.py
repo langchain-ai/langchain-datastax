@@ -23,7 +23,7 @@ from astrapy.db import AstraDB
 
 from langchain_astradb import AstraDBLoader
 
-from .conftest import _has_env_vars
+from .conftest import _has_env_vars, AstraDBCredentials
 
 
 @pytest.fixture
@@ -61,7 +61,7 @@ class TestAstraDB:
     def test_astradb_loader_sync(
         self,
         collection: Collection,
-        astra_db_credentials: Dict[str, Optional[str]],
+        astra_db_credentials: AstraDBCredentials,
     ) -> None:
         loader = AstraDBLoader(
             collection.name,
@@ -93,7 +93,7 @@ class TestAstraDB:
     def test_page_content_mapper_sync(
         self,
         collection: Collection,
-        astra_db_credentials: Dict[str, Optional[str]],
+        astra_db_credentials: AstraDBCredentials,
     ) -> None:
         loader = AstraDBLoader(
             collection.name,
@@ -113,7 +113,7 @@ class TestAstraDB:
     def test_metadata_mapper_sync(
         self,
         collection: Collection,
-        astra_db_credentials: Dict[str, Optional[str]],
+        astra_db_credentials: AstraDBCredentials,
     ) -> None:
         loader = AstraDBLoader(
             collection.name,
@@ -133,7 +133,7 @@ class TestAstraDB:
     async def test_astradb_loader_async(
         self,
         async_collection: AsyncCollection,
-        astra_db_credentials: Dict[str, Optional[str]],
+        astra_db_credentials: AstraDBCredentials,
     ) -> None:
         loader = AstraDBLoader(
             async_collection.name,
@@ -165,7 +165,7 @@ class TestAstraDB:
     async def test_page_content_mapper_async(
         self,
         async_collection: AsyncCollection,
-        astra_db_credentials: Dict[str, Optional[str]],
+        astra_db_credentials: AstraDBCredentials,
     ) -> None:
         loader = AstraDBLoader(
             async_collection.name,
@@ -183,7 +183,7 @@ class TestAstraDB:
     async def test_metadata_mapper_async(
         self,
         async_collection: AsyncCollection,
-        astra_db_credentials: Dict[str, Optional[str]],
+        astra_db_credentials: AstraDBCredentials,
     ) -> None:
         loader = AstraDBLoader(
             async_collection.name,
@@ -204,7 +204,7 @@ class TestAstraDB:
     )
     def test_astradb_loader_coreclients_init(
         self,
-        astra_db_credentials: Dict[str, Optional[str]],
+        astra_db_credentials: AstraDBCredentials,
         collection: Collection,
         core_astra_db: AstraDB,
     ) -> None:
@@ -229,7 +229,7 @@ class TestAstraDB:
 
     def test_astradb_loader_findoptions_deprecation(
         self,
-        astra_db_credentials: Dict[str, Optional[str]],
+        astra_db_credentials: AstraDBCredentials,
         collection: Collection,
         core_astra_db: AstraDB,
     ) -> None:

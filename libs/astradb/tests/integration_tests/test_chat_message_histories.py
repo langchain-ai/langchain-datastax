@@ -11,12 +11,12 @@ from langchain_astradb.chat_message_histories import (
 )
 from langchain_astradb.utils.astradb import SetupMode
 
-from .conftest import _has_env_vars
+from .conftest import _has_env_vars, AstraDBCredentials
 
 
 @pytest.fixture(scope="function")
 def history1(
-    astra_db_credentials: Dict[str, Optional[str]]
+    astra_db_credentials: AstraDBCredentials
 ) -> Iterable[AstraDBChatMessageHistory]:
     history1 = AstraDBChatMessageHistory(
         session_id="session-test-1",
@@ -33,7 +33,7 @@ def history1(
 @pytest.fixture(scope="function")
 def history2(
     history1: AstraDBChatMessageHistory,
-    astra_db_credentials: Dict[str, Optional[str]],
+    astra_db_credentials: AstraDBCredentials,
 ) -> Iterable[AstraDBChatMessageHistory]:
     history2 = AstraDBChatMessageHistory(
         session_id="session-test-2",
@@ -52,7 +52,7 @@ def history2(
 
 @pytest.fixture
 async def async_history1(
-    astra_db_credentials: Dict[str, Optional[str]]
+    astra_db_credentials: AstraDBCredentials
 ) -> AsyncIterable[AstraDBChatMessageHistory]:
     history1 = AstraDBChatMessageHistory(
         session_id="async-session-test-1",
@@ -70,7 +70,7 @@ async def async_history1(
 @pytest.fixture(scope="function")
 async def async_history2(
     history1: AstraDBChatMessageHistory,
-    astra_db_credentials: Dict[str, Optional[str]],
+    astra_db_credentials: AstraDBCredentials,
 ) -> AsyncIterable[AstraDBChatMessageHistory]:
     history2 = AstraDBChatMessageHistory(
         session_id="async-session-test-2",
@@ -206,7 +206,7 @@ class TestAstraDBChatMessageHistories:
     )
     def test_chatms_coreclients_init_sync(
         self,
-        astra_db_credentials: Dict[str, Optional[str]],
+        astra_db_credentials: AstraDBCredentials,
         core_astra_db: AstraDB,
     ) -> None:
         """A deprecation warning from passing a (core) AstraDB, but it works."""
@@ -239,7 +239,7 @@ class TestAstraDBChatMessageHistories:
     )
     async def test_chatms_coreclients_init_async(
         self,
-        astra_db_credentials: Dict[str, Optional[str]],
+        astra_db_credentials: AstraDBCredentials,
         core_astra_db: AstraDB,
     ) -> None:
         """A deprecation warning from passing a (core) AstraDB, but it works."""

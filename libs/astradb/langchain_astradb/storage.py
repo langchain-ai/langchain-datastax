@@ -23,6 +23,7 @@ from astrapy.results import UpdateResult
 from langchain_core.stores import BaseStore, ByteStore
 
 from langchain_astradb.utils.astradb import (
+    INSERT_DOCUMENT_MAX_THREADS,
     REPLACE_DOCUMENTS_MAX_THREADS,
     SetupMode,
     _AstraDBCollectionEnvironment,
@@ -92,6 +93,7 @@ class AstraDBBaseStore(Generic[V], BaseStore[str, V], ABC):
             self.collection.insert_many(
                 documents_to_insert,
                 ordered=False,
+                concurrency=INSERT_DOCUMENT_MAX_THREADS,
             )
             ids_to_replace = []
         except InsertManyException as err:
@@ -166,9 +168,9 @@ class AstraDBBaseStore(Generic[V], BaseStore[str, V], ABC):
             sem = asyncio.Semaphore(REPLACE_DOCUMENTS_MAX_THREADS)
 
             _async_collection = self.async_collection
-            async def _replace_document(document: Dict[str, Any]) -> None:
+            async def _replace_document(document: Dict[str, Any]) -> UpdateResult:
                 async with sem:
-                    await _async_collection.replace_one(
+                    return await _async_collection.replace_one(
                         {"_id": document["_id"]},
                         document,
                     )

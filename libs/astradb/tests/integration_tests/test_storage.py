@@ -11,7 +11,7 @@ from astrapy.db import AstraDB
 from langchain_astradb.storage import AstraDBByteStore, AstraDBStore
 from langchain_astradb.utils.astradb import SetupMode
 
-from .conftest import _has_env_vars
+from .conftest import _has_env_vars, AstraDBCredentials
 
 
 def init_store(

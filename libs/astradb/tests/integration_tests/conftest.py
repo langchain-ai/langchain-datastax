@@ -1,5 +1,5 @@
 import os
-from typing import Dict, Optional
+from typing import Dict, Optional, TypedDict
 
 import pytest
 from astrapy import Database
@@ -30,8 +30,15 @@ def _has_env_vars() -> bool:
     )
 
 
+class AstraDBCredentials(TypedDict):
+    token: str
+    api_endpoint: str
+    namespace: Optional[str]
+    environment: Optional[str]
+
+
 @pytest.fixture(scope="session")
-def astra_db_credentials() -> Dict[str, Optional[str]]:
+def astra_db_credentials() -> AstraDBCredentials:
     return {
         "token": os.environ["ASTRA_DB_APPLICATION_TOKEN"],
         "api_endpoint": os.environ["ASTRA_DB_API_ENDPOINT"],
@@ -41,7 +48,7 @@ def astra_db_credentials() -> Dict[str, Optional[str]]:
 
 
 @pytest.fixture(scope="session")
-def database(astra_db_credentials: Dict[str, Optional[str]]) -> Database:
+def database(astra_db_credentials: AstraDBCredentials) -> Database:
     return Database(
         token=astra_db_credentials["token"],
         api_endpoint=astra_db_credentials["api_endpoint"],  # type: ignore[arg-type]
@@ -51,7 +58,7 @@ def database(astra_db_credentials: Dict[str, Optional[str]]) -> Database:
 
 
 @pytest.fixture(scope="session")
-def core_astra_db(astra_db_credentials: Dict[str, Optional[str]]) -> AstraDB:
+def core_astra_db(astra_db_credentials: AstraDBCredentials) -> AstraDB:
     return AstraDB(
         token=astra_db_credentials["token"],
         api_endpoint=astra_db_credentials["api_endpoint"],  # type: ignore[arg-type]
