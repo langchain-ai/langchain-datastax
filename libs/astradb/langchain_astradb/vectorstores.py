@@ -33,14 +33,13 @@ from astrapy.results import UpdateResult
 from langchain_core.documents import Document
 from langchain_core.embeddings import Embeddings
 from langchain_core.runnables.utils import gather_with_concurrency
-from langchain_core.utils.iter import batch_iterate
 from langchain_core.vectorstores import VectorStore
 
 from langchain_astradb.utils.astradb import (
-    INSERT_DOCUMENT_MAX_THREADS,
-    REPLACE_DOCUMENTS_MAX_THREADS,
     DEFAULT_DOCUMENT_CHUNK_SIZE,
     DELETE_DOCUMENTS_MAX_THREADS,
+    INSERT_DOCUMENT_MAX_THREADS,
+    REPLACE_DOCUMENTS_MAX_THREADS,
     SetupMode,
     _AstraDBCollectionEnvironment,
 )
@@ -409,7 +408,9 @@ class AstraDBVectorStore(VectorStore):
             True if a document has indeed been deleted, False if ID not found.
         """
         await self.astra_env.aensure_db_setup()
-        deletion_response = await self.astra_env.async_collection.delete_one({"_id": document_id})
+        deletion_response = await self.astra_env.async_collection.delete_one(
+            {"_id": document_id},
+        )
         return deletion_response.deleted_count == 1
 
     def delete(
@@ -685,11 +686,16 @@ class AstraDBVectorStore(VectorStore):
                 if document["_id"] in ids_to_replace
             ]
 
+            _max_workers = (
+                overwrite_concurrency or self.bulk_insert_overwrite_concurrency
+            )
             with ThreadPoolExecutor(
-                max_workers=overwrite_concurrency or self.bulk_insert_overwrite_concurrency
+                max_workers=_max_workers,
             ) as executor:
 
-                def _replace_document(document: Dict[str, Any]) -> Tuple[UpdateResult, str]:
+                def _replace_document(
+                    document: Dict[str, Any],
+                ) -> Tuple[UpdateResult, str]:
                     return self.astra_env.collection.replace_one(
                         {"_id": document["_id"]},
                         document,
@@ -799,10 +805,14 @@ class AstraDBVectorStore(VectorStore):
                 if document["_id"] in ids_to_replace
             ]
 
-            sem = asyncio.Semaphore(overwrite_concurrency or self.bulk_insert_overwrite_concurrency)
+            sem = asyncio.Semaphore(
+                overwrite_concurrency or self.bulk_insert_overwrite_concurrency,
+            )
 
             _async_collection = self.astra_env.async_collection
-            async def _replace_document(document: Dict[str, Any]) -> Tuple[UpdateResult, str]:
+            async def _replace_document(
+                document: Dict[str, Any],
+            ) -> Tuple[UpdateResult, str]:
                 async with sem:
                     return await _async_collection.replace_one(
                         {"_id": document["_id"]},
@@ -1625,7 +1635,10 @@ class AstraDBVectorStore(VectorStore):
         }
         _init_kwargs = {k: v for k, v in kwargs.items() if k not in _method_args}
         _method_kwargs = {k: v for k, v in kwargs.items() if k in _method_args}
-        astra_db_store = AstraDBVectorStore._from_kwargs(embedding=embedding, **_init_kwargs)
+        astra_db_store = AstraDBVectorStore._from_kwargs(
+            embedding=embedding,
+            **_init_kwargs,
+        )
         astra_db_store.add_texts(
             texts=texts,
             metadatas=metadatas,
@@ -1664,7 +1677,10 @@ class AstraDBVectorStore(VectorStore):
         }
         _init_kwargs = {k: v for k, v in kwargs.items() if k not in _method_args}
         _method_kwargs = {k: v for k, v in kwargs.items() if k in _method_args}
-        astra_db_store = AstraDBVectorStore._from_kwargs(embedding=embedding, **_init_kwargs)
+        astra_db_store = AstraDBVectorStore._from_kwargs(
+            embedding=embedding,
+            **_init_kwargs,
+        )
         await astra_db_store.aadd_texts(
             texts=texts,
             metadatas=metadatas,

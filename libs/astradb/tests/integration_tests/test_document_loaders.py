@@ -15,7 +15,7 @@ from __future__ import annotations
 import json
 import os
 import uuid
-from typing import AsyncIterator, Dict, Iterator, Optional
+from typing import AsyncIterator, Iterator
 
 import pytest
 from astrapy import AsyncCollection, Collection, Database
@@ -23,7 +23,7 @@ from astrapy.db import AstraDB
 
 from langchain_astradb import AstraDBLoader
 
-from .conftest import _has_env_vars, AstraDBCredentials
+from .conftest import AstraDBCredentials, _has_env_vars
 
 
 @pytest.fixture

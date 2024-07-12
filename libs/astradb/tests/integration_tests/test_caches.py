@@ -27,7 +27,7 @@ from langchain_core.pydantic_v1 import validator
 from langchain_astradb import AstraDBCache, AstraDBSemanticCache
 from langchain_astradb.utils.astradb import SetupMode
 
-from .conftest import _has_env_vars, AstraDBCredentials
+from .conftest import AstraDBCredentials, _has_env_vars
 
 
 class FakeEmbeddings(Embeddings):

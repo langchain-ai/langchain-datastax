@@ -1,5 +1,5 @@
 import os
-from typing import AsyncIterable, Dict, Iterable, Optional
+from typing import AsyncIterable, Iterable
 
 import pytest
 from astrapy.db import AstraDB
@@ -11,7 +11,7 @@ from langchain_astradb.chat_message_histories import (
 )
 from langchain_astradb.utils.astradb import SetupMode
 
-from .conftest import _has_env_vars, AstraDBCredentials
+from .conftest import AstraDBCredentials, _has_env_vars
 
 
 @pytest.fixture(scope="function")

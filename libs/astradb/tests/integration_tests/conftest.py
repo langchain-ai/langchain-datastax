@@ -1,5 +1,5 @@
 import os
-from typing import Dict, Optional, TypedDict
+from typing import Optional, TypedDict
 
 import pytest
 from astrapy import Database
