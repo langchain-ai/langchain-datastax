@@ -58,6 +58,29 @@ async def async_collection(database: Database) -> AsyncIterator[AsyncCollection]
 @pytest.mark.requires("astrapy")
 @pytest.mark.skipif(not _has_env_vars(), reason="Missing Astra DB env. vars")
 class TestAstraDB:
+    def test_astradb_loader_prefetched_sync(
+        self,
+        collection: Collection,
+        astra_db_credentials: AstraDBCredentials,
+    ) -> None:
+        """using 'prefetched' should give a warning but work nonetheless."""
+        with pytest.warns(UserWarning) as rec_warnings:
+            loader = AstraDBLoader(
+                collection.name,
+                token=astra_db_credentials["token"],
+                api_endpoint=astra_db_credentials["api_endpoint"],
+                namespace=astra_db_credentials["namespace"],
+                environment=astra_db_credentials["environment"],
+                nb_prefetched=123,
+                projection={"foo": 1},
+                limit=22,
+                filter_criteria={"foo": "bar"},
+            )
+            assert len(rec_warnings) == 1
+
+        docs = loader.load()
+        assert len(docs) == 22
+
     def test_astradb_loader_sync(
         self,
         collection: Collection,
@@ -69,7 +92,6 @@ class TestAstraDB:
             api_endpoint=astra_db_credentials["api_endpoint"],
             namespace=astra_db_credentials["namespace"],
             environment=astra_db_credentials["environment"],
-            nb_prefetched=1,
             projection={"foo": 1},
             limit=22,
             filter_criteria={"foo": "bar"},
@@ -130,6 +152,35 @@ class TestAstraDB:
 
         assert doc.metadata == {"a": "bar"}
 
+    async def test_astradb_loader_prefetched_async(
+        self,
+        async_collection: AsyncCollection,
+        astra_db_credentials: AstraDBCredentials,
+    ) -> None:
+        """using 'prefetched' should give a warning but work nonetheless."""
+        with pytest.warns(UserWarning) as rec_warnings:
+            loader = AstraDBLoader(
+                async_collection.name,
+                token=astra_db_credentials["token"],
+                api_endpoint=astra_db_credentials["api_endpoint"],
+                namespace=astra_db_credentials["namespace"],
+                environment=astra_db_credentials["environment"],
+                nb_prefetched=1,
+                projection={"foo": 1},
+                limit=22,
+                filter_criteria={"foo": "bar"},
+            )
+            # cleaning out 'spurious' "unclosed socket/transport..." warnings
+            f_rec_warnings = [
+                wrn
+                for wrn in rec_warnings
+                if not issubclass(wrn.category, ResourceWarning)
+            ]
+            assert len(f_rec_warnings) == 1
+
+        docs = await loader.aload()
+        assert len(docs) == 22
+
     async def test_astradb_loader_async(
         self,
         async_collection: AsyncCollection,
@@ -141,7 +192,6 @@ class TestAstraDB:
             api_endpoint=astra_db_credentials["api_endpoint"],
             namespace=astra_db_credentials["namespace"],
             environment=astra_db_credentials["environment"],
-            nb_prefetched=1,
             projection={"foo": 1},
             limit=22,
             filter_criteria={"foo": "bar"},

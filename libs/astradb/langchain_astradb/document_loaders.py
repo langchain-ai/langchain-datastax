@@ -44,7 +44,7 @@ class AstraDBLoader(BaseLoader):
         projection: Optional[Dict[str, Any]] = _NOT_SET,  # type: ignore[assignment]
         find_options: Optional[Dict[str, Any]] = None,
         limit: Optional[int] = None,
-        nb_prefetched: int = 1000,
+        nb_prefetched: int = _NOT_SET,  # type: ignore[assignment]
         page_content_mapper: Callable[[Dict], str] = json.dumps,
         metadata_mapper: Optional[Callable[[Dict], Dict[str, Any]]] = None,
     ) -> None:
@@ -82,7 +82,8 @@ class AstraDBLoader(BaseLoader):
                 *DEPRECATED starting from version 0.3.5.*
                 *For limiting, please use `limit`. Other options are ignored.*
             limit: a maximum number of documents to return in the read query.
-            nb_prefetched: Max number of documents to pre-fetch. Defaults to 1000.
+            nb_prefetched: Max number of documents to pre-fetch.
+                *IGNORED starting from v. 0.3.5: astrapy v1.0+ does not support it.*
             page_content_mapper: Function applied to collection documents to create
                 the `page_content` of the LangChain Document. Defaults to `json.dumps`.
         """
@@ -101,6 +102,16 @@ class AstraDBLoader(BaseLoader):
         self._projection: Optional[Dict[str, Any]] = (
             projection if projection is not _NOT_SET else {"*": True}
         )
+        # warning if 'prefetched' passed
+        if nb_prefetched is not _NOT_SET:
+            warnings.warn(
+                (
+                    "Parameter 'nb_prefetched' is not supported by the Data API "
+                    "client and will be ignored in reading document."
+                ),
+                UserWarning,
+            )
+
         # normalizing limit and options and deprecations
         _limit: Optional[int]
         if "limit" in (find_options or {}):
