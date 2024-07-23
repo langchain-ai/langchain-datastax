@@ -1536,7 +1536,13 @@ class TestAstraDBVectorStore:
                 setup_mode=SetupMode.ASYNC,
             )
             await leg_store.aadd_texts(["Triggering warning."])
-        assert len(rec_warnings) == 1
+            # cleaning out 'spurious' "unclosed socket/transport..." warnings
+            f_rec_warnings = [
+                wrn
+                for wrn in rec_warnings
+                if not issubclass(wrn.category, ResourceWarning)
+            ]
+            assert len(f_rec_warnings) == 1
 
         await database.to_async().drop_collection("lc_legacy_coll")
         await database.to_async().drop_collection("lc_default_idx")

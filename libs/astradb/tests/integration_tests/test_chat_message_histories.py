@@ -263,7 +263,13 @@ class TestAstraDBChatMessageHistories:
                     astra_db_client=core_astra_db,
                     setup_mode=SetupMode.ASYNC,
                 )
-            assert len(rec_warnings) == 1
+            # cleaning out 'spurious' "unclosed socket/transport..." warnings
+            f_rec_warnings = [
+                wrn
+                for wrn in rec_warnings
+                if not issubclass(wrn.category, ResourceWarning)
+            ]
+            assert len(f_rec_warnings) == 1
             assert await chatmh_init_core.aget_messages() == test_messages
         finally:
             await chatmh_init_ok.astra_env.async_collection.drop()
