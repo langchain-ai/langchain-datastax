@@ -38,9 +38,9 @@ from langchain_core.vectorstores import VectorStore
 
 from langchain_astradb.utils.astradb import (
     DEFAULT_DOCUMENT_CHUNK_SIZE,
-    DELETE_DOCUMENTS_MAX_THREADS,
-    INSERT_DOCUMENT_MAX_THREADS,
-    REPLACE_DOCUMENTS_MAX_THREADS,
+    MAX_CONCURRENT_DOCUMENT_DELETIONS,
+    MAX_CONCURRENT_DOCUMENT_INSERTIONS,
+    MAX_CONCURRENT_DOCUMENT_REPLACEMENTS,
     SetupMode,
     _AstraDBCollectionEnvironment,
 )
@@ -299,13 +299,13 @@ class AstraDBVectorStore(VectorStore):
         # Concurrency settings
         self.batch_size: Optional[int] = batch_size or DEFAULT_DOCUMENT_CHUNK_SIZE
         self.bulk_insert_batch_concurrency: int = (
-            bulk_insert_batch_concurrency or INSERT_DOCUMENT_MAX_THREADS
+            bulk_insert_batch_concurrency or MAX_CONCURRENT_DOCUMENT_INSERTIONS
         )
         self.bulk_insert_overwrite_concurrency: int = (
-            bulk_insert_overwrite_concurrency or REPLACE_DOCUMENTS_MAX_THREADS
+            bulk_insert_overwrite_concurrency or MAX_CONCURRENT_DOCUMENT_REPLACEMENTS
         )
         self.bulk_delete_concurrency: int = (
-            bulk_delete_concurrency or DELETE_DOCUMENTS_MAX_THREADS
+            bulk_delete_concurrency or MAX_CONCURRENT_DOCUMENT_DELETIONS
         )
         # "vector-related" settings
         self.metric = metric
@@ -1626,6 +1626,7 @@ class AstraDBVectorStore(VectorStore):
 
         Args:
             texts: the texts to insert.
+            embedding: the embedding function to use in the store.
             metadatas: metadata dicts for the texts.
             ids: ids to associate to the texts.
             **kwargs: you can pass any argument that you would

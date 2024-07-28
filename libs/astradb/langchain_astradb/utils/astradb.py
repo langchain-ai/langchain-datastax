@@ -25,11 +25,11 @@ NAMESPACE_ENV_VAR = "ASTRA_DB_KEYSPACE"
 # Chunk size for many-document insertions (None meaning defer to astrapy):
 DEFAULT_DOCUMENT_CHUNK_SIZE = None
 # thread/coroutine count for bulk inserts
-INSERT_DOCUMENT_MAX_THREADS = 20
+MAX_CONCURRENT_DOCUMENT_INSERTIONS = 20
 # Thread/coroutine count for one-doc-at-a-time overwrites
-REPLACE_DOCUMENTS_MAX_THREADS = 20
+MAX_CONCURRENT_DOCUMENT_REPLACEMENTS = 20
 # Thread/coroutine count for one-doc-at-a-time deletes:
-DELETE_DOCUMENTS_MAX_THREADS = 20
+MAX_CONCURRENT_DOCUMENT_DELETIONS = 20
 
 logger = logging.getLogger()
 
