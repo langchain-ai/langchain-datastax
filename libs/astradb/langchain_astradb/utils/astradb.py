@@ -87,6 +87,7 @@ class _AstraDBEnvironment:
                     "instead."
                 ),
                 DeprecationWarning,
+                stacklevel=2,
             )
             _tokens = list(
                 {

@@ -52,7 +52,8 @@ class TestAstraDBEnvironment:
             )
 
             # through a core AstraDB instance
-            env2 = _AstraDBEnvironment(astra_db_client=mock_astra_db)
+            with pytest.warns(DeprecationWarning):
+                env2 = _AstraDBEnvironment(astra_db_client=mock_astra_db)
 
             assert env1.data_api_client == env2.data_api_client
             assert env1.database == env2.database
@@ -79,47 +80,52 @@ class TestAstraDBEnvironment:
                 )
 
             # just client(s)
-            env3 = _AstraDBEnvironment(
-                async_astra_db_client=mock_astra_db.to_async(),
-            )
+            with pytest.warns(DeprecationWarning):
+                env3 = _AstraDBEnvironment(
+                    async_astra_db_client=mock_astra_db.to_async(),
+                )
             assert env1.data_api_client == env3.data_api_client
             assert env1.database == env3.database
             assert env1.async_database == env3.async_database
 
             # both sync and async (matching)
-            _AstraDBEnvironment(
-                astra_db_client=mock_astra_db,
-                async_astra_db_client=mock_astra_db.to_async(),
-            )
+            with pytest.warns(DeprecationWarning):
+                _AstraDBEnvironment(
+                    astra_db_client=mock_astra_db,
+                    async_astra_db_client=mock_astra_db.to_async(),
+                )
 
             # both sync and async, but mismatching in various ways
             with pytest.raises(ValueError):
-                _AstraDBEnvironment(
-                    async_astra_db_client=mock_astra_db.to_async(),
-                    astra_db_client=AstraDB(
-                        token="t",
-                        api_endpoint=a_e_string_2,
-                        namespace="n",
-                    ),
-                )
+                with pytest.warns(DeprecationWarning):
+                    _AstraDBEnvironment(
+                        async_astra_db_client=mock_astra_db.to_async(),
+                        astra_db_client=AstraDB(
+                            token="t",
+                            api_endpoint=a_e_string_2,
+                            namespace="n",
+                        ),
+                    )
             with pytest.raises(ValueError):
-                _AstraDBEnvironment(
-                    async_astra_db_client=mock_astra_db.to_async(),
-                    astra_db_client=AstraDB(
-                        token="t",
-                        api_endpoint=a_e_string,
-                        namespace="n2",
-                    ),
-                )
+                with pytest.warns(DeprecationWarning):
+                    _AstraDBEnvironment(
+                        async_astra_db_client=mock_astra_db.to_async(),
+                        astra_db_client=AstraDB(
+                            token="t",
+                            api_endpoint=a_e_string,
+                            namespace="n2",
+                        ),
+                    )
             with pytest.raises(ValueError):
-                _AstraDBEnvironment(
-                    async_astra_db_client=mock_astra_db.to_async(),
-                    astra_db_client=AstraDB(
-                        token="t2",
-                        api_endpoint=a_e_string,
-                        namespace="n",
-                    ),
-                )
+                with pytest.warns(DeprecationWarning):
+                    _AstraDBEnvironment(
+                        async_astra_db_client=mock_astra_db.to_async(),
+                        astra_db_client=AstraDB(
+                            token="t2",
+                            api_endpoint=a_e_string,
+                            namespace="n",
+                        ),
+                    )
 
             # token+client
             with pytest.raises(ValueError):
@@ -172,16 +178,19 @@ class TestAstraDBEnvironment:
             os.environ[TOKEN_ENV_VAR] = "NO!"
             os.environ[API_ENDPOINT_ENV_VAR] = "NO!"
             os.environ[NAMESPACE_ENV_VAR] = "NO!"
-            env7a = _AstraDBEnvironment(
-                async_astra_db_client=mock_astra_db.to_async(),
-            )
-            env7b = _AstraDBEnvironment(
-                astra_db_client=mock_astra_db,
-            )
-            env7c = _AstraDBEnvironment(
-                astra_db_client=mock_astra_db,
-                async_astra_db_client=mock_astra_db.to_async(),
-            )
+            with pytest.warns(DeprecationWarning):
+                env7a = _AstraDBEnvironment(
+                    async_astra_db_client=mock_astra_db.to_async(),
+                )
+            with pytest.warns(DeprecationWarning):
+                env7b = _AstraDBEnvironment(
+                    astra_db_client=mock_astra_db,
+                )
+            with pytest.warns(DeprecationWarning):
+                env7c = _AstraDBEnvironment(
+                    astra_db_client=mock_astra_db,
+                    async_astra_db_client=mock_astra_db.to_async(),
+                )
             assert env1.data_api_client == env7a.data_api_client
             assert env1.database == env7a.database
             assert env1.async_database == env7a.async_database
