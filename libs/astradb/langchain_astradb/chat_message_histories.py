@@ -3,8 +3,9 @@ from __future__ import annotations
 
 import json
 import time
-from typing import List, Optional, Sequence
+from typing import List, Optional, Sequence, Union
 
+from astrapy.authentication import TokenProvider
 from astrapy.db import AstraDB, AsyncAstraDB
 from langchain_core.chat_history import BaseChatMessageHistory
 from langchain_core.messages import (
@@ -27,8 +28,9 @@ class AstraDBChatMessageHistory(BaseChatMessageHistory):
         *,
         session_id: str,
         collection_name: str = DEFAULT_COLLECTION_NAME,
-        token: Optional[str] = None,
+        token: Optional[Union[str, TokenProvider]] = None,
         api_endpoint: Optional[str] = None,
+        environment: Optional[str] = None,
         astra_db_client: Optional[AstraDB] = None,
         async_astra_db_client: Optional[AsyncAstraDB] = None,
         namespace: Optional[str] = None,
@@ -41,15 +43,26 @@ class AstraDBChatMessageHistory(BaseChatMessageHistory):
             session_id: arbitrary key that is used to store the messages
                 of a single chat session.
             collection_name: name of the Astra DB collection to create/use.
-            token: API token for Astra DB usage. If not provided, the environment
-                variable ASTRA_DB_APPLICATION_TOKEN is inspected.
+            token: API token for Astra DB usage, either in the form of a string
+                or a subclass of `astrapy.authentication.TokenProvider`.
+                If not provided, the environment variable
+                ASTRA_DB_APPLICATION_TOKEN is inspected.
             api_endpoint: full URL to the API endpoint, such as
                 `https://<DB-ID>-us-east1.apps.astra.datastax.com`. If not provided,
                 the environment variable ASTRA_DB_API_ENDPOINT is inspected.
-            astra_db_client: *alternative to token+api_endpoint*,
-                you can pass an already-created 'astrapy.db.AstraDB' instance.
-            async_astra_db_client: *alternative to token+api_endpoint*,
-                you can pass an already-created 'astrapy.db.AsyncAstraDB' instance.
+            environment: a string specifying the environment of the target Data API.
+                If omitted, defaults to "prod" (Astra DB production).
+                Other values are in `astrapy.constants.Environment` enum class.
+            astra_db_client:
+                *DEPRECATED starting from version 0.3.5.*
+                *Please use 'token', 'api_endpoint' and optionally 'environment'.*
+                you can pass an already-created 'astrapy.db.AstraDB' instance
+                (alternatively to 'token', 'api_endpoint' and 'environment').
+            async_astra_db_client:
+                *DEPRECATED starting from version 0.3.5.*
+                *Please use 'token', 'api_endpoint' and optionally 'environment'.*
+                you can pass an already-created 'astrapy.db.AsyncAstraDB' instance
+                (alternatively to 'token', 'api_endpoint' and 'environment').
             namespace: namespace (aka keyspace) where the collection is created.
                 If not provided, the environment variable ASTRA_DB_KEYSPACE is
                 inspected. Defaults to the database's "default namespace".
@@ -58,6 +71,7 @@ class AstraDBChatMessageHistory(BaseChatMessageHistory):
             collection_name=collection_name,
             token=token,
             api_endpoint=api_endpoint,
+            environment=environment,
             astra_db_client=astra_db_client,
             async_astra_db_client=async_astra_db_client,
             namespace=namespace,
@@ -78,13 +92,13 @@ class AstraDBChatMessageHistory(BaseChatMessageHistory):
         message_blobs = [
             doc["body_blob"]
             for doc in sorted(
-                self.collection.paginated_find(
+                self.collection.find(
                     filter={
                         "session_id": self.session_id,
                     },
                     projection={
-                        "timestamp": 1,
-                        "body_blob": 1,
+                        "timestamp": True,
+                        "body_blob": True,
                     },
                 ),
                 key=lambda _doc: _doc["timestamp"],
@@ -100,13 +114,13 @@ class AstraDBChatMessageHistory(BaseChatMessageHistory):
 
     async def aget_messages(self) -> List[BaseMessage]:
         await self.astra_env.aensure_db_setup()
-        docs = self.async_collection.paginated_find(
+        docs = self.async_collection.find(
             filter={
                 "session_id": self.session_id,
             },
             projection={
-                "timestamp": 1,
-                "body_blob": 1,
+                "timestamp": True,
+                "body_blob": True,
             },
         )
         sorted_docs = sorted(
@@ -128,7 +142,7 @@ class AstraDBChatMessageHistory(BaseChatMessageHistory):
             }
             for message in messages
         ]
-        self.collection.chunked_insert_many(docs)
+        self.collection.insert_many(docs)
 
     async def aadd_messages(self, messages: Sequence[BaseMessage]) -> None:
         await self.astra_env.aensure_db_setup()
@@ -140,7 +154,7 @@ class AstraDBChatMessageHistory(BaseChatMessageHistory):
             }
             for message in messages
         ]
-        await self.async_collection.chunked_insert_many(docs)
+        await self.async_collection.insert_many(docs)
 
     def clear(self) -> None:
         self.astra_env.ensure_db_setup()

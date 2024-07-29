@@ -15,6 +15,7 @@ import os
 from typing import Any, AsyncIterator, Dict, Iterator, List, Mapping, Optional, cast
 
 import pytest
+from astrapy.db import AstraDB
 from langchain_core.caches import BaseCache
 from langchain_core.callbacks import CallbackManagerForLLMRun
 from langchain_core.embeddings import Embeddings
@@ -25,6 +26,8 @@ from langchain_core.pydantic_v1 import validator
 
 from langchain_astradb import AstraDBCache, AstraDBSemanticCache
 from langchain_astradb.utils.astradb import SetupMode
+
+from .conftest import AstraDBCredentials, _has_env_vars
 
 
 class FakeEmbeddings(Embeddings):
@@ -103,82 +106,79 @@ class FakeLLM(LLM):
         return response
 
 
-def _has_env_vars() -> bool:
-    return all(
-        [
-            "ASTRA_DB_APPLICATION_TOKEN" in os.environ,
-            "ASTRA_DB_API_ENDPOINT" in os.environ,
-        ]
-    )
-
-
 @pytest.fixture(scope="module")
-def astradb_cache() -> Iterator[AstraDBCache]:
+def astradb_cache(astra_db_credentials: AstraDBCredentials) -> Iterator[AstraDBCache]:
     cache = AstraDBCache(
         collection_name="lc_integration_test_cache",
-        token=os.environ["ASTRA_DB_APPLICATION_TOKEN"],
-        api_endpoint=os.environ["ASTRA_DB_API_ENDPOINT"],
-        namespace=os.environ.get("ASTRA_DB_KEYSPACE"),
+        token=astra_db_credentials["token"],
+        api_endpoint=astra_db_credentials["api_endpoint"],
+        namespace=astra_db_credentials["namespace"],
+        environment=astra_db_credentials["environment"],
     )
     yield cache
-    cache.collection.astra_db.delete_collection("lc_integration_test_cache")
+    cache.collection.drop()
 
 
-@pytest.fixture
-async def async_astradb_cache() -> AsyncIterator[AstraDBCache]:
+@pytest.fixture(scope="function")
+async def async_astradb_cache(
+    astra_db_credentials: AstraDBCredentials,
+) -> AsyncIterator[AstraDBCache]:
     cache = AstraDBCache(
         collection_name="lc_integration_test_cache_async",
-        token=os.environ["ASTRA_DB_APPLICATION_TOKEN"],
-        api_endpoint=os.environ["ASTRA_DB_API_ENDPOINT"],
-        namespace=os.environ.get("ASTRA_DB_KEYSPACE"),
+        token=astra_db_credentials["token"],
+        api_endpoint=astra_db_credentials["api_endpoint"],
+        namespace=astra_db_credentials["namespace"],
+        environment=astra_db_credentials["environment"],
         setup_mode=SetupMode.ASYNC,
     )
     yield cache
-    await cache.async_collection.astra_db.delete_collection(
-        "lc_integration_test_cache_async"
-    )
+    await cache.async_collection.drop()
 
 
 @pytest.fixture(scope="module")
-def astradb_semantic_cache() -> Iterator[AstraDBSemanticCache]:
+def astradb_semantic_cache(
+    astra_db_credentials: AstraDBCredentials,
+) -> Iterator[AstraDBSemanticCache]:
     fake_embe = FakeEmbeddings()
     sem_cache = AstraDBSemanticCache(
         collection_name="lc_integration_test_sem_cache",
-        token=os.environ["ASTRA_DB_APPLICATION_TOKEN"],
-        api_endpoint=os.environ["ASTRA_DB_API_ENDPOINT"],
-        namespace=os.environ.get("ASTRA_DB_KEYSPACE"),
+        token=astra_db_credentials["token"],
+        api_endpoint=astra_db_credentials["api_endpoint"],
+        namespace=astra_db_credentials["namespace"],
+        environment=astra_db_credentials["environment"],
         embedding=fake_embe,
     )
     yield sem_cache
-    sem_cache.collection.astra_db.delete_collection("lc_integration_test_sem_cache")
+    sem_cache.collection.drop()
 
 
-@pytest.fixture
-async def async_astradb_semantic_cache() -> AsyncIterator[AstraDBSemanticCache]:
+@pytest.fixture(scope="function")
+async def async_astradb_semantic_cache(
+    astra_db_credentials: AstraDBCredentials,
+) -> AsyncIterator[AstraDBSemanticCache]:
     fake_embe = FakeEmbeddings()
     sem_cache = AstraDBSemanticCache(
         collection_name="lc_integration_test_sem_cache_async",
-        token=os.environ["ASTRA_DB_APPLICATION_TOKEN"],
-        api_endpoint=os.environ["ASTRA_DB_API_ENDPOINT"],
-        namespace=os.environ.get("ASTRA_DB_KEYSPACE"),
+        token=astra_db_credentials["token"],
+        api_endpoint=astra_db_credentials["api_endpoint"],
+        namespace=astra_db_credentials["namespace"],
+        environment=astra_db_credentials["environment"],
         embedding=fake_embe,
         setup_mode=SetupMode.ASYNC,
     )
     yield sem_cache
-    sem_cache.collection.astra_db.delete_collection(
-        "lc_integration_test_sem_cache_async"
-    )
+    sem_cache.collection.drop()
 
 
 @pytest.mark.skipif(not _has_env_vars(), reason="Missing Astra DB env. vars")
 class TestAstraDBCaches:
-    def test_astradb_cache(self, astradb_cache: AstraDBCache) -> None:
+    def test_astradb_cache_sync(self, astradb_cache: AstraDBCache) -> None:
         self.do_cache_test(FakeLLM(), astradb_cache, "foo")
 
     async def test_astradb_cache_async(self, async_astradb_cache: AstraDBCache) -> None:
         await self.ado_cache_test(FakeLLM(), async_astradb_cache, "foo")
 
-    def test_astradb_semantic_cache(
+    def test_astradb_semantic_cache_sync(
         self, astradb_semantic_cache: AstraDBSemanticCache
     ) -> None:
         llm = FakeLLM()
@@ -233,3 +233,141 @@ class TestAstraDBCaches:
         assert output == expected_output
         # clear the cache
         await cache.aclear()
+
+    @pytest.mark.skipif(
+        os.environ.get("ASTRA_DB_ENVIRONMENT", "prod").upper() != "PROD",
+        reason="Can run on Astra DB prod only",
+    )
+    def test_cache_coreclients_init_sync(
+        self,
+        astra_db_credentials: AstraDBCredentials,
+        core_astra_db: AstraDB,
+    ) -> None:
+        """A deprecation warning from passing a (core) AstraDB, but it works."""
+        collection_name = "lc_test_cache_coreclsync"
+        test_gens = [Generation(text="ret_val0123")]
+        try:
+            cache_init_ok = AstraDBCache(
+                collection_name=collection_name,
+                token=astra_db_credentials["token"],
+                api_endpoint=astra_db_credentials["api_endpoint"],
+                namespace=astra_db_credentials["namespace"],
+            )
+            cache_init_ok.update("pr", "llms", test_gens)
+            # create an equivalent cache with core AstraDB in init
+            with pytest.warns(DeprecationWarning) as rec_warnings:
+                cache_init_core = AstraDBCache(
+                    collection_name=collection_name,
+                    astra_db_client=core_astra_db,
+                )
+            assert len(rec_warnings) == 1
+            assert cache_init_core.lookup("pr", "llms") == test_gens
+        finally:
+            cache_init_ok.astra_env.database.drop_collection(collection_name)
+
+    @pytest.mark.skipif(
+        os.environ.get("ASTRA_DB_ENVIRONMENT", "prod").upper() != "PROD",
+        reason="Can run on Astra DB prod only",
+    )
+    async def test_cache_coreclients_init_async(
+        self,
+        astra_db_credentials: AstraDBCredentials,
+        core_astra_db: AstraDB,
+    ) -> None:
+        """A deprecation warning from passing a (core) AstraDB, but it works."""
+        collection_name = "lc_test_cache_coreclasync"
+        test_gens = [Generation(text="ret_val4567")]
+        try:
+            cache_init_ok = AstraDBCache(
+                collection_name=collection_name,
+                token=astra_db_credentials["token"],
+                api_endpoint=astra_db_credentials["api_endpoint"],
+                namespace=astra_db_credentials["namespace"],
+                setup_mode=SetupMode.ASYNC,
+            )
+            await cache_init_ok.aupdate("pr", "llms", test_gens)
+            # create an equivalent cache with core AstraDB in init
+            with pytest.warns(DeprecationWarning) as rec_warnings:
+                cache_init_core = AstraDBCache(
+                    collection_name=collection_name,
+                    astra_db_client=core_astra_db,
+                    setup_mode=SetupMode.ASYNC,
+                )
+            assert len(rec_warnings) == 1
+            assert await cache_init_core.alookup("pr", "llms") == test_gens
+        finally:
+            await cache_init_ok.astra_env.async_database.drop_collection(
+                collection_name
+            )
+
+    @pytest.mark.skipif(
+        os.environ.get("ASTRA_DB_ENVIRONMENT", "prod").upper() != "PROD",
+        reason="Can run on Astra DB prod only",
+    )
+    def test_semcache_coreclients_init_sync(
+        self,
+        astra_db_credentials: AstraDBCredentials,
+        core_astra_db: AstraDB,
+    ) -> None:
+        """A deprecation warning from passing a (core) AstraDB, but it works."""
+        fake_embe = FakeEmbeddings()
+        collection_name = "lc_test_cache_coreclsync"
+        test_gens = [Generation(text="ret_val0123")]
+        try:
+            cache_init_ok = AstraDBSemanticCache(
+                collection_name=collection_name,
+                token=astra_db_credentials["token"],
+                api_endpoint=astra_db_credentials["api_endpoint"],
+                namespace=astra_db_credentials["namespace"],
+                embedding=fake_embe,
+            )
+            cache_init_ok.update("pr", "llms", test_gens)
+            # create an equivalent cache with core AstraDB in init
+            with pytest.warns(DeprecationWarning) as rec_warnings:
+                cache_init_core = AstraDBSemanticCache(
+                    collection_name=collection_name,
+                    astra_db_client=core_astra_db,
+                    embedding=fake_embe,
+                )
+            assert len(rec_warnings) == 1
+            assert cache_init_core.lookup("pr", "llms") == test_gens
+        finally:
+            cache_init_ok.astra_env.database.drop_collection(collection_name)
+
+    @pytest.mark.skipif(
+        os.environ.get("ASTRA_DB_ENVIRONMENT", "prod").upper() != "PROD",
+        reason="Can run on Astra DB prod only",
+    )
+    async def test_semcache_coreclients_init_async(
+        self,
+        astra_db_credentials: AstraDBCredentials,
+        core_astra_db: AstraDB,
+    ) -> None:
+        """A deprecation warning from passing a (core) AstraDB, but it works."""
+        fake_embe = FakeEmbeddings()
+        collection_name = "lc_test_cache_coreclasync"
+        test_gens = [Generation(text="ret_val4567")]
+        try:
+            cache_init_ok = AstraDBSemanticCache(
+                collection_name=collection_name,
+                token=astra_db_credentials["token"],
+                api_endpoint=astra_db_credentials["api_endpoint"],
+                namespace=astra_db_credentials["namespace"],
+                setup_mode=SetupMode.ASYNC,
+                embedding=fake_embe,
+            )
+            await cache_init_ok.aupdate("pr", "llms", test_gens)
+            # create an equivalent cache with core AstraDB in init
+            with pytest.warns(DeprecationWarning) as rec_warnings:
+                cache_init_core = AstraDBSemanticCache(
+                    collection_name=collection_name,
+                    astra_db_client=core_astra_db,
+                    setup_mode=SetupMode.ASYNC,
+                    embedding=fake_embe,
+                )
+            assert len(rec_warnings) == 1
+            assert await cache_init_core.alookup("pr", "llms") == test_gens
+        finally:
+            await cache_init_ok.astra_env.async_database.drop_collection(
+                collection_name
+            )

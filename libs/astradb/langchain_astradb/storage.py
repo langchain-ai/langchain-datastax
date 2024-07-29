@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import asyncio
 import base64
 from abc import ABC, abstractmethod
+from concurrent.futures import ThreadPoolExecutor
 from typing import (
     Any,
     AsyncIterator,
+    Dict,
     Generic,
     Iterator,
     List,
@@ -12,12 +15,18 @@ from typing import (
     Sequence,
     Tuple,
     TypeVar,
+    Union,
 )
 
+from astrapy.authentication import TokenProvider
 from astrapy.db import AstraDB, AsyncAstraDB
+from astrapy.exceptions import InsertManyException
+from astrapy.results import UpdateResult
 from langchain_core.stores import BaseStore, ByteStore
 
 from langchain_astradb.utils.astradb import (
+    MAX_CONCURRENT_DOCUMENT_INSERTIONS,
+    MAX_CONCURRENT_DOCUMENT_REPLACEMENTS,
     SetupMode,
     _AstraDBCollectionEnvironment,
 )
@@ -26,7 +35,7 @@ V = TypeVar("V")
 
 
 class AstraDBBaseStore(Generic[V], BaseStore[str, V], ABC):
-    """Base class for the DataStax AstraDB data store."""
+    """Base class for the DataStax Astra DB data store."""
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         if "requested_indexing_policy" in kwargs:
@@ -57,7 +66,7 @@ class AstraDBBaseStore(Generic[V], BaseStore[str, V], ABC):
     def mget(self, keys: Sequence[str]) -> List[Optional[V]]:
         self.astra_env.ensure_db_setup()
         docs_dict = {}
-        for doc in self.collection.paginated_find(
+        for doc in self.collection.find(
             filter={"_id": {"$in": list(keys)}},
             projection={"*": True},
         ):
@@ -67,7 +76,7 @@ class AstraDBBaseStore(Generic[V], BaseStore[str, V], ABC):
     async def amget(self, keys: Sequence[str]) -> List[Optional[V]]:
         await self.astra_env.aensure_db_setup()
         docs_dict = {}
-        async for doc in self.async_collection.paginated_find(
+        async for doc in self.async_collection.find(
             filter={"_id": {"$in": list(keys)}},
             projection={"*": True},
         ):
@@ -76,15 +85,113 @@ class AstraDBBaseStore(Generic[V], BaseStore[str, V], ABC):
 
     def mset(self, key_value_pairs: Sequence[Tuple[str, V]]) -> None:
         self.astra_env.ensure_db_setup()
-        for k, v in key_value_pairs:
-            self.collection.upsert_one({"_id": k, "value": self.encode_value(v)})
+        documents_to_insert = [
+            {"_id": k, "value": self.encode_value(v)} for k, v in key_value_pairs
+        ]
+        # perform an AstraPy insert_many, catching exceptions for overwriting docs
+        ids_to_replace: List[int]
+        try:
+            self.collection.insert_many(
+                documents_to_insert,
+                ordered=False,
+                concurrency=MAX_CONCURRENT_DOCUMENT_INSERTIONS,
+            )
+            ids_to_replace = []
+        except InsertManyException as err:
+            inserted_ids_set = set(err.partial_result.inserted_ids)
+            ids_to_replace = [
+                document["_id"]
+                for document in documents_to_insert
+                if document["_id"] not in inserted_ids_set
+            ]
+
+        # if necessary, replace docs for the non-inserted ids
+        if ids_to_replace:
+            documents_to_replace = [
+                document
+                for document in documents_to_insert
+                if document["_id"] in ids_to_replace
+            ]
+
+            with ThreadPoolExecutor(
+                max_workers=MAX_CONCURRENT_DOCUMENT_REPLACEMENTS
+            ) as executor:
+
+                def _replace_document(document: Dict[str, Any]) -> UpdateResult:
+                    return self.collection.replace_one(
+                        {"_id": document["_id"]},
+                        document,
+                    )
+
+                replace_results = list(
+                    executor.map(
+                        _replace_document,
+                        documents_to_replace,
+                    )
+                )
+
+            replaced_count = sum(r_res.update_info["n"] for r_res in replace_results)
+            if replaced_count != len(ids_to_replace):
+                missing = len(ids_to_replace) - replaced_count
+                raise ValueError(
+                    "AstraDBBaseStore.mset could not insert all requested "
+                    f"documents ({missing} failed replace_one calls)"
+                )
 
     async def amset(self, key_value_pairs: Sequence[Tuple[str, V]]) -> None:
         await self.astra_env.aensure_db_setup()
-        for k, v in key_value_pairs:
-            await self.async_collection.upsert_one(
-                {"_id": k, "value": self.encode_value(v)}
+        documents_to_insert = [
+            {"_id": k, "value": self.encode_value(v)} for k, v in key_value_pairs
+        ]
+        # perform an AstraPy insert_many, catching exceptions for overwriting docs
+        ids_to_replace: List[int]
+        try:
+            await self.async_collection.insert_many(
+                documents_to_insert,
+                ordered=False,
             )
+            ids_to_replace = []
+        except InsertManyException as err:
+            inserted_ids_set = set(err.partial_result.inserted_ids)
+            ids_to_replace = [
+                document["_id"]
+                for document in documents_to_insert
+                if document["_id"] not in inserted_ids_set
+            ]
+
+        # if necessary, replace docs for the non-inserted ids
+        if ids_to_replace:
+            documents_to_replace = [
+                document
+                for document in documents_to_insert
+                if document["_id"] in ids_to_replace
+            ]
+
+            sem = asyncio.Semaphore(MAX_CONCURRENT_DOCUMENT_REPLACEMENTS)
+
+            _async_collection = self.async_collection
+
+            async def _replace_document(document: Dict[str, Any]) -> UpdateResult:
+                async with sem:
+                    return await _async_collection.replace_one(
+                        {"_id": document["_id"]},
+                        document,
+                    )
+
+            tasks = [
+                asyncio.create_task(_replace_document(document))
+                for document in documents_to_replace
+            ]
+
+            replace_results = await asyncio.gather(*tasks, return_exceptions=False)
+
+            replaced_count = sum(r_res.update_info["n"] for r_res in replace_results)
+            if replaced_count != len(ids_to_replace):
+                missing = len(ids_to_replace) - replaced_count
+                raise ValueError(
+                    "AstraDBBaseStore.mset could not insert all requested "
+                    f"documents ({missing} failed replace_one calls)"
+                )
 
     def mdelete(self, keys: Sequence[str]) -> None:
         self.astra_env.ensure_db_setup()
@@ -96,7 +203,7 @@ class AstraDBBaseStore(Generic[V], BaseStore[str, V], ABC):
 
     def yield_keys(self, *, prefix: Optional[str] = None) -> Iterator[str]:
         self.astra_env.ensure_db_setup()
-        docs = self.collection.paginated_find()
+        docs = self.collection.find()
         for doc in docs:
             key = doc["_id"]
             if not prefix or key.startswith(prefix):
@@ -104,7 +211,7 @@ class AstraDBBaseStore(Generic[V], BaseStore[str, V], ABC):
 
     async def ayield_keys(self, *, prefix: Optional[str] = None) -> AsyncIterator[str]:
         await self.astra_env.aensure_db_setup()
-        async for doc in self.async_collection.paginated_find():
+        async for doc in self.async_collection.find():
             key = doc["_id"]
             if not prefix or key.startswith(prefix):
                 yield key
@@ -115,8 +222,9 @@ class AstraDBStore(AstraDBBaseStore[Any]):
         self,
         collection_name: str,
         *,
-        token: Optional[str] = None,
+        token: Optional[Union[str, TokenProvider]] = None,
         api_endpoint: Optional[str] = None,
+        environment: Optional[str] = None,
         astra_db_client: Optional[AstraDB] = None,
         namespace: Optional[str] = None,
         async_astra_db_client: Optional[AsyncAstraDB] = None,
@@ -138,15 +246,26 @@ class AstraDBStore(AstraDBBaseStore[Any]):
 
         Args:
             collection_name: name of the Astra DB collection to create/use.
-            token: API token for Astra DB usage. If not provided, the environment
-                variable ASTRA_DB_APPLICATION_TOKEN is inspected.
+            token: API token for Astra DB usage, either in the form of a string
+                or a subclass of `astrapy.authentication.TokenProvider`.
+                If not provided, the environment variable
+                ASTRA_DB_APPLICATION_TOKEN is inspected.
             api_endpoint: full URL to the API endpoint, such as
                 `https://<DB-ID>-us-east1.apps.astra.datastax.com`. If not provided,
                 the environment variable ASTRA_DB_API_ENDPOINT is inspected.
-            astra_db_client: *alternative to token+api_endpoint*,
-                you can pass an already-created 'astrapy.db.AstraDB' instance.
-            async_astra_db_client: *alternative to token+api_endpoint*,
-                you can pass an already-created 'astrapy.db.AsyncAstraDB' instance.
+            environment: a string specifying the environment of the target Data API.
+                If omitted, defaults to "prod" (Astra DB production).
+                Other values are in `astrapy.constants.Environment` enum class.
+            astra_db_client:
+                *DEPRECATED starting from version 0.3.5.*
+                *Please use 'token', 'api_endpoint' and optionally 'environment'.*
+                you can pass an already-created 'astrapy.db.AstraDB' instance
+                (alternatively to 'token', 'api_endpoint' and 'environment').
+            async_astra_db_client:
+                *DEPRECATED starting from version 0.3.5.*
+                *Please use 'token', 'api_endpoint' and optionally 'environment'.*
+                you can pass an already-created 'astrapy.db.AsyncAstraDB' instance
+                (alternatively to 'token', 'api_endpoint' and 'environment').
             namespace: namespace (aka keyspace) where the collection is created.
                 If not provided, the environment variable ASTRA_DB_KEYSPACE is
                 inspected. Defaults to the database's "default namespace".
@@ -160,6 +279,7 @@ class AstraDBStore(AstraDBBaseStore[Any]):
             collection_name=collection_name,
             token=token,
             api_endpoint=api_endpoint,
+            environment=environment,
             astra_db_client=astra_db_client,
             async_astra_db_client=async_astra_db_client,
             namespace=namespace,
@@ -179,8 +299,9 @@ class AstraDBByteStore(AstraDBBaseStore[bytes], ByteStore):
         self,
         *,
         collection_name: str,
-        token: Optional[str] = None,
+        token: Optional[Union[str, TokenProvider]] = None,
         api_endpoint: Optional[str] = None,
+        environment: Optional[str] = None,
         astra_db_client: Optional[AstraDB] = None,
         namespace: Optional[str] = None,
         async_astra_db_client: Optional[AsyncAstraDB] = None,
@@ -200,15 +321,26 @@ class AstraDBByteStore(AstraDBBaseStore[bytes], ByteStore):
 
         Args:
             collection_name: name of the Astra DB collection to create/use.
-            token: API token for Astra DB usage. If not provided, the environment
-                variable ASTRA_DB_APPLICATION_TOKEN is inspected.
+            token: API token for Astra DB usage, either in the form of a string
+                or a subclass of `astrapy.authentication.TokenProvider`.
+                If not provided, the environment variable
+                ASTRA_DB_APPLICATION_TOKEN is inspected.
             api_endpoint: full URL to the API endpoint, such as
                 `https://<DB-ID>-us-east1.apps.astra.datastax.com`. If not provided,
                 the environment variable ASTRA_DB_API_ENDPOINT is inspected.
-            astra_db_client: *alternative to token+api_endpoint*,
-                you can pass an already-created 'astrapy.db.AstraDB' instance.
-            async_astra_db_client: *alternative to token+api_endpoint*,
-                you can pass an already-created 'astrapy.db.AsyncAstraDB' instance.
+            environment: a string specifying the environment of the target Data API.
+                If omitted, defaults to "prod" (Astra DB production).
+                Other values are in `astrapy.constants.Environment` enum class.
+            astra_db_client:
+                *DEPRECATED starting from version 0.3.5.*
+                *Please use 'token', 'api_endpoint' and optionally 'environment'.*
+                you can pass an already-created 'astrapy.db.AstraDB' instance
+                (alternatively to 'token', 'api_endpoint' and 'environment').
+            async_astra_db_client:
+                *DEPRECATED starting from version 0.3.5.*
+                *Please use 'token', 'api_endpoint' and optionally 'environment'.*
+                you can pass an already-created 'astrapy.db.AsyncAstraDB' instance
+                (alternatively to 'token', 'api_endpoint' and 'environment').
             namespace: namespace (aka keyspace) where the collection is created.
                 If not provided, the environment variable ASTRA_DB_KEYSPACE is
                 inspected. Defaults to the database's "default namespace".
@@ -222,6 +354,7 @@ class AstraDBByteStore(AstraDBBaseStore[bytes], ByteStore):
             collection_name=collection_name,
             token=token,
             api_endpoint=api_endpoint,
+            environment=environment,
             astra_db_client=astra_db_client,
             async_astra_db_client=async_astra_db_client,
             namespace=namespace,
