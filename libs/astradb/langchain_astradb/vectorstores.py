@@ -1600,18 +1600,22 @@ class AstraDBVectorStore(VectorStore):
     ) -> AstraDBVectorStore:
         _args = inspect.getfullargspec(AstraDBVectorStore.__init__).args
         _kwargs = inspect.getfullargspec(AstraDBVectorStore.__init__).kwonlyargs
-        known_kwargs = (set(_args) | set(_kwargs)) - {"self"}
+        known_kwarg_keys = (set(_args) | set(_kwargs)) - {"self"}
         if kwargs:
-            unknown_kwargs = set(kwargs.keys()) - known_kwargs
-            if unknown_kwargs:
+            unknown_kwarg_keys = set(kwargs.keys()) - known_kwarg_keys
+            if unknown_kwarg_keys:
                 warnings.warn(
-                    "Method 'from_texts' of AstraDBVectorStore vector store "
-                    "invoked with unsupported arguments "
-                    f"({', '.join(sorted(unknown_kwargs))}), "
-                    "which will be ignored."
+                    (
+                        "Method 'from_texts/afrom_texts' of AstraDBVectorStore "
+                        "vector store invoked with unsupported arguments "
+                        f"({', '.join(sorted(unknown_kwarg_keys))}), "
+                        "which will be ignored."
+                    ),
+                    UserWarning,
                 )
 
-        return cls(**kwargs)
+        known_kwargs = {k: v for k, v in kwargs.items() if k in known_kwarg_keys}
+        return cls(**known_kwargs)
 
     @classmethod
     def from_texts(
@@ -1637,11 +1641,11 @@ class AstraDBVectorStore(VectorStore):
         Returns:
             an `AstraDBVectorStore` vectorstore.
         """
-        _method_args = {
-            "batch_size",
-            "batch_concurrency",
-            "overwrite_concurrency",
-        }
+        _add_texts_inspection = inspect.getfullargspec(AstraDBVectorStore.add_texts)
+        _method_args = (
+            set(_add_texts_inspection.kwonlyargs)
+            | set(_add_texts_inspection.kwonlyargs)
+        ) - {"self", "texts", "metadatas", "ids"}
         _init_kwargs = {k: v for k, v in kwargs.items() if k not in _method_args}
         _method_kwargs = {k: v for k, v in kwargs.items() if k in _method_args}
         astra_db_store = AstraDBVectorStore._from_kwargs(
@@ -1672,18 +1676,18 @@ class AstraDBVectorStore(VectorStore):
             metadatas: metadata dicts for the texts.
             ids: ids to associate to the texts.
             **kwargs: you can pass any argument that you would
-                to :meth:`~add_texts` and/or to the 'AstraDBVectorStore' constructor
+                to :meth:`~aadd_texts` and/or to the 'AstraDBVectorStore' constructor
                 (see these methods for details). These arguments will be
                 routed to the respective methods as they are.
 
         Returns:
             an `AstraDBVectorStore` vectorstore.
         """
-        _method_args = {
-            "batch_size",
-            "batch_concurrency",
-            "overwrite_concurrency",
-        }
+        _aadd_texts_inspection = inspect.getfullargspec(AstraDBVectorStore.aadd_texts)
+        _method_args = (
+            set(_aadd_texts_inspection.kwonlyargs)
+            | set(_aadd_texts_inspection.kwonlyargs)
+        ) - {"self", "texts", "metadatas", "ids"}
         _init_kwargs = {k: v for k, v in kwargs.items() if k not in _method_args}
         _method_kwargs = {k: v for k, v in kwargs.items() if k in _method_args}
         astra_db_store = AstraDBVectorStore._from_kwargs(

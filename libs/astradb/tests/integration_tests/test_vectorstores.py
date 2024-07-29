@@ -433,6 +433,52 @@ class TestAstraDBVectorStore:
         )
         try:
             assert v_store.similarity_search("Ho", k=1)[0].page_content == "Ho"
+            # testing additional kwargs & from_text-specific kwargs
+            # baseline
+            AstraDBVectorStore.from_texts(
+                texts=["F T one", "F T two"],
+                embedding=emb,
+                metadatas=[{"m": 1}, {"m": 2}],
+                ids=["ft1", "ft2"],
+                collection_name=COLLECTION_NAME_DIM2,
+                token=astra_db_credentials["token"],
+                api_endpoint=astra_db_credentials["api_endpoint"],
+                namespace=astra_db_credentials["namespace"],
+                environment=astra_db_credentials["environment"],
+                setup_mode=SetupMode.OFF,
+            )
+            with pytest.warns(UserWarning):
+                # unknown kwargs going to the constructor through _from_kwargs
+                AstraDBVectorStore.from_texts(
+                    texts=["F T one", "F T two"],
+                    embedding=emb,
+                    metadatas=[{"m": 1}, {"m": 2}],
+                    ids=["ft1", "ft2"],
+                    collection_name=COLLECTION_NAME_DIM2,
+                    token=astra_db_credentials["token"],
+                    api_endpoint=astra_db_credentials["api_endpoint"],
+                    namespace=astra_db_credentials["namespace"],
+                    environment=astra_db_credentials["environment"],
+                    setup_mode=SetupMode.OFF,
+                    number_of_wizards=123,
+                    name_of_river="Thames",
+                )
+            # routing of 'add_texts' keyword arguments
+            AstraDBVectorStore.from_texts(
+                texts=["F T one", "F T two"],
+                embedding=emb,
+                metadatas=[{"m": 1}, {"m": 2}],
+                ids=["ft1", "ft2"],
+                collection_name=COLLECTION_NAME_DIM2,
+                token=astra_db_credentials["token"],
+                api_endpoint=astra_db_credentials["api_endpoint"],
+                namespace=astra_db_credentials["namespace"],
+                environment=astra_db_credentials["environment"],
+                setup_mode=SetupMode.OFF,
+                batch_size=12,
+                batch_concurrency=23,
+                overwrite_concurrency=34,
+            )
         finally:
             if not SKIP_COLLECTION_DELETE:
                 v_store.delete_collection()
@@ -535,6 +581,52 @@ class TestAstraDBVectorStore:
         )
         try:
             assert (await v_store.asimilarity_search("Ho", k=1))[0].page_content == "Ho"
+            # testing additional kwargs & from_text-specific kwargs
+            # baseline
+            await AstraDBVectorStore.afrom_texts(
+                texts=["F T one", "F T two"],
+                embedding=emb,
+                metadatas=[{"m": 1}, {"m": 2}],
+                ids=["ft1", "ft2"],
+                collection_name=COLLECTION_NAME_DIM2,
+                token=astra_db_credentials["token"],
+                api_endpoint=astra_db_credentials["api_endpoint"],
+                namespace=astra_db_credentials["namespace"],
+                environment=astra_db_credentials["environment"],
+                setup_mode=SetupMode.OFF,
+            )
+            with pytest.warns(UserWarning):
+                # unknown kwargs going to the constructor through _from_kwargs
+                await AstraDBVectorStore.afrom_texts(
+                    texts=["F T one", "F T two"],
+                    embedding=emb,
+                    metadatas=[{"m": 1}, {"m": 2}],
+                    ids=["ft1", "ft2"],
+                    collection_name=COLLECTION_NAME_DIM2,
+                    token=astra_db_credentials["token"],
+                    api_endpoint=astra_db_credentials["api_endpoint"],
+                    namespace=astra_db_credentials["namespace"],
+                    environment=astra_db_credentials["environment"],
+                    setup_mode=SetupMode.OFF,
+                    number_of_wizards=123,
+                    name_of_river="Thames",
+                )
+            # routing of 'add_texts' keyword arguments
+            await AstraDBVectorStore.afrom_texts(
+                texts=["F T one", "F T two"],
+                embedding=emb,
+                metadatas=[{"m": 1}, {"m": 2}],
+                ids=["ft1", "ft2"],
+                collection_name=COLLECTION_NAME_DIM2,
+                token=astra_db_credentials["token"],
+                api_endpoint=astra_db_credentials["api_endpoint"],
+                namespace=astra_db_credentials["namespace"],
+                environment=astra_db_credentials["environment"],
+                setup_mode=SetupMode.OFF,
+                batch_size=12,
+                batch_concurrency=23,
+                overwrite_concurrency=34,
+            )
         finally:
             if not SKIP_COLLECTION_DELETE:
                 await v_store.adelete_collection()

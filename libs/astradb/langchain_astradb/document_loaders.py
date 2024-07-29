@@ -113,8 +113,8 @@ class AstraDBLoader(BaseLoader):
             )
 
         # normalizing limit and options and deprecations
-        _limit: Optional[int]
-        if "limit" in (find_options or {}):
+        _find_options = find_options.copy() if find_options else {}
+        if "limit" in _find_options:
             if limit is not None:
                 raise ValueError(
                     "Duplicate 'limit' directive supplied. Please remove it "
@@ -130,12 +130,8 @@ class AstraDBLoader(BaseLoader):
                     ),
                     DeprecationWarning,
                 )
-                _limit = (find_options or {})["limit"]
-        else:
-            _limit = limit
-        self.limit = _limit
-        _other_option_keys = set((find_options or {}).keys()) - {"limit"}
-        if _other_option_keys:
+        self.limit = _find_options.pop("limit", limit)
+        if _find_options:
             warnings.warn(
                 (
                     "Unknown keys passed in the 'find_options' dictionary. "
