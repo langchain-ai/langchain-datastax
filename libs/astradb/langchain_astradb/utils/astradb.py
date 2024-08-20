@@ -8,7 +8,7 @@ import os
 import warnings
 from asyncio import InvalidStateError, Task
 from enum import Enum
-from typing import Any, Awaitable, Dict, List, Optional, Union
+from typing import Any, Awaitable
 
 import langchain_core
 from astrapy import AsyncDatabase, DataAPIClient, Database
@@ -43,17 +43,17 @@ class SetupMode(Enum):
 class _AstraDBEnvironment:
     def __init__(
         self,
-        token: Optional[Union[str, TokenProvider]] = None,
-        api_endpoint: Optional[str] = None,
-        environment: Optional[str] = None,
-        astra_db_client: Optional[AstraDB] = None,
-        async_astra_db_client: Optional[AsyncAstraDB] = None,
-        namespace: Optional[str] = None,
+        token: str | TokenProvider | None = None,
+        api_endpoint: str | None = None,
+        environment: str | None = None,
+        astra_db_client: AstraDB | None = None,
+        async_astra_db_client: AsyncAstraDB | None = None,
+        namespace: str | None = None,
     ) -> None:
-        self.token: Optional[Union[str, TokenProvider]]
-        self.api_endpoint: Optional[str]
-        self.namespace: Optional[str]
-        self.environment: Optional[str]
+        self.token: str | TokenProvider | None
+        self.api_endpoint: str | None
+        self.namespace: str | None
+        self.environment: str | None
 
         self.data_api_client: DataAPIClient
         self.database: Database
@@ -133,7 +133,7 @@ class _AstraDBEnvironment:
             self.api_endpoint = _api_endpoints[0]
             self.namespace = _namespaces[0]
         else:
-            _token: Optional[Union[str, TokenProvider]]
+            _token: str | TokenProvider | None
             # secrets-based initialization
             if token is None:
                 logger.info(
@@ -192,24 +192,20 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
     def __init__(
         self,
         collection_name: str,
-        token: Optional[Union[str, TokenProvider]] = None,
-        api_endpoint: Optional[str] = None,
-        environment: Optional[str] = None,
-        astra_db_client: Optional[AstraDB] = None,
-        async_astra_db_client: Optional[AsyncAstraDB] = None,
-        namespace: Optional[str] = None,
+        token: str | TokenProvider | None = None,
+        api_endpoint: str | None = None,
+        environment: str | None = None,
+        astra_db_client: AstraDB | None = None,
+        async_astra_db_client: AsyncAstraDB | None = None,
+        namespace: str | None = None,
         setup_mode: SetupMode = SetupMode.SYNC,
         pre_delete_collection: bool = False,
-        embedding_dimension: Union[int, Awaitable[int], None] = None,
-        metric: Optional[str] = None,
-        requested_indexing_policy: Optional[Dict[str, Any]] = None,
-        default_indexing_policy: Optional[Dict[str, Any]] = None,
-        collection_vector_service_options: Optional[
-            CollectionVectorServiceOptions
-        ] = None,
-        collection_embedding_api_key: Optional[
-            Union[str, EmbeddingHeadersProvider]
-        ] = None,
+        embedding_dimension: int | Awaitable[int] | None = None,
+        metric: str | None = None,
+        requested_indexing_policy: dict[str, Any] | None = None,
+        default_indexing_policy: dict[str, Any] | None = None,
+        collection_vector_service_options: CollectionVectorServiceOptions | None = None,
+        collection_embedding_api_key: str | EmbeddingHeadersProvider | None = None,
     ) -> None:
         super().__init__(
             token=token,
@@ -226,7 +222,7 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
         )
         self.async_collection = self.collection.to_async()
 
-        self.async_setup_db_task: Optional[Task] = None
+        self.async_setup_db_task: Task | None = None
         if setup_mode == SetupMode.ASYNC:
             async_database = self.async_database
 
@@ -299,10 +295,10 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
 
     @staticmethod
     def _validate_indexing_policy(
-        collection_descriptors: List[CollectionDescriptor],
+        collection_descriptors: list[CollectionDescriptor],
         collection_name: str,
-        requested_indexing_policy: Optional[Dict[str, Any]],
-        default_indexing_policy: Optional[Dict[str, Any]],
+        requested_indexing_policy: dict[str, Any] | None,
+        default_indexing_policy: dict[str, Any] | None,
     ) -> bool:
         """
         This is a validation helper, to be called when the collection-creation

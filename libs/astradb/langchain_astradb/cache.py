@@ -1,7 +1,9 @@
+from __future__ import annotations
+
 import hashlib
 import json
 from functools import lru_cache, wraps
-from typing import Any, Awaitable, Callable, Generator, List, Optional, Tuple, Union
+from typing import Any, Awaitable, Callable, Generator
 
 from astrapy.authentication import TokenProvider
 from astrapy.db import AstraDB, AsyncAstraDB, logger
@@ -46,7 +48,7 @@ def _dumps_generations(generations: RETURN_VAL_TYPE) -> str:
     return json.dumps([dumps(_item) for _item in generations])
 
 
-def _loads_generations(generations_str: str) -> Union[RETURN_VAL_TYPE, None]:
+def _loads_generations(generations_str: str) -> RETURN_VAL_TYPE | None:
     """
     Deserialization of a string into a generic RETURN_VAL_TYPE
     (i.e. a sequence of `Generation`).
@@ -94,12 +96,12 @@ class AstraDBCache(BaseCache):
         self,
         *,
         collection_name: str = ASTRA_DB_CACHE_DEFAULT_COLLECTION_NAME,
-        token: Optional[Union[str, TokenProvider]] = None,
-        api_endpoint: Optional[str] = None,
-        environment: Optional[str] = None,
-        astra_db_client: Optional[AstraDB] = None,
-        async_astra_db_client: Optional[AsyncAstraDB] = None,
-        namespace: Optional[str] = None,
+        token: str | TokenProvider | None = None,
+        api_endpoint: str | None = None,
+        environment: str | None = None,
+        astra_db_client: AstraDB | None = None,
+        async_astra_db_client: AsyncAstraDB | None = None,
+        namespace: str | None = None,
         pre_delete_collection: bool = False,
         setup_mode: SetupMode = SetupMode.SYNC,
     ):
@@ -157,7 +159,7 @@ class AstraDBCache(BaseCache):
         self.collection = self.astra_env.collection
         self.async_collection = self.astra_env.async_collection
 
-    def lookup(self, prompt: str, llm_string: str) -> Optional[RETURN_VAL_TYPE]:
+    def lookup(self, prompt: str, llm_string: str) -> RETURN_VAL_TYPE | None:
         self.astra_env.ensure_db_setup()
         doc_id = self._make_id(prompt, llm_string)
         item = self.collection.find_one(
@@ -170,7 +172,7 @@ class AstraDBCache(BaseCache):
         )
         return _loads_generations(item["body_blob"]) if item is not None else None
 
-    async def alookup(self, prompt: str, llm_string: str) -> Optional[RETURN_VAL_TYPE]:
+    async def alookup(self, prompt: str, llm_string: str) -> RETURN_VAL_TYPE | None:
         await self.astra_env.aensure_db_setup()
         doc_id = self._make_id(prompt, llm_string)
         item = await self.async_collection.find_one(
@@ -212,7 +214,7 @@ class AstraDBCache(BaseCache):
         )
 
     def delete_through_llm(
-        self, prompt: str, llm: LLM, stop: Optional[List[str]] = None
+        self, prompt: str, llm: LLM, stop: list[str] | None = None
     ) -> None:
         """
         A wrapper around `delete` with the LLM being passed.
@@ -225,7 +227,7 @@ class AstraDBCache(BaseCache):
         return self.delete(prompt, llm_string=llm_string)
 
     async def adelete_through_llm(
-        self, prompt: str, llm: LLM, stop: Optional[List[str]] = None
+        self, prompt: str, llm: LLM, stop: list[str] | None = None
     ) -> None:
         """
         A wrapper around `adelete` with the LLM being passed.
@@ -301,16 +303,16 @@ class AstraDBSemanticCache(BaseCache):
         self,
         *,
         collection_name: str = ASTRA_DB_SEMANTIC_CACHE_DEFAULT_COLLECTION_NAME,
-        token: Optional[Union[str, TokenProvider]] = None,
-        api_endpoint: Optional[str] = None,
-        environment: Optional[str] = None,
-        astra_db_client: Optional[AstraDB] = None,
-        async_astra_db_client: Optional[AsyncAstraDB] = None,
-        namespace: Optional[str] = None,
+        token: str | TokenProvider | None = None,
+        api_endpoint: str | None = None,
+        environment: str | None = None,
+        astra_db_client: AstraDB | None = None,
+        async_astra_db_client: AsyncAstraDB | None = None,
+        namespace: str | None = None,
         setup_mode: SetupMode = SetupMode.SYNC,
         pre_delete_collection: bool = False,
         embedding: Embeddings,
-        metric: Optional[str] = None,
+        metric: str | None = None,
         similarity_threshold: float = ASTRA_DB_SEMANTIC_CACHE_DEFAULT_THRESHOLD,
     ):
         """
@@ -372,18 +374,18 @@ class AstraDBSemanticCache(BaseCache):
         # Note: each instance of this class has its own `_get_embedding` with
         # its own lru.
         @lru_cache(maxsize=ASTRA_DB_SEMANTIC_CACHE_EMBEDDING_CACHE_SIZE)
-        def _cache_embedding(text: str) -> List[float]:
+        def _cache_embedding(text: str) -> list[float]:
             return self.embedding.embed_query(text=text)
 
         self._get_embedding = _cache_embedding
 
         @_async_lru_cache(maxsize=ASTRA_DB_SEMANTIC_CACHE_EMBEDDING_CACHE_SIZE)
-        async def _acache_embedding(text: str) -> List[float]:
+        async def _acache_embedding(text: str) -> list[float]:
             return await self.embedding.aembed_query(text=text)
 
         self._aget_embedding = _acache_embedding
 
-        embedding_dimension: Union[int, Awaitable[int], None] = None
+        embedding_dimension: int | Awaitable[int] | None = None
         if setup_mode == SetupMode.ASYNC:
             embedding_dimension = self._aget_embedding_dimension()
         elif setup_mode == SetupMode.SYNC:
@@ -453,14 +455,14 @@ class AstraDBSemanticCache(BaseCache):
             upsert=True,
         )
 
-    def lookup(self, prompt: str, llm_string: str) -> Optional[RETURN_VAL_TYPE]:
+    def lookup(self, prompt: str, llm_string: str) -> RETURN_VAL_TYPE | None:
         hit_with_id = self.lookup_with_id(prompt, llm_string)
         if hit_with_id is not None:
             return hit_with_id[1]
         else:
             return None
 
-    async def alookup(self, prompt: str, llm_string: str) -> Optional[RETURN_VAL_TYPE]:
+    async def alookup(self, prompt: str, llm_string: str) -> RETURN_VAL_TYPE | None:
         hit_with_id = await self.alookup_with_id(prompt, llm_string)
         if hit_with_id is not None:
             return hit_with_id[1]
@@ -469,13 +471,13 @@ class AstraDBSemanticCache(BaseCache):
 
     def lookup_with_id(
         self, prompt: str, llm_string: str
-    ) -> Optional[Tuple[str, RETURN_VAL_TYPE]]:
+    ) -> tuple[str, RETURN_VAL_TYPE] | None:
         """
         Look up based on prompt and llm_string.
         If there are hits, return (document_id, cached_entry) for the top hit
         """
         self.astra_env.ensure_db_setup()
-        prompt_embedding: List[float] = self._get_embedding(text=prompt)
+        prompt_embedding: list[float] = self._get_embedding(text=prompt)
         llm_string_hash = _hash(llm_string)
 
         hit = self.collection.find_one(
@@ -499,13 +501,13 @@ class AstraDBSemanticCache(BaseCache):
 
     async def alookup_with_id(
         self, prompt: str, llm_string: str
-    ) -> Optional[Tuple[str, RETURN_VAL_TYPE]]:
+    ) -> tuple[str, RETURN_VAL_TYPE] | None:
         """
         Look up based on prompt and llm_string.
         If there are hits, return (document_id, cached_entry) for the top hit
         """
         await self.astra_env.aensure_db_setup()
-        prompt_embedding: List[float] = await self._aget_embedding(text=prompt)
+        prompt_embedding: list[float] = await self._aget_embedding(text=prompt)
         llm_string_hash = _hash(llm_string)
 
         hit = await self.async_collection.find_one(
@@ -528,8 +530,8 @@ class AstraDBSemanticCache(BaseCache):
                 return None
 
     def lookup_with_id_through_llm(
-        self, prompt: str, llm: LLM, stop: Optional[List[str]] = None
-    ) -> Optional[Tuple[str, RETURN_VAL_TYPE]]:
+        self, prompt: str, llm: LLM, stop: list[str] | None = None
+    ) -> tuple[str, RETURN_VAL_TYPE] | None:
         llm_string = get_prompts(
             {**llm.dict(), **{"stop": stop}},
             [],
@@ -537,8 +539,8 @@ class AstraDBSemanticCache(BaseCache):
         return self.lookup_with_id(prompt, llm_string=llm_string)
 
     async def alookup_with_id_through_llm(
-        self, prompt: str, llm: LLM, stop: Optional[List[str]] = None
-    ) -> Optional[Tuple[str, RETURN_VAL_TYPE]]:
+        self, prompt: str, llm: LLM, stop: list[str] | None = None
+    ) -> tuple[str, RETURN_VAL_TYPE] | None:
         llm_string = (
             await aget_prompts(
                 {**llm.dict(), **{"stop": stop}},

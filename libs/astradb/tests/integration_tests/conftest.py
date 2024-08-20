@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 import os
-from typing import Optional, TypedDict
+from typing import TypedDict
 
 import pytest
 from astrapy import Database
@@ -33,8 +35,8 @@ def _has_env_vars() -> bool:
 class AstraDBCredentials(TypedDict):
     token: str
     api_endpoint: str
-    namespace: Optional[str]
-    environment: Optional[str]
+    namespace: str | None
+    environment: str | None
 
 
 @pytest.fixture(scope="session")

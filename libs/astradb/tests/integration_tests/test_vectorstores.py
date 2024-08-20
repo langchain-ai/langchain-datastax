@@ -19,11 +19,13 @@ Required to run this test:
         export ASTRA_DB_SKIP_COLLECTION_DELETIONS="0" ("1" = no deletions, default)
 """
 
+from __future__ import annotations
+
 import json
 import math
 import os
 import warnings
-from typing import Dict, Iterable, Optional
+from typing import Iterable
 
 import pytest
 from astrapy import Database
@@ -1392,7 +1394,7 @@ class TestAstraDBVectorStore:
 
     def test_astradb_vectorstore_indexing_sync(
         self,
-        astra_db_credentials: Dict[str, Optional[str]],
+        astra_db_credentials: dict[str, str | None],
         database: Database,
     ) -> None:
         """
@@ -1508,7 +1510,7 @@ class TestAstraDBVectorStore:
 
     async def test_astradb_vectorstore_indexing_async(
         self,
-        astra_db_credentials: Dict[str, Optional[str]],
+        astra_db_credentials: dict[str, str | None],
         database: Database,
     ) -> None:
         """
@@ -1646,7 +1648,7 @@ class TestAstraDBVectorStore:
     )
     def test_astradb_vectorstore_coreclients_init_sync(
         self,
-        astra_db_credentials: Dict[str, Optional[str]],
+        astra_db_credentials: dict[str, str | None],
         core_astra_db: AstraDB,
     ) -> None:
         """A deprecation warning from passing a (core) AstraDB, but it works."""
@@ -1687,7 +1689,7 @@ class TestAstraDBVectorStore:
     )
     async def test_astradb_vectorstore_coreclients_init_async(
         self,
-        astra_db_credentials: Dict[str, Optional[str]],
+        astra_db_credentials: dict[str, str | None],
         core_astra_db: AstraDB,
     ) -> None:
         """A deprecation warning from passing a (core) AstraDB, but it works."""

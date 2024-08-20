@@ -7,6 +7,7 @@ are duplicated in this utility respectively from modules:
     - "libs/community/langchain_community/vectorstores/utils.py"
     - "libs/community/langchain_community/utils/math.py"
 """
+from __future__ import annotations
 
 import logging
 from typing import List, Union
@@ -58,7 +59,7 @@ def maximal_marginal_relevance(
     embedding_list: list,
     lambda_mult: float = 0.5,
     k: int = 4,
-) -> List[int]:
+) -> list[int]:
     """Calculate maximal marginal relevance."""
     if min(k, len(embedding_list)) <= 0:
         return []
