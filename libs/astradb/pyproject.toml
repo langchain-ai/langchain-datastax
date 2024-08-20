@@ -50,7 +50,7 @@ optional = true
 optional = true
 
 [tool.poetry.group.lint.dependencies]
-ruff = "^0.1.5"
+ruff = "^0.5"
 
 [tool.poetry.group.typing.dependencies]
 mypy = "^0.991"
@@ -62,7 +62,7 @@ optional = true
 [tool.poetry.group.dev.dependencies]
 langchain-core = { git = "https://github.com/langchain-ai/langchain.git", subdirectory = "libs/core" }
 
-[tool.ruff]
+[tool.ruff.lint]
 select = [
   "E", # pycodestyle
   "F", # pyflakes
