@@ -13,6 +13,7 @@ from typing import (
     Iterable,
     List,
     Optional,
+    Sequence,
     Set,
     Tuple,
     Type,
@@ -455,20 +456,18 @@ class AstraDBVectorStore(VectorStore):
         )
 
     def _get_embedding_dimension(self) -> int:
-        assert self.embedding is not None
-
+        # this is only to be called when self.embedding is not None
         if self.embedding_dimension is None:
             self.embedding_dimension = len(
-                self.embedding.embed_query(text="This is a sample sentence.")
+                self.embedding.embed_query(text="This is a sample sentence.")  # type: ignore[union-attr]
             )
         return self.embedding_dimension
 
     async def _aget_embedding_dimension(self) -> int:
-        assert self.embedding is not None
-
+        # this is only to be called when self.embedding is not None
         if self.embedding_dimension is None:
             self.embedding_dimension = len(
-                await self.embedding.aembed_query(text="This is a sample sentence.")
+                await self.embedding.aembed_query(text="This is a sample sentence.")  # type: ignore[union-attr]
             )
         return self.embedding_dimension
 
@@ -479,10 +478,6 @@ class AstraDBVectorStore(VectorStore):
         this will return None.
         """
         return self.embedding
-
-    def _using_vectorize(self) -> bool:
-        """Indicates whether server-side embeddings are being used."""
-        return self.document_encoder.server_side_embeddings
 
     def _select_relevance_score_fn(self) -> Callable[[float], float]:
         """
@@ -626,7 +621,7 @@ class AstraDBVectorStore(VectorStore):
     def _get_documents_to_insert(
         self,
         texts: Iterable[str],
-        embedding_vectors: List[List[float]],
+        embedding_vectors: Sequence[Optional[List[float]]],
         metadatas: Optional[List[dict]] = None,
         ids: Optional[List[str]] = None,
     ) -> List[DocDict]:
@@ -645,37 +640,6 @@ class AstraDBVectorStore(VectorStore):
             for b_txt, b_emb, b_id, b_md in zip(
                 texts,
                 embedding_vectors,
-                ids,
-                metadatas,
-            )
-        ]
-        # make unique by id, keeping the last
-        uniqued_documents_to_insert = _unique_list(
-            documents_to_insert[::-1],
-            lambda document: document["_id"],
-        )[::-1]
-        return uniqued_documents_to_insert
-
-    def _get_vectorize_documents_to_insert(
-        self,
-        texts: Iterable[str],
-        metadatas: Optional[List[dict]] = None,
-        ids: Optional[List[str]] = None,
-    ) -> List[DocDict]:
-        if ids is None:
-            ids = [uuid.uuid4().hex for _ in texts]
-        if metadatas is None:
-            metadatas = [{} for _ in texts]
-        #
-        documents_to_insert = [
-            self.document_encoder.encode(
-                content=b_txt,
-                id=b_id,
-                vector=None,
-                metadata=b_md,
-            )
-            for b_txt, b_id, b_md in zip(
-                texts,
                 ids,
                 metadatas,
             )
@@ -767,16 +731,14 @@ class AstraDBVectorStore(VectorStore):
             )
         self.astra_env.ensure_db_setup()
 
-        if self._using_vectorize():
-            documents_to_insert = self._get_vectorize_documents_to_insert(
-                texts, metadatas, ids
-            )
+        embedding_vectors: Sequence[Optional[List[float]]]
+        if self.document_encoder.server_side_embeddings:
+            embedding_vectors = [None for _ in list(texts)]
         else:
-            assert self.embedding is not None
-            embedding_vectors = self.embedding.embed_documents(list(texts))
-            documents_to_insert = self._get_documents_to_insert(
-                texts, embedding_vectors, metadatas, ids
-            )
+            embedding_vectors = self.embedding.embed_documents(list(texts))  # type: ignore[union-attr]
+        documents_to_insert = self._get_documents_to_insert(
+            texts, embedding_vectors, metadatas, ids
+        )
 
         # perform an AstraPy insert_many, catching exceptions for overwriting docs
         ids_to_replace: List[int]
@@ -887,17 +849,14 @@ class AstraDBVectorStore(VectorStore):
             )
         await self.astra_env.aensure_db_setup()
 
-        if self._using_vectorize():
-            # using server-side embeddings
-            documents_to_insert = self._get_vectorize_documents_to_insert(
-                texts, metadatas, ids
-            )
+        embedding_vectors: Sequence[Optional[List[float]]]
+        if self.document_encoder.server_side_embeddings:
+            embedding_vectors = [None for _ in list(texts)]
         else:
-            assert self.embedding is not None
-            embedding_vectors = await self.embedding.aembed_documents(list(texts))
-            documents_to_insert = self._get_documents_to_insert(
-                texts, embedding_vectors, metadatas, ids
-            )
+            embedding_vectors = await self.embedding.aembed_documents(list(texts))  # type: ignore[union-attr]
+        documents_to_insert = self._get_documents_to_insert(
+            texts, embedding_vectors, metadatas, ids
+        )
 
         # perform an AstraPy insert_many, catching exceptions for overwriting docs
         ids_to_replace: List[int]
@@ -1110,15 +1069,14 @@ class AstraDBVectorStore(VectorStore):
             The list of (Document, score, id), the most similar to the query.
         """
 
-        if self._using_vectorize():
+        if self.document_encoder.server_side_embeddings:
             return self._similarity_search_with_score_id_with_vectorize(
                 query=query,
                 k=k,
                 filter=filter,
             )
         else:
-            assert self.embedding is not None
-            embedding_vector = self.embedding.embed_query(query)
+            embedding_vector = self.embedding.embed_query(query)  # type: ignore[union-attr]
             return self.similarity_search_with_score_id_by_vector(
                 embedding=embedding_vector,
                 k=k,
@@ -1141,15 +1099,14 @@ class AstraDBVectorStore(VectorStore):
         Returns:
             The list of (Document, score, id), the most similar to the query.
         """
-        if self._using_vectorize():
+        if self.document_encoder.server_side_embeddings:
             return await self._asimilarity_search_with_score_id_with_vectorize(
                 query=query,
                 k=k,
                 filter=filter,
             )
         else:
-            assert self.embedding is not None
-            embedding_vector = await self.embedding.aembed_query(query)
+            embedding_vector = await self.embedding.aembed_query(query)  # type: ignore[union-attr]
             return await self.asimilarity_search_with_score_id_by_vector(
                 embedding=embedding_vector,
                 k=k,
@@ -1227,7 +1184,7 @@ class AstraDBVectorStore(VectorStore):
         Returns:
             The list of Documents most similar to the query.
         """
-        if self._using_vectorize():
+        if self.document_encoder.server_side_embeddings:
             return [
                 doc
                 for (doc, _, _) in self._similarity_search_with_score_id_with_vectorize(
@@ -1237,8 +1194,7 @@ class AstraDBVectorStore(VectorStore):
                 )
             ]
         else:
-            assert self.embedding is not None
-            embedding_vector = self.embedding.embed_query(query)
+            embedding_vector = self.embedding.embed_query(query)  # type: ignore[union-attr]
             return self.similarity_search_by_vector(
                 embedding_vector,
                 k,
@@ -1262,7 +1218,7 @@ class AstraDBVectorStore(VectorStore):
         Returns:
             The list of Documents most similar to the query.
         """
-        if self._using_vectorize():
+        if self.document_encoder.server_side_embeddings:
             return [
                 doc
                 for (
@@ -1276,8 +1232,7 @@ class AstraDBVectorStore(VectorStore):
                 )
             ]
         else:
-            assert self.embedding is not None
-            embedding_vector = await self.embedding.aembed_query(query)
+            embedding_vector = await self.embedding.aembed_query(query)  # type: ignore[union-attr]
             return await self.asimilarity_search_by_vector(
                 embedding_vector,
                 k,
@@ -1352,7 +1307,7 @@ class AstraDBVectorStore(VectorStore):
         Returns:
             The list of (Document, score), the most similar to the query vector.
         """
-        if self._using_vectorize():
+        if self.document_encoder.server_side_embeddings:
             return [
                 (doc, score)
                 for (
@@ -1366,8 +1321,7 @@ class AstraDBVectorStore(VectorStore):
                 )
             ]
         else:
-            assert self.embedding is not None
-            embedding_vector = self.embedding.embed_query(query)
+            embedding_vector = self.embedding.embed_query(query)  # type: ignore[union-attr]
             return self.similarity_search_with_score_by_vector(
                 embedding_vector,
                 k,
@@ -1390,7 +1344,7 @@ class AstraDBVectorStore(VectorStore):
         Returns:
             The list of (Document, score), the most similar to the query vector.
         """
-        if self._using_vectorize():
+        if self.document_encoder.server_side_embeddings:
             return [
                 (doc, score)
                 for (
@@ -1404,8 +1358,7 @@ class AstraDBVectorStore(VectorStore):
                 )
             ]
         else:
-            assert self.embedding is not None
-            embedding_vector = await self.embedding.aembed_query(query)
+            embedding_vector = await self.embedding.aembed_query(query)  # type: ignore[union-attr]
             return await self.asimilarity_search_with_score_by_vector(
                 embedding_vector,
                 k,
@@ -1584,7 +1537,7 @@ class AstraDBVectorStore(VectorStore):
         Returns:
             The list of Documents selected by maximal marginal relevance.
         """
-        if self._using_vectorize():
+        if self.document_encoder.server_side_embeddings:
             # this case goes directly to the "_by_sort" method
             # (and does its own filter normalization, as it cannot
             #  use the path for the with-embedding mmr querying)
@@ -1597,8 +1550,7 @@ class AstraDBVectorStore(VectorStore):
                 metadata_parameter=metadata_parameter,
             )
         else:
-            assert self.embedding is not None
-            embedding_vector = self.embedding.embed_query(query)
+            embedding_vector = self.embedding.embed_query(query)  # type: ignore[union-attr]
             return self.max_marginal_relevance_search_by_vector(
                 embedding_vector,
                 k,
@@ -1633,7 +1585,7 @@ class AstraDBVectorStore(VectorStore):
         Returns:
             The list of Documents selected by maximal marginal relevance.
         """
-        if self._using_vectorize():
+        if self.document_encoder.server_side_embeddings:
             # this case goes directly to the "_by_sort" method
             # (and does its own filter normalization, as it cannot
             #  use the path for the with-embedding mmr querying)
@@ -1646,8 +1598,7 @@ class AstraDBVectorStore(VectorStore):
                 metadata_parameter=metadata_parameter,
             )
         else:
-            assert self.embedding is not None
-            embedding_vector = await self.embedding.aembed_query(query)
+            embedding_vector = await self.embedding.aembed_query(query)  # type: ignore[union-attr]
             return await self.amax_marginal_relevance_search_by_vector(
                 embedding_vector,
                 k,

@@ -72,6 +72,7 @@ class DefaultVSDocumentEncoder(VSDocumentEncoder):
         vector: Optional[List[float]],
         metadata: Optional[dict],
     ) -> Dict[str, Any]:
+        assert vector is not None  # TODO remove
         return {
             "content": content,
             "_id": id,
@@ -107,6 +108,7 @@ class DefaultVectorizeVSDocumentEncoder(VSDocumentEncoder):
         vector: Optional[List[float]],
         metadata: Optional[dict],
     ) -> Dict[str, Any]:
+        assert vector is None  # TODO remove
         return {
             "$vectorize": content,
             "_id": id,
