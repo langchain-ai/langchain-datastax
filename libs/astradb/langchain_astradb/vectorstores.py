@@ -45,6 +45,11 @@ from langchain_astradb.utils.astradb import (
     _AstraDBCollectionEnvironment,
 )
 from langchain_astradb.utils.mmr import maximal_marginal_relevance
+from langchain_astradb.utils.encoders import (
+    DefaultVectorizeVSDocumentEncoder,
+    DefaultVSDocumentEncoder,
+    VSDocumentEncoder,
+)
 
 T = TypeVar("T")
 U = TypeVar("U")
@@ -197,25 +202,11 @@ class AstraDBVectorStore(VectorStore):
 
     """  # noqa: E501
 
-    @staticmethod
-    def _filter_to_metadata(filter_dict: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    def _filter_to_metadata(self, filter_dict: Optional[Dict[str, Any]]) -> Dict[str, Any]:
         if filter_dict is None:
             return {}
         else:
-            metadata_filter = {}
-            for k, v in filter_dict.items():
-                if k and k[0] == "$":
-                    if isinstance(v, list):
-                        metadata_filter[k] = [
-                            AstraDBVectorStore._filter_to_metadata(f) for f in v
-                        ]
-                    else:
-                        # assume each list item can be fed back to this function
-                        metadata_filter[k] = AstraDBVectorStore._filter_to_metadata(v)  # type: ignore[assignment]
-                else:
-                    metadata_filter[f"metadata.{k}"] = v
-
-            return metadata_filter
+            return self.document_encoder.encode_filter(filter_dict)
 
     @staticmethod
     def _normalize_metadata_indexing_policy(
@@ -410,6 +401,11 @@ class AstraDBVectorStore(VectorStore):
         self.environment = environment
         self.namespace = namespace
         self.collection_vector_service_options = collection_vector_service_options
+        self.document_encoder: VSDocumentEncoder
+        if self.collection_vector_service_options is not None:
+            self.document_encoder = DefaultVectorizeVSDocumentEncoder()
+        else:
+            self.document_encoder = DefaultVSDocumentEncoder()
         self.collection_embedding_api_key = collection_embedding_api_key
         # Concurrency settings
         self.batch_size: Optional[int] = batch_size or DEFAULT_DOCUMENT_CHUNK_SIZE
@@ -625,8 +621,8 @@ class AstraDBVectorStore(VectorStore):
         await self.astra_env.aensure_db_setup()
         await self.astra_env.async_collection.drop()
 
-    @staticmethod
     def _get_documents_to_insert(
+        self,
         texts: Iterable[str],
         embedding_vectors: List[List[float]],
         metadatas: Optional[List[dict]] = None,
@@ -638,12 +634,12 @@ class AstraDBVectorStore(VectorStore):
             metadatas = [{} for _ in texts]
         #
         documents_to_insert = [
-            {
-                "content": b_txt,
-                "_id": b_id,
-                "$vector": b_emb,
-                "metadata": b_md,
-            }
+            self.document_encoder.encode(
+                content=b_txt,
+                id=b_id,
+                vector=b_emb,
+                metadata=b_md,
+            )
             for b_txt, b_emb, b_id, b_md in zip(
                 texts,
                 embedding_vectors,
@@ -658,8 +654,8 @@ class AstraDBVectorStore(VectorStore):
         )[::-1]
         return uniqued_documents_to_insert
 
-    @staticmethod
     def _get_vectorize_documents_to_insert(
+        self,
         texts: Iterable[str],
         metadatas: Optional[List[dict]] = None,
         ids: Optional[List[str]] = None,
@@ -670,11 +666,12 @@ class AstraDBVectorStore(VectorStore):
             metadatas = [{} for _ in texts]
         #
         documents_to_insert = [
-            {
-                "_id": b_id,
-                "$vectorize": b_txt,
-                "metadata": b_md,
-            }
+            self.document_encoder.encode(
+                content=b_txt,
+                id=b_id,
+                vector=None,
+                metadata=b_md,
+            )
             for b_txt, b_id, b_md in zip(
                 texts,
                 ids,
@@ -984,11 +981,7 @@ class AstraDBVectorStore(VectorStore):
         hits = list(
             self.astra_env.collection.find(
                 filter=metadata_parameter,
-                projection={
-                    "_id": True,
-                    "content": True,
-                    "metadata": True,
-                },
+                projection=self.document_encoder.base_projection,
                 limit=k,
                 include_similarity=True,
                 sort={"$vector": embedding},
@@ -997,10 +990,7 @@ class AstraDBVectorStore(VectorStore):
         #
         return [
             (
-                Document(
-                    page_content=hit["content"],
-                    metadata=hit["metadata"],
-                ),
+                self.document_encoder.decode(hit),
                 hit["$similarity"],
                 hit["_id"],
             )
@@ -1028,20 +1018,13 @@ class AstraDBVectorStore(VectorStore):
         #
         return [
             (
-                Document(
-                    page_content=hit["content"],
-                    metadata=hit["metadata"],
-                ),
+                self.document_encoder.decode(hit),
                 hit["$similarity"],
                 hit["_id"],
             )
             async for hit in self.astra_env.async_collection.find(
                 filter=metadata_parameter,
-                projection={
-                    "_id": True,
-                    "content": True,
-                    "metadata": True,
-                },
+                projection=self.document_encoder.base_projection,
                 limit=k,
                 include_similarity=True,
                 sort={"$vector": embedding},
@@ -1064,11 +1047,7 @@ class AstraDBVectorStore(VectorStore):
         hits = list(
             self.astra_env.collection.find(
                 filter=metadata_parameter,
-                projection={
-                    "_id": True,
-                    "$vectorize": True,
-                    "metadata": True,
-                },
+                projection=self.document_encoder.base_projection,
                 limit=k,
                 include_similarity=True,
                 sort={"$vectorize": query},
@@ -1077,11 +1056,7 @@ class AstraDBVectorStore(VectorStore):
         #
         return [
             (
-                Document(
-                    # text content is stored in $vectorize instead of content
-                    page_content=hit["$vectorize"],
-                    metadata=hit["metadata"],
-                ),
+                self.document_encoder.decode(hit),
                 hit["$similarity"],
                 hit["_id"],
             )
@@ -1103,21 +1078,13 @@ class AstraDBVectorStore(VectorStore):
         #
         return [
             (
-                Document(
-                    # text content is stored in $vectorize instead of content
-                    page_content=hit["$vectorize"],
-                    metadata=hit["metadata"],
-                ),
+                self.document_encoder.decode(hit),
                 hit["$similarity"],
                 hit["_id"],
             )
             async for hit in self.astra_env.async_collection.find(
                 filter=metadata_parameter,
-                projection={
-                    "_id": True,
-                    "$vectorize": True,
-                    "metadata": True,
-                },
+                projection=self.document_encoder.base_projection,
                 limit=k,
                 include_similarity=True,
                 sort={"$vectorize": query},
@@ -1454,13 +1421,7 @@ class AstraDBVectorStore(VectorStore):
     ) -> List[Document]:
         prefetch_cursor = self.astra_env.collection.find(
             filter=metadata_parameter,
-            projection={
-                "_id": True,
-                "content": True,
-                "metadata": True,
-                "$vector": True,
-                "$vectorize": True,
-            },
+            projection=self.document_encoder.full_projection,
             limit=fetch_k,
             include_similarity=True,
             include_sort_vector=True,
@@ -1473,7 +1434,6 @@ class AstraDBVectorStore(VectorStore):
             k=k,
             lambda_mult=lambda_mult,
             prefetch_hits=prefetch_hits,
-            content_field="$vectorize" if self._using_vectorize() else "content",
         )
 
     async def _arun_mmr_query_by_sort(
@@ -1487,13 +1447,7 @@ class AstraDBVectorStore(VectorStore):
     ) -> List[Document]:
         prefetch_cursor = self.astra_env.async_collection.find(
             filter=metadata_parameter,
-            projection={
-                "_id": True,
-                "content": True,
-                "metadata": True,
-                "$vector": True,
-                "$vectorize": True,
-            },
+            projection=self.document_encoder.full_projection,
             limit=fetch_k,
             include_similarity=True,
             include_sort_vector=True,
@@ -1506,16 +1460,14 @@ class AstraDBVectorStore(VectorStore):
             k=k,
             lambda_mult=lambda_mult,
             prefetch_hits=prefetch_hits,
-            content_field="$vectorize" if self._using_vectorize() else "content",
         )
 
-    @staticmethod
     def _get_mmr_hits(
+        self,
         embedding: List[float],
         k: int,
         lambda_mult: float,
         prefetch_hits: List[DocDict],
-        content_field: str,
     ) -> List[Document]:
         mmr_chosen_indices = maximal_marginal_relevance(
             np.array(embedding, dtype=np.float32),
@@ -1529,10 +1481,7 @@ class AstraDBVectorStore(VectorStore):
             if prefetch_index in mmr_chosen_indices
         ]
         return [
-            Document(
-                page_content=hit[content_field],
-                metadata=hit["metadata"],
-            )
+            self.document_encoder.decode(hit)
             for hit in mmr_hits
         ]
 
