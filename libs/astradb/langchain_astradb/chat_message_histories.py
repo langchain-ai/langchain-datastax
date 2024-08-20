@@ -14,6 +14,7 @@ from langchain_core.messages import (
     message_to_dict,
     messages_from_dict,
 )
+from typing_extensions import override
 
 from langchain_astradb.utils.astradb import (
     SetupMode,
@@ -67,6 +68,9 @@ class AstraDBChatMessageHistory(BaseChatMessageHistory):
             namespace: namespace (aka keyspace) where the collection is created.
                 If not provided, the environment variable ASTRA_DB_KEYSPACE is
                 inspected. Defaults to the database's "default namespace".
+            setup_mode: mode used to create the Astra DB collection (SYNC, ASYNC or
+                OFF).
+            pre_delete_collection: whether to delete the collection.
         """
         self.astra_env = _AstraDBCollectionEnvironment(
             collection_name=collection_name,
@@ -88,7 +92,7 @@ class AstraDBChatMessageHistory(BaseChatMessageHistory):
 
     @property
     def messages(self) -> list[BaseMessage]:
-        """Retrieve all session messages from DB"""
+        """Retrieve all session messages from DB."""
         self.astra_env.ensure_db_setup()
         message_blobs = [
             doc["body_blob"]
@@ -113,6 +117,7 @@ class AstraDBChatMessageHistory(BaseChatMessageHistory):
     def messages(self, messages: list[BaseMessage]) -> None:
         raise NotImplementedError("Use add_messages instead")
 
+    @override
     async def aget_messages(self) -> list[BaseMessage]:
         await self.astra_env.aensure_db_setup()
         docs = self.async_collection.find(
@@ -133,6 +138,7 @@ class AstraDBChatMessageHistory(BaseChatMessageHistory):
         messages = messages_from_dict(items)
         return messages
 
+    @override
     def add_messages(self, messages: Sequence[BaseMessage]) -> None:
         self.astra_env.ensure_db_setup()
         docs = [
@@ -145,6 +151,7 @@ class AstraDBChatMessageHistory(BaseChatMessageHistory):
         ]
         self.collection.insert_many(docs)
 
+    @override
     async def aadd_messages(self, messages: Sequence[BaseMessage]) -> None:
         await self.astra_env.aensure_db_setup()
         docs = [
@@ -157,10 +164,12 @@ class AstraDBChatMessageHistory(BaseChatMessageHistory):
         ]
         await self.async_collection.insert_many(docs)
 
+    @override
     def clear(self) -> None:
         self.astra_env.ensure_db_setup()
         self.collection.delete_many(filter={"session_id": self.session_id})
 
+    @override
     async def aclear(self) -> None:
         await self.astra_env.aensure_db_setup()
         await self.async_collection.delete_many(filter={"session_id": self.session_id})

@@ -29,6 +29,7 @@ from langchain_core.documents import Document
 from langchain_core.embeddings import Embeddings
 from langchain_core.runnables.utils import gather_with_concurrency
 from langchain_core.vectorstores import VectorStore
+from typing_extensions import override
 
 from langchain_astradb.utils.astradb import (
     DEFAULT_DOCUMENT_CHUNK_SIZE,
@@ -217,7 +218,8 @@ class AstraDBVectorStore(VectorStore):
         metadata_indexing_exclude: Iterable[str] | None,
         collection_indexing_policy: dict[str, Any] | None,
     ) -> dict[str, Any]:
-        """
+        """Normalize the constructor indexing parameters.
+
         Validate the constructor indexing parameters and normalize them
         into a ready-to-use dict for the 'options' when creating a collection.
         """
@@ -326,6 +328,7 @@ class AstraDBVectorStore(VectorStore):
                 batch to insert pre-existing entries.
             bulk_delete_concurrency: Number of threads or coroutines for
                 multiple-entry deletes.
+            setup_mode: mode used to create the collection (SYNC, ASYNC or OFF).
             pre_delete_collection: whether to delete the collection before creating it.
                 If False and the collection already exists, the collection will be used
                 as is.
@@ -465,10 +468,11 @@ class AstraDBVectorStore(VectorStore):
         return self.embedding_dimension
 
     @property
+    @override
     def embeddings(self) -> Embeddings | None:
-        """
-        Accesses the supplied embeddings object. If using server-side embeddings,
-        this will return None.
+        """Accesses the supplied embeddings object.
+
+        If using server-side embeddings, this will return None.
         """
         return self.embedding
 
@@ -477,11 +481,9 @@ class AstraDBVectorStore(VectorStore):
         return self.collection_vector_service_options is not None
 
     def _select_relevance_score_fn(self) -> Callable[[float], float]:
-        """
-        The underlying API calls already returns a "score proper",
-        i.e. one in [0, 1] where higher means more *similar*,
-        so here the final score transformation is not reversing the interval:
-        """
+        # The underlying API calls already returns a "score proper",
+        # i.e. one in [0, 1] where higher means more *similar*,
+        # so here the final score transformation is not reversing the interval.
         return lambda score: score
 
     def clear(self) -> None:
@@ -495,13 +497,12 @@ class AstraDBVectorStore(VectorStore):
         await self.astra_env.async_collection.delete_many({})
 
     def delete_by_document_id(self, document_id: str) -> bool:
-        """
-        Remove a single document from the store, given its document ID.
+        """Remove a single document from the store, given its document ID.
 
         Args:
             document_id: The document ID
 
-        Returns
+        Returns:
             True if a document has indeed been deleted, False if ID not found.
         """
         self.astra_env.ensure_db_setup()
@@ -510,13 +511,12 @@ class AstraDBVectorStore(VectorStore):
         return deletion_response.deleted_count == 1
 
     async def adelete_by_document_id(self, document_id: str) -> bool:
-        """
-        Remove a single document from the store, given its document ID.
+        """Remove a single document from the store, given its document ID.
 
         Args:
             document_id: The document ID
 
-        Returns
+        Returns:
             True if a document has indeed been deleted, False if ID not found.
         """
         await self.astra_env.aensure_db_setup()
@@ -525,6 +525,7 @@ class AstraDBVectorStore(VectorStore):
         )
         return deletion_response.deleted_count == 1
 
+    @override
     def delete(
         self,
         ids: list[str] | None = None,
@@ -541,7 +542,6 @@ class AstraDBVectorStore(VectorStore):
         Returns:
             True if deletion is (entirely) successful, False otherwise.
         """
-
         if kwargs:
             warnings.warn(
                 "Method 'delete' of AstraDBVectorStore vector store invoked with "
@@ -562,6 +562,7 @@ class AstraDBVectorStore(VectorStore):
             )
         return True
 
+    @override
     async def adelete(
         self,
         ids: list[str] | None = None,
@@ -596,7 +597,8 @@ class AstraDBVectorStore(VectorStore):
         )
 
     def delete_collection(self) -> None:
-        """
+        """Completely delete the collection from the database.
+
         Completely delete the collection from the database (as opposed
         to :meth:`~clear`, which empties it only).
         Stored data is lost and unrecoverable, resources are freed.
@@ -606,7 +608,8 @@ class AstraDBVectorStore(VectorStore):
         self.astra_env.collection.drop()
 
     async def adelete_collection(self) -> None:
-        """
+        """Completely delete the collection from the database.
+
         Completely delete the collection from the database (as opposed
         to :meth:`~aclear`, which empties it only).
         Stored data is lost and unrecoverable, resources are freed.
@@ -709,6 +712,7 @@ class AstraDBVectorStore(VectorStore):
         ]
         return batch_inserted, missing_from_batch
 
+    @override
     def add_texts(
         self,
         texts: Iterable[str],
@@ -749,7 +753,6 @@ class AstraDBVectorStore(VectorStore):
         Returns:
             The list of ids of the added texts.
         """
-
         if kwargs:
             warnings.warn(
                 "Method 'add_texts' of AstraDBVectorStore vector store invoked with "
@@ -830,6 +833,7 @@ class AstraDBVectorStore(VectorStore):
                 )
         return inserted_ids
 
+    @override
     async def aadd_texts(
         self,
         texts: Iterable[str],
@@ -1130,7 +1134,6 @@ class AstraDBVectorStore(VectorStore):
         Returns:
             The list of (Document, score, id), the most similar to the query.
         """
-
         if self._using_vectorize():
             return self._similarity_search_with_score_id_with_vectorize(
                 query=query,
@@ -1231,6 +1234,7 @@ class AstraDBVectorStore(VectorStore):
             )
         ]
 
+    @override
     def similarity_search(
         self,
         query: str,
@@ -1266,6 +1270,7 @@ class AstraDBVectorStore(VectorStore):
                 filter=filter,
             )
 
+    @override
     async def asimilarity_search(
         self,
         query: str,
@@ -1305,6 +1310,7 @@ class AstraDBVectorStore(VectorStore):
                 filter=filter,
             )
 
+    @override
     def similarity_search_by_vector(
         self,
         embedding: list[float],
@@ -1331,6 +1337,7 @@ class AstraDBVectorStore(VectorStore):
             )
         ]
 
+    @override
     async def asimilarity_search_by_vector(
         self,
         embedding: list[float],
@@ -1357,6 +1364,7 @@ class AstraDBVectorStore(VectorStore):
             )
         ]
 
+    @override
     def similarity_search_with_score(
         self,
         query: str,
@@ -1395,6 +1403,7 @@ class AstraDBVectorStore(VectorStore):
                 filter=filter,
             )
 
+    @override
     async def asimilarity_search_with_score(
         self,
         query: str,
@@ -1526,6 +1535,7 @@ class AstraDBVectorStore(VectorStore):
             for hit in mmr_hits
         ]
 
+    @override
     def max_marginal_relevance_search_by_vector(
         self,
         embedding: list[float],
@@ -1563,6 +1573,7 @@ class AstraDBVectorStore(VectorStore):
             metadata_parameter=metadata_parameter,
         )
 
+    @override
     async def amax_marginal_relevance_search_by_vector(
         self,
         embedding: list[float],
@@ -1600,6 +1611,7 @@ class AstraDBVectorStore(VectorStore):
             metadata_parameter=metadata_parameter,
         )
 
+    @override
     def max_marginal_relevance_search(
         self,
         query: str,
@@ -1649,6 +1661,7 @@ class AstraDBVectorStore(VectorStore):
                 filter=filter,
             )
 
+    @override
     async def amax_marginal_relevance_search(
         self,
         query: str,
@@ -1723,6 +1736,7 @@ class AstraDBVectorStore(VectorStore):
         return cls(**known_kwargs)
 
     @classmethod
+    @override
     def from_texts(
         cls: type[AstraDBVectorStore],
         texts: list[str],
@@ -1765,6 +1779,7 @@ class AstraDBVectorStore(VectorStore):
         )
         return astra_db_store
 
+    @override
     @classmethod
     async def afrom_texts(
         cls: type[AstraDBVectorStore],
@@ -1778,6 +1793,7 @@ class AstraDBVectorStore(VectorStore):
 
         Args:
             texts: the texts to insert.
+            embedding: embedding function to use.
             metadatas: metadata dicts for the texts.
             ids: ids to associate to the texts.
             **kwargs: you can pass any argument that you would
@@ -1808,6 +1824,7 @@ class AstraDBVectorStore(VectorStore):
         return astra_db_store
 
     @classmethod
+    @override
     def from_documents(
         cls: type[AstraDBVectorStore],
         documents: list[Document],

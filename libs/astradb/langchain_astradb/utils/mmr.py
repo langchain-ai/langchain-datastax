@@ -1,5 +1,5 @@
-"""
-Tools for the Maximal Marginal Relevance (MMR) reranking.
+"""Tools for the Maximal Marginal Relevance (MMR) reranking.
+
 Duplicated from langchain_community to avoid cross-dependencies.
 
 Functions "maximal_marginal_relevance" and "cosine_similarity"

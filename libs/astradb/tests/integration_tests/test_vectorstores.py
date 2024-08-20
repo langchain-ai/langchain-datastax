@@ -1,5 +1,4 @@
-"""
-Test of Astra DB vector store class `AstraDBVectorStore`
+"""Test of Astra DB vector store class `AstraDBVectorStore`
 
 Required to run this test:
     - a recent `astrapy` Python package available
@@ -156,9 +155,7 @@ def store_parseremb(
 def vectorize_store(
     astra_db_credentials: AstraDBCredentials,
 ) -> Iterable[AstraDBVectorStore]:
-    """
-    astra db vector store with server-side embeddings using openai + shared_secret
-    """
+    """Astra db vector store with server-side embeddings using openai + shared_secret"""
     if "SHARED_SECRET_NAME_OPENAI" not in os.environ:
         pytest.skip("OpenAI SHARED_SECRET key not set for KMS vectorize")
 
@@ -182,9 +179,7 @@ def vectorize_store(
 def vectorize_store_w_header(
     astra_db_credentials: AstraDBCredentials,
 ) -> Iterable[AstraDBVectorStore]:
-    """
-    astra db vector store with server-side embeddings using openai + header
-    """
+    """Astra db vector store with server-side embeddings using openai + header"""
     if not os.environ.get("OPENAI_API_KEY"):
         pytest.skip("OpenAI key not available")
 
@@ -209,8 +204,7 @@ def vectorize_store_w_header(
 def vectorize_store_w_header_and_provider(
     astra_db_credentials: AstraDBCredentials,
 ) -> Iterable[AstraDBVectorStore]:
-    """
-    astra db vector store with server-side embeddings using openai + header
+    """Astra db vector store with server-side embeddings using openai + header
     Variant initialized with a EmbeddingHeadersProvider instance for the header
     """
     if not os.environ.get("OPENAI_API_KEY"):
@@ -239,9 +233,7 @@ def vectorize_store_w_header_and_provider(
 def vectorize_store_nvidia(
     astra_db_credentials: AstraDBCredentials,
 ) -> Iterable[AstraDBVectorStore]:
-    """
-    astra db vector store with server-side embeddings using the nvidia model
-    """
+    """Astra db vector store with server-side embeddings using the nvidia model"""
     if not is_nvidia_vector_service_available():
         pytest.skip("vectorize/nvidia unavailable")
 
@@ -267,7 +259,6 @@ class TestAstraDBVectorStore:
         self, astra_db_credentials: AstraDBCredentials
     ) -> None:
         """Create and delete."""
-
         emb = SomeEmbeddings(dimension=2)
 
         v_store = AstraDBVectorStore(
@@ -935,8 +926,7 @@ class TestAstraDBVectorStore:
     def test_astradb_vectorstore_mmr_sync(
         self, store_parseremb: AstraDBVectorStore
     ) -> None:
-        """
-        MMR testing. We work on the unit circle with angle multiples
+        """MMR testing. We work on the unit circle with angle multiples
         of 2*pi/20 and prepare a store with known vectors for a controlled
         MMR outcome.
         """
@@ -962,8 +952,7 @@ class TestAstraDBVectorStore:
     async def test_astradb_vectorstore_mmr_async(
         self, store_parseremb: AstraDBVectorStore
     ) -> None:
-        """
-        MMR testing. We work on the unit circle with angle multiples
+        """MMR testing. We work on the unit circle with angle multiples
         of 2*pi/20 and prepare a store with known vectors for a controlled
         MMR outcome.
         """
@@ -990,9 +979,7 @@ class TestAstraDBVectorStore:
     def test_astradb_vectorstore_mmr_vectorize_sync(
         self, vectorize_store: AstraDBVectorStore
     ) -> None:
-        """
-        MMR testing with vectorize, sync.
-        """
+        """MMR testing with vectorize, sync."""
         vectorize_store.add_texts(
             [
                 "Dog",
@@ -1009,9 +996,7 @@ class TestAstraDBVectorStore:
     async def test_astradb_vectorstore_mmr_vectorize_async(
         self, vectorize_store: AstraDBVectorStore
     ) -> None:
-        """
-        MMR async testing with vectorize, async.
-        """
+        """MMR async testing with vectorize, async."""
         await vectorize_store.aadd_texts(
             [
                 "Dog",
@@ -1181,7 +1166,7 @@ class TestAstraDBVectorStore:
     def test_astradb_vectorstore_delete_collection(
         self, astra_db_credentials: AstraDBCredentials
     ) -> None:
-        """behaviour of 'delete_collection'."""
+        """Behaviour of 'delete_collection'."""
         collection_name = COLLECTION_NAME_DIM2
         emb = SomeEmbeddings(dimension=2)
         v_store = AstraDBVectorStore(
@@ -1300,8 +1285,7 @@ class TestAstraDBVectorStore:
     def test_astradb_vectorstore_metrics(
         self, astra_db_credentials: AstraDBCredentials
     ) -> None:
-        """
-        Different choices of similarity metric.
+        """Different choices of similarity metric.
         Both stores (with "cosine" and "euclidea" metrics) contain these two:
             - a vector slightly rotated w.r.t query vector
             - a vector which is a long multiple of query vector
@@ -1397,8 +1381,7 @@ class TestAstraDBVectorStore:
         astra_db_credentials: dict[str, str | None],
         database: Database,
     ) -> None:
-        """
-        Test that the right errors/warnings are issued depending
+        """Test that the right errors/warnings are issued depending
         on the compatibility of on-DB indexing settings and the requested ones.
 
         We do NOT check for substrings in the warning messages: that would
@@ -1513,8 +1496,7 @@ class TestAstraDBVectorStore:
         astra_db_credentials: dict[str, str | None],
         database: Database,
     ) -> None:
-        """
-        Async version of the same test on warnings/errors related
+        """Async version of the same test on warnings/errors related
         to incompatible indexing choices.
         """
         embe = SomeEmbeddings(dimension=2)
@@ -1652,7 +1634,6 @@ class TestAstraDBVectorStore:
         core_astra_db: AstraDB,
     ) -> None:
         """A deprecation warning from passing a (core) AstraDB, but it works."""
-
         collection_name = "lc_test_vstore_coreclsync"
         emb = SomeEmbeddings(dimension=2)
 
@@ -1693,7 +1674,6 @@ class TestAstraDBVectorStore:
         core_astra_db: AstraDB,
     ) -> None:
         """A deprecation warning from passing a (core) AstraDB, but it works."""
-
         collection_name = "lc_test_vstore_coreclasync"
         emb = SomeEmbeddings(dimension=2)
 

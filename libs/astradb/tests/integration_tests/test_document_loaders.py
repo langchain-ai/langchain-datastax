@@ -1,5 +1,4 @@
-"""
-Test of Astra DB document loader class `AstraDBLoader`
+"""Test of Astra DB document loader class `AstraDBLoader`
 
 Required to run this test:
     - a recent `astrapy` Python package available
@@ -64,7 +63,7 @@ class TestAstraDB:
         collection: Collection,
         astra_db_credentials: AstraDBCredentials,
     ) -> None:
-        """using 'prefetched' should give a warning but work nonetheless."""
+        """Using 'prefetched' should give a warning but work nonetheless."""
         with pytest.warns(UserWarning) as rec_warnings:
             loader = AstraDBLoader(
                 collection.name,
@@ -158,7 +157,7 @@ class TestAstraDB:
         async_collection: AsyncCollection,
         astra_db_credentials: AstraDBCredentials,
     ) -> None:
-        """using 'prefetched' should give a warning but work nonetheless."""
+        """Using 'prefetched' should give a warning but work nonetheless."""
         with pytest.warns(UserWarning) as rec_warnings:
             loader = AstraDBLoader(
                 async_collection.name,

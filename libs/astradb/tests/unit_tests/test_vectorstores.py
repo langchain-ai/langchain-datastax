@@ -14,7 +14,6 @@ from ..conftest import SomeEmbeddings
 class TestAstraDB:
     def test_initialization(self) -> None:
         """Unit test of vector store initialization modes."""
-
         # Using a 'core' AstraDB class (as opposed to secret-based)
         a_e_string = (
             "https://01234567-89ab-cdef-0123-456789abcdef-us-east1"

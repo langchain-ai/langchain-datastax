@@ -14,6 +14,7 @@ from astrapy.authentication import TokenProvider
 from astrapy.db import AstraDB, AsyncAstraDB
 from langchain_core.document_loaders import BaseLoader
 from langchain_core.documents import Document
+from typing_extensions import override
 
 from langchain_astradb.utils.astradb import (
     SetupMode,
@@ -82,6 +83,9 @@ class AstraDBLoader(BaseLoader):
                 *IGNORED starting from v. 0.3.5: astrapy v1.0+ does not support it.*
             page_content_mapper: Function applied to collection documents to create
                 the `page_content` of the LangChain Document. Defaults to `json.dumps`.
+            metadata_mapper: Function applied to collection documents to create the
+                `metadata` of the LangChain Document. Defaults to returning the
+                 namespace, API endpoint and collection name.
         """
         astra_db_env = _AstraDBCollectionEnvironment(
             collection_name=collection_name,
@@ -152,6 +156,7 @@ class AstraDBLoader(BaseLoader):
             metadata=self.metadata_mapper(doc),
         )
 
+    @override
     def lazy_load(self) -> Iterator[Document]:
         for doc in self.astra_db_env.collection.find(
             filter=self.filter,
@@ -166,6 +171,7 @@ class AstraDBLoader(BaseLoader):
         """Load data into Document objects."""
         return [doc async for doc in self.alazy_load()]
 
+    @override
     async def alazy_load(self) -> AsyncIterator[Document]:
         async for doc in self.astra_db_env.async_collection.find(
             filter=self.filter,
