@@ -60,7 +60,6 @@ class VSDocumentEncoder(ABC):
 
 
 class DefaultVSDocumentEncoder(VSDocumentEncoder):
-
     server_side_embeddings = False
     content_field = "content"
     base_projection = {"_id": True, "content": True, "metadata": True}
@@ -91,7 +90,6 @@ class DefaultVSDocumentEncoder(VSDocumentEncoder):
 
 
 class DefaultVectorizeVSDocumentEncoder(VSDocumentEncoder):
-
     server_side_embeddings = True
     content_field = "$vectorize"
     base_projection = {"_id": True, "$vectorize": True, "metadata": True}
@@ -114,7 +112,6 @@ class DefaultVectorizeVSDocumentEncoder(VSDocumentEncoder):
             "_id": id,
             "metadata": metadata,
         }
-
 
     def decode(self, astra_document: Dict[str, Any]) -> Document:
         return Document(

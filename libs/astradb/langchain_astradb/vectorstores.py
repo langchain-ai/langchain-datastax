@@ -44,12 +44,12 @@ from langchain_astradb.utils.astradb import (
     SetupMode,
     _AstraDBCollectionEnvironment,
 )
-from langchain_astradb.utils.mmr import maximal_marginal_relevance
 from langchain_astradb.utils.encoders import (
     DefaultVectorizeVSDocumentEncoder,
     DefaultVSDocumentEncoder,
     VSDocumentEncoder,
 )
+from langchain_astradb.utils.mmr import maximal_marginal_relevance
 
 T = TypeVar("T")
 U = TypeVar("U")
@@ -202,7 +202,9 @@ class AstraDBVectorStore(VectorStore):
 
     """  # noqa: E501
 
-    def _filter_to_metadata(self, filter_dict: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    def _filter_to_metadata(
+        self, filter_dict: Optional[Dict[str, Any]]
+    ) -> Dict[str, Any]:
         if filter_dict is None:
             return {}
         else:
@@ -480,7 +482,7 @@ class AstraDBVectorStore(VectorStore):
 
     def _using_vectorize(self) -> bool:
         """Indicates whether server-side embeddings are being used."""
-        return self.collection_vector_service_options is not None
+        return self.document_encoder.server_side_embeddings
 
     def _select_relevance_score_fn(self) -> Callable[[float], float]:
         """
@@ -1480,10 +1482,7 @@ class AstraDBVectorStore(VectorStore):
             for prefetch_index, prefetch_hit in enumerate(prefetch_hits)
             if prefetch_index in mmr_chosen_indices
         ]
-        return [
-            self.document_encoder.decode(hit)
-            for hit in mmr_hits
-        ]
+        return [self.document_encoder.decode(hit) for hit in mmr_hits]
 
     def max_marginal_relevance_search_by_vector(
         self,
