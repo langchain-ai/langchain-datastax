@@ -6,6 +6,7 @@ import uuid
 import warnings
 from concurrent.futures import ThreadPoolExecutor
 from typing import (
+    TYPE_CHECKING,
     Any,
     Awaitable,
     Callable,
@@ -15,18 +16,8 @@ from typing import (
 )
 
 import numpy as np
-from astrapy.authentication import EmbeddingHeadersProvider, TokenProvider
-from astrapy.db import (
-    AstraDB as AstraDBClient,
-)
-from astrapy.db import (
-    AsyncAstraDB as AsyncAstraDBClient,
-)
 from astrapy.exceptions import InsertManyException
-from astrapy.info import CollectionVectorServiceOptions
-from astrapy.results import UpdateResult
 from langchain_core.documents import Document
-from langchain_core.embeddings import Embeddings
 from langchain_core.runnables.utils import gather_with_concurrency
 from langchain_core.vectorstores import VectorStore
 from typing_extensions import override
@@ -40,6 +31,18 @@ from langchain_astradb.utils.astradb import (
     _AstraDBCollectionEnvironment,
 )
 from langchain_astradb.utils.mmr import maximal_marginal_relevance
+
+if TYPE_CHECKING:
+    from astrapy.authentication import EmbeddingHeadersProvider, TokenProvider
+    from astrapy.db import (
+        AstraDB as AstraDBClient,
+    )
+    from astrapy.db import (
+        AsyncAstraDB as AsyncAstraDBClient,
+    )
+    from astrapy.info import CollectionVectorServiceOptions
+    from astrapy.results import UpdateResult
+    from langchain_core.embeddings import Embeddings
 
 T = TypeVar("T")
 U = TypeVar("U")
@@ -421,7 +424,7 @@ class AstraDBVectorStore(VectorStore):
         if self.embedding is not None:
             if setup_mode == SetupMode.ASYNC:
                 embedding_dimension_m = self._aget_embedding_dimension()
-            elif setup_mode == SetupMode.SYNC or setup_mode == SetupMode.OFF:
+            elif setup_mode in (SetupMode.SYNC, SetupMode.OFF):
                 embedding_dimension_m = self._get_embedding_dimension()
 
         # indexing policy setting
@@ -645,11 +648,10 @@ class AstraDBVectorStore(VectorStore):
             )
         ]
         # make unique by id, keeping the last
-        uniqued_documents_to_insert = _unique_list(
+        return _unique_list(
             documents_to_insert[::-1],
             lambda document: document["_id"],
         )[::-1]
-        return uniqued_documents_to_insert
 
     @staticmethod
     def _get_vectorize_documents_to_insert(
@@ -675,11 +677,10 @@ class AstraDBVectorStore(VectorStore):
             )
         ]
         # make unique by id, keeping the last
-        uniqued_documents_to_insert = _unique_list(
+        return _unique_list(
             documents_to_insert[::-1],
             lambda document: document["_id"],
         )[::-1]
-        return uniqued_documents_to_insert
 
     @staticmethod
     def _get_missing_from_batch(
@@ -687,7 +688,7 @@ class AstraDBVectorStore(VectorStore):
     ) -> tuple[list[str], list[DocDict]]:
         if "status" not in insert_result:
             raise ValueError(
-                f"API Exception while running bulk insertion: {str(insert_result)}"
+                f"API Exception while running bulk insertion: {insert_result}"
             )
         batch_inserted = insert_result["status"]["insertedIds"]
         # estimation of the preexisting documents that failed
@@ -701,9 +702,7 @@ class AstraDBVectorStore(VectorStore):
             error.get("errorCode") != "DOCUMENT_ALREADY_EXISTS" for error in errors
         )
         if num_errors != len(missed_inserted_ids) or unexpected_errors:
-            raise ValueError(
-                f"API Exception while running bulk insertion: {str(errors)}"
-            )
+            raise ValueError(f"API Exception while running bulk insertion: {errors}")
         # deal with the missing insertions as upserts
         missing_from_batch = [
             document

@@ -67,8 +67,7 @@ def _loads_generations(generations_str: str) -> RETURN_VAL_TYPE | None:
         RETURN_VAL_TYPE: A list of generations.
     """
     try:
-        generations = [loads(_item_str) for _item_str in json.loads(generations_str)]
-        return generations
+        return [loads(_item_str) for _item_str in json.loads(generations_str)]
     except (json.JSONDecodeError, TypeError):
         # deferring the (soft) handling to after the legacy-format attempt
         pass

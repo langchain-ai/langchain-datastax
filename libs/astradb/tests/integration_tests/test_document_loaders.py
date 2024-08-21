@@ -15,18 +15,20 @@ from __future__ import annotations
 import json
 import os
 import uuid
-from typing import AsyncIterator, Iterator
+from typing import TYPE_CHECKING, AsyncIterator, Iterator
 
 import pytest
-from astrapy import AsyncCollection, Collection, Database
-from astrapy.db import AstraDB
 
 from langchain_astradb import AstraDBLoader
 
 from .conftest import AstraDBCredentials, _has_env_vars
 
+if TYPE_CHECKING:
+    from astrapy import AsyncCollection, Collection, Database
+    from astrapy.db import AstraDB
 
-@pytest.fixture
+
+@pytest.fixture()
 def collection(database: Database) -> Iterator[Collection]:
     collection_name = f"lc_test_loader_{str(uuid.uuid4()).split('-')[0]}"
     collection = database.create_collection(collection_name)
@@ -40,7 +42,7 @@ def collection(database: Database) -> Iterator[Collection]:
     collection.drop()
 
 
-@pytest.fixture
+@pytest.fixture()
 async def async_collection(database: Database) -> AsyncIterator[AsyncCollection]:
     adatabase = database.to_async()
     collection_name = f"lc_test_loader_{str(uuid.uuid4()).split('-')[0]}"

@@ -38,7 +38,7 @@ class FakeEmbeddings(Embeddings):
         """Return simple embeddings.
         Embeddings encode each text as its index.
         """
-        return [[float(1.0)] * 9 + [float(i)] for i in range(len(texts))]
+        return [[1.0] * 9 + [float(i)] for i in range(len(texts))]
 
     async def aembed_documents(self, texts: list[str]) -> list[list[float]]:
         return self.embed_documents(texts)
@@ -49,7 +49,7 @@ class FakeEmbeddings(Embeddings):
         Distance to each text will be that text's index,
         as it was passed to embed_documents.
         """
-        return [float(1.0)] * 9 + [float(0.0)]
+        return [1.0] * 9 + [0.0]
 
     async def aembed_query(self, text: str) -> list[float]:
         return self.embed_query(text)
@@ -122,7 +122,7 @@ def astradb_cache(astra_db_credentials: AstraDBCredentials) -> Iterator[AstraDBC
     cache.collection.drop()
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture()
 async def async_astradb_cache(
     astra_db_credentials: AstraDBCredentials,
 ) -> AsyncIterator[AstraDBCache]:
@@ -155,7 +155,7 @@ def astradb_semantic_cache(
     sem_cache.collection.drop()
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture()
 async def async_astradb_semantic_cache(
     astra_db_credentials: AstraDBCredentials,
 ) -> AsyncIterator[AstraDBSemanticCache]:
@@ -210,7 +210,7 @@ class TestAstraDBCaches:
         set_llm_cache(cache)
         params = llm.dict()
         params["stop"] = None
-        llm_string = str(sorted([(k, v) for k, v in params.items()]))
+        llm_string = str(sorted(params.items()))
         get_llm_cache().update("foo", llm_string, [Generation(text="fizz")])
         output = llm.generate([prompt])
         expected_output = LLMResult(
@@ -226,7 +226,7 @@ class TestAstraDBCaches:
         set_llm_cache(cache)
         params = llm.dict()
         params["stop"] = None
-        llm_string = str(sorted([(k, v) for k, v in params.items()]))
+        llm_string = str(sorted(params.items()))
         await get_llm_cache().aupdate("foo", llm_string, [Generation(text="fizz")])
         output = await llm.agenerate([prompt])
         expected_output = LLMResult(

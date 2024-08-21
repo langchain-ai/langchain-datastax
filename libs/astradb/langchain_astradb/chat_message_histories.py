@@ -4,10 +4,8 @@ from __future__ import annotations
 
 import json
 import time
-from typing import Sequence
+from typing import TYPE_CHECKING, Sequence
 
-from astrapy.authentication import TokenProvider
-from astrapy.db import AstraDB, AsyncAstraDB
 from langchain_core.chat_history import BaseChatMessageHistory
 from langchain_core.messages import (
     BaseMessage,
@@ -20,6 +18,10 @@ from langchain_astradb.utils.astradb import (
     SetupMode,
     _AstraDBCollectionEnvironment,
 )
+
+if TYPE_CHECKING:
+    from astrapy.authentication import TokenProvider
+    from astrapy.db import AstraDB, AsyncAstraDB
 
 DEFAULT_COLLECTION_NAME = "langchain_message_store"
 
@@ -110,8 +112,7 @@ class AstraDBChatMessageHistory(BaseChatMessageHistory):
             )
         ]
         items = [json.loads(message_blob) for message_blob in message_blobs]
-        messages = messages_from_dict(items)
-        return messages
+        return messages_from_dict(items)
 
     @messages.setter
     def messages(self, messages: list[BaseMessage]) -> None:
@@ -135,8 +136,7 @@ class AstraDBChatMessageHistory(BaseChatMessageHistory):
         )
         message_blobs = [doc["body_blob"] for doc in sorted_docs]
         items = [json.loads(message_blob) for message_blob in message_blobs]
-        messages = messages_from_dict(items)
-        return messages
+        return messages_from_dict(items)
 
     @override
     def add_messages(self, messages: Sequence[BaseMessage]) -> None:
