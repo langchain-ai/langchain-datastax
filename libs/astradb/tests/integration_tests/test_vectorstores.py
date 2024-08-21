@@ -1655,7 +1655,13 @@ class TestAstraDBVectorStore:
                 )
 
             results = v_store_init_core.similarity_search("another", k=1)
-            assert len(rec_warnings) == 1
+            # cleaning out 'spurious' "unclosed socket/transport..." warnings
+            f_rec_warnings = [
+                wrn
+                for wrn in rec_warnings
+                if not issubclass(wrn.category, ResourceWarning)
+            ]
+            assert len(f_rec_warnings) == 1
             assert len(results) == 1
             assert results[0].page_content == "One text"
         finally:
