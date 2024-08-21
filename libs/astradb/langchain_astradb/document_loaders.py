@@ -4,14 +4,13 @@ import json
 import logging
 import warnings
 from typing import (
+    TYPE_CHECKING,
     Any,
     AsyncIterator,
     Callable,
     Iterator,
 )
 
-from astrapy.authentication import TokenProvider
-from astrapy.db import AstraDB, AsyncAstraDB
 from langchain_core.document_loaders import BaseLoader
 from langchain_core.documents import Document
 from typing_extensions import override
@@ -20,6 +19,10 @@ from langchain_astradb.utils.astradb import (
     SetupMode,
     _AstraDBCollectionEnvironment,
 )
+
+if TYPE_CHECKING:
+    from astrapy.authentication import TokenProvider
+    from astrapy.db import AstraDB, AsyncAstraDB
 
 logger = logging.getLogger(__name__)
 

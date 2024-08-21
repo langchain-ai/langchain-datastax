@@ -3,15 +3,18 @@
 from __future__ import annotations
 
 import os
+from typing import TYPE_CHECKING
 
 import pytest
-from astrapy import Database
-from astrapy.db import AstraDB
 
 from langchain_astradb.storage import AstraDBByteStore, AstraDBStore
 from langchain_astradb.utils.astradb import SetupMode
 
 from .conftest import _has_env_vars
+
+if TYPE_CHECKING:
+    from astrapy import Database
+    from astrapy.db import AstraDB
 
 
 def init_store(
@@ -162,8 +165,8 @@ class TestAstraDBStore:
 
             # final read (we want the IDs to do a full check)
             expected_text_by_id = {
-                **{d_id: d_tx for d_id, d_tx in zip(group0_ids, group0_texts)},
-                **{d_id: d_tx for d_id, d_tx in zip(group1_ids, group1_texts)},
+                **dict(zip(group0_ids, group0_texts)),
+                **dict(zip(group1_ids, group1_texts)),
             }
             all_ids = [doc_id for doc_id, _ in ids_and_texts]
             # The Data API can handle at most MAX_VALUES_IN_IN entries, let's chunk
@@ -227,8 +230,8 @@ class TestAstraDBStore:
 
             # final read (we want the IDs to do a full check)
             expected_text_by_id = {
-                **{d_id: d_tx for d_id, d_tx in zip(group0_ids, group0_texts)},
-                **{d_id: d_tx for d_id, d_tx in zip(group1_ids, group1_texts)},
+                **dict(zip(group0_ids, group0_texts)),
+                **dict(zip(group1_ids, group1_texts)),
             }
             all_ids = [doc_id for doc_id, _ in ids_and_texts]
             # The Data API can handle at most MAX_VALUES_IN_IN entries, let's chunk

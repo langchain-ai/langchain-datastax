@@ -8,14 +8,16 @@ import os
 import warnings
 from asyncio import InvalidStateError, Task
 from enum import Enum
-from typing import Any, Awaitable
+from typing import TYPE_CHECKING, Any, Awaitable
 
 import langchain_core
 from astrapy import AsyncDatabase, DataAPIClient, Database
-from astrapy.authentication import EmbeddingHeadersProvider, TokenProvider
-from astrapy.db import AstraDB, AsyncAstraDB  # 'core' astrapy imports
 from astrapy.exceptions import DataAPIException
-from astrapy.info import CollectionDescriptor, CollectionVectorServiceOptions
+
+if TYPE_CHECKING:
+    from astrapy.authentication import EmbeddingHeadersProvider, TokenProvider
+    from astrapy.db import AstraDB, AsyncAstraDB
+    from astrapy.info import CollectionDescriptor, CollectionVectorServiceOptions
 
 TOKEN_ENV_VAR = "ASTRA_DB_APPLICATION_TOKEN"
 API_ENDPOINT_ENV_VAR = "ASTRA_DB_API_ENDPOINT"
@@ -68,10 +70,7 @@ class _AstraDBEnvironment:
                     "to AstraDBEnvironment if passing 'token', 'api_endpoint' or "
                     "'environment'."
                 )
-            if astra_db_client is not None:
-                _astra_db = astra_db_client.copy()
-            else:
-                _astra_db = None
+            _astra_db = astra_db_client.copy() if astra_db_client is not None else None
             if async_astra_db_client is not None:
                 _async_astra_db = async_astra_db_client.copy()
             else:

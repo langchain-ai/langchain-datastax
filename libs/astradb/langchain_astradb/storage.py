@@ -5,6 +5,7 @@ import base64
 from abc import ABC, abstractmethod
 from concurrent.futures import ThreadPoolExecutor
 from typing import (
+    TYPE_CHECKING,
     Any,
     AsyncIterator,
     Generic,
@@ -13,10 +14,7 @@ from typing import (
     TypeVar,
 )
 
-from astrapy.authentication import TokenProvider
-from astrapy.db import AstraDB, AsyncAstraDB
 from astrapy.exceptions import InsertManyException
-from astrapy.results import UpdateResult
 from langchain_core.stores import BaseStore, ByteStore
 from typing_extensions import override
 
@@ -26,6 +24,11 @@ from langchain_astradb.utils.astradb import (
     SetupMode,
     _AstraDBCollectionEnvironment,
 )
+
+if TYPE_CHECKING:
+    from astrapy.authentication import TokenProvider
+    from astrapy.db import AstraDB, AsyncAstraDB
+    from astrapy.results import UpdateResult
 
 V = TypeVar("V")
 

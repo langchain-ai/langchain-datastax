@@ -7,8 +7,7 @@ from langchain_astradb.vectorstores import (
     DEFAULT_INDEXING_OPTIONS,
     AstraDBVectorStore,
 )
-
-from ..conftest import SomeEmbeddings
+from tests.conftest import SomeEmbeddings
 
 
 class TestAstraDB:

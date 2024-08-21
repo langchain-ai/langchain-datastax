@@ -35,8 +35,8 @@ from langchain_core.documents import Document
 
 from langchain_astradb.utils.astradb import SetupMode
 from langchain_astradb.vectorstores import AstraDBVectorStore
+from tests.conftest import ParserEmbeddings, SomeEmbeddings
 
-from ..conftest import ParserEmbeddings, SomeEmbeddings
 from .conftest import AstraDBCredentials, _has_env_vars
 
 # Faster testing (no actual collection deletions). Off by default (=full tests)
@@ -81,7 +81,7 @@ def is_nvidia_vector_service_available() -> bool:
         return False
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture()
 def store_someemb(
     astra_db_credentials: AstraDBCredentials,
 ) -> Iterable[AstraDBVectorStore]:
@@ -104,7 +104,7 @@ def store_someemb(
         v_store.clear()
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture()
 def store_someemb_tokenprovider(
     astra_db_credentials: AstraDBCredentials,
 ) -> Iterable[AstraDBVectorStore]:
@@ -128,7 +128,7 @@ def store_someemb_tokenprovider(
         v_store.clear()
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture()
 def store_parseremb(
     astra_db_credentials: AstraDBCredentials,
 ) -> Iterable[AstraDBVectorStore]:
@@ -151,7 +151,7 @@ def store_parseremb(
         v_store.clear()
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture()
 def vectorize_store(
     astra_db_credentials: AstraDBCredentials,
 ) -> Iterable[AstraDBVectorStore]:
@@ -175,7 +175,7 @@ def vectorize_store(
     v_store.delete_collection()
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture()
 def vectorize_store_w_header(
     astra_db_credentials: AstraDBCredentials,
 ) -> Iterable[AstraDBVectorStore]:
@@ -200,7 +200,7 @@ def vectorize_store_w_header(
     v_store.delete_collection()
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture()
 def vectorize_store_w_header_and_provider(
     astra_db_credentials: AstraDBCredentials,
 ) -> Iterable[AstraDBVectorStore]:
@@ -229,7 +229,7 @@ def vectorize_store_w_header_and_provider(
     v_store.delete_collection()
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture()
 def vectorize_store_nvidia(
     astra_db_credentials: AstraDBCredentials,
 ) -> Iterable[AstraDBVectorStore]:
@@ -867,8 +867,8 @@ class TestAstraDBVectorStore:
         assert set(inserted_ids1) == set(group1_ids)
         # final read (we want the IDs to do a full check)
         expected_text_by_id = {
-            **{d_id: d_tx for d_id, d_tx in zip(group0_ids, group0_texts)},
-            **{d_id: d_tx for d_id, d_tx in zip(group1_ids, group1_texts)},
+            **dict(zip(group0_ids, group0_texts)),
+            **dict(zip(group1_ids, group1_texts)),
         }
         full_results = store_someemb.similarity_search_with_score_id_by_vector(
             embedding=[1.0, 1.0],
@@ -913,8 +913,8 @@ class TestAstraDBVectorStore:
         assert set(inserted_ids1) == set(group1_ids)
         # final read (we want the IDs to do a full check)
         expected_text_by_id = {
-            **{d_id: d_tx for d_id, d_tx in zip(group0_ids, group0_texts)},
-            **{d_id: d_tx for d_id, d_tx in zip(group1_ids, group1_texts)},
+            **dict(zip(group0_ids, group0_texts)),
+            **dict(zip(group1_ids, group1_texts)),
         }
         full_results = await store_someemb.asimilarity_search_with_score_id_by_vector(
             embedding=[1.0, 1.0],
@@ -1107,7 +1107,8 @@ class TestAstraDBVectorStore:
         )
         scores = [sco for _, sco in res1]
         sco_near, sco_far = scores
-        assert abs(1 - sco_near) < MATCH_EPSILON and abs(sco_far) < MATCH_EPSILON
+        assert abs(1 - sco_near) < MATCH_EPSILON
+        assert abs(sco_far) < MATCH_EPSILON
 
     @pytest.mark.parametrize("vector_store", ["store_parseremb"])
     async def test_astradb_vectorstore_similarity_scale_async(
@@ -1128,7 +1129,8 @@ class TestAstraDBVectorStore:
         )
         scores = [sco for _, sco in res1]
         sco_near, sco_far = scores
-        assert abs(1 - sco_near) < MATCH_EPSILON and abs(sco_far) < MATCH_EPSILON
+        assert abs(1 - sco_near) < MATCH_EPSILON
+        assert abs(sco_far) < MATCH_EPSILON
 
     @pytest.mark.parametrize(
         "vector_store",
@@ -1154,7 +1156,7 @@ class TestAstraDBVectorStore:
         del_res0 = vstore.delete(ids0)
         assert del_res0 is True
         # deleting the rest plus a fake one
-        del_res1 = vstore.delete(ids1 + ["ghost!"])
+        del_res1 = vstore.delete([*ids1, "ghost!"])
         assert del_res1 is True  # ensure no error
         # nothing left
         assert vstore.similarity_search("x", k=2 * M) == []

@@ -29,8 +29,7 @@ class SomeEmbeddings(Embeddings):
             : self.dimension
         ]
         norm = sum(x * x for x in unnormed) ** 0.5
-        normed = [x / norm for x in unnormed]
-        return normed
+        return [x / norm for x in unnormed]
 
     async def aembed_query(self, text: str) -> list[float]:
         return self.embed_query(text)
