@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import os
-from typing import Dict, Optional
 
 import pytest
 from astrapy import Database
@@ -16,7 +15,7 @@ from .conftest import _has_env_vars
 
 
 def init_store(
-    astra_db_credentials: Dict[str, Optional[str]],
+    astra_db_credentials: dict[str, str | None],
     collection_name: str,
 ) -> AstraDBStore:
     store = AstraDBStore(
@@ -31,7 +30,7 @@ def init_store(
 
 
 def init_bytestore(
-    astra_db_credentials: Dict[str, Optional[str]],
+    astra_db_credentials: dict[str, str | None],
     collection_name: str,
 ) -> AstraDBByteStore:
     store = AstraDBByteStore(
@@ -46,7 +45,7 @@ def init_bytestore(
 
 
 async def init_async_store(
-    astra_db_credentials: Dict[str, Optional[str]], collection_name: str
+    astra_db_credentials: dict[str, str | None], collection_name: str
 ) -> AstraDBStore:
     store = AstraDBStore(
         collection_name=collection_name,
@@ -64,7 +63,7 @@ async def init_async_store(
 class TestAstraDBStore:
     def test_mget(
         self,
-        astra_db_credentials: Dict[str, Optional[str]],
+        astra_db_credentials: dict[str, str | None],
     ) -> None:
         """Test AstraDBStore mget method."""
         collection_name = "lc_test_store_mget"
@@ -76,7 +75,7 @@ class TestAstraDBStore:
 
     async def test_amget(
         self,
-        astra_db_credentials: Dict[str, Optional[str]],
+        astra_db_credentials: dict[str, str | None],
     ) -> None:
         """Test AstraDBStore amget method."""
         collection_name = "lc_test_store_mget"
@@ -88,7 +87,7 @@ class TestAstraDBStore:
 
     def test_mset(
         self,
-        astra_db_credentials: Dict[str, Optional[str]],
+        astra_db_credentials: dict[str, str | None],
     ) -> None:
         """Test that multiple keys can be set with AstraDBStore."""
         collection_name = "lc_test_store_mset"
@@ -103,7 +102,7 @@ class TestAstraDBStore:
 
     async def test_amset(
         self,
-        astra_db_credentials: Dict[str, Optional[str]],
+        astra_db_credentials: dict[str, str | None],
     ) -> None:
         """Test that multiple keys can be set with AstraDBStore."""
         collection_name = "lc_test_store_mset"
@@ -118,7 +117,7 @@ class TestAstraDBStore:
 
     def test_store_massive_mset_with_replace(
         self,
-        astra_db_credentials: Dict[str, Optional[str]],
+        astra_db_credentials: dict[str, str | None],
     ) -> None:
         """Testing the insert-many-and-replace-some patterns thoroughly."""
         FULL_SIZE = 300
@@ -182,7 +181,7 @@ class TestAstraDBStore:
 
     async def test_store_massive_amset_with_replace(
         self,
-        astra_db_credentials: Dict[str, Optional[str]],
+        astra_db_credentials: dict[str, str | None],
     ) -> None:
         """Testing the insert-many-and-replace-some patterns thoroughly."""
         FULL_SIZE = 300
@@ -247,7 +246,7 @@ class TestAstraDBStore:
 
     def test_mdelete(
         self,
-        astra_db_credentials: Dict[str, Optional[str]],
+        astra_db_credentials: dict[str, str | None],
     ) -> None:
         """Test that deletion works as expected."""
         collection_name = "lc_test_store_mdelete"
@@ -261,7 +260,7 @@ class TestAstraDBStore:
 
     async def test_amdelete(
         self,
-        astra_db_credentials: Dict[str, Optional[str]],
+        astra_db_credentials: dict[str, str | None],
     ) -> None:
         """Test that deletion works as expected."""
         collection_name = "lc_test_store_mdelete"
@@ -275,7 +274,7 @@ class TestAstraDBStore:
 
     def test_yield_keys(
         self,
-        astra_db_credentials: Dict[str, Optional[str]],
+        astra_db_credentials: dict[str, str | None],
     ) -> None:
         collection_name = "lc_test_store_yield_keys"
         try:
@@ -288,7 +287,7 @@ class TestAstraDBStore:
 
     async def test_ayield_keys(
         self,
-        astra_db_credentials: Dict[str, Optional[str]],
+        astra_db_credentials: dict[str, str | None],
     ) -> None:
         collection_name = "lc_test_store_yield_keys"
         try:
@@ -304,7 +303,7 @@ class TestAstraDBStore:
 
     def test_bytestore_mget(
         self,
-        astra_db_credentials: Dict[str, Optional[str]],
+        astra_db_credentials: dict[str, str | None],
     ) -> None:
         """Test AstraDBByteStore mget method."""
         collection_name = "lc_test_bytestore_mget"
@@ -316,7 +315,7 @@ class TestAstraDBStore:
 
     def test_bytestore_mset(
         self,
-        astra_db_credentials: Dict[str, Optional[str]],
+        astra_db_credentials: dict[str, str | None],
     ) -> None:
         """Test that multiple keys can be set with AstraDBByteStore."""
         collection_name = "lc_test_bytestore_mset"
@@ -331,7 +330,7 @@ class TestAstraDBStore:
 
     def test_indexing_detection(
         self,
-        astra_db_credentials: Dict[str, Optional[str]],
+        astra_db_credentials: dict[str, str | None],
         database: Database,
     ) -> None:
         """Test the behaviour against preexisting legacy collections."""
@@ -385,7 +384,7 @@ class TestAstraDBStore:
     )
     def test_store_coreclients_init_sync(
         self,
-        astra_db_credentials: Dict[str, Optional[str]],
+        astra_db_credentials: dict[str, str | None],
         core_astra_db: AstraDB,
     ) -> None:
         """A deprecation warning from passing a (core) AstraDB, but it works."""
@@ -415,7 +414,7 @@ class TestAstraDBStore:
     )
     async def test_store_coreclients_init_async(
         self,
-        astra_db_credentials: Dict[str, Optional[str]],
+        astra_db_credentials: dict[str, str | None],
         core_astra_db: AstraDB,
     ) -> None:
         """A deprecation warning from passing a (core) AstraDB, but it works."""

@@ -7,11 +7,7 @@ from typing import (
     Any,
     AsyncIterator,
     Callable,
-    Dict,
     Iterator,
-    List,
-    Optional,
-    Union,
 )
 
 from astrapy.authentication import TokenProvider
@@ -34,19 +30,19 @@ class AstraDBLoader(BaseLoader):
         self,
         collection_name: str,
         *,
-        token: Optional[Union[str, TokenProvider]] = None,
-        api_endpoint: Optional[str] = None,
-        environment: Optional[str] = None,
-        astra_db_client: Optional[AstraDB] = None,
-        async_astra_db_client: Optional[AsyncAstraDB] = None,
-        namespace: Optional[str] = None,
-        filter_criteria: Optional[Dict[str, Any]] = None,
-        projection: Optional[Dict[str, Any]] = _NOT_SET,  # type: ignore[assignment]
-        find_options: Optional[Dict[str, Any]] = None,
-        limit: Optional[int] = None,
+        token: str | TokenProvider | None = None,
+        api_endpoint: str | None = None,
+        environment: str | None = None,
+        astra_db_client: AstraDB | None = None,
+        async_astra_db_client: AsyncAstraDB | None = None,
+        namespace: str | None = None,
+        filter_criteria: dict[str, Any] | None = None,
+        projection: dict[str, Any] | None = _NOT_SET,  # type: ignore[assignment]
+        find_options: dict[str, Any] | None = None,
+        limit: int | None = None,
         nb_prefetched: int = _NOT_SET,  # type: ignore[assignment]
-        page_content_mapper: Callable[[Dict], str] = json.dumps,
-        metadata_mapper: Optional[Callable[[Dict], Dict[str, Any]]] = None,
+        page_content_mapper: Callable[[dict], str] = json.dumps,
+        metadata_mapper: Callable[[dict], dict[str, Any]] | None = None,
     ) -> None:
         """Load DataStax Astra DB documents.
 
@@ -99,7 +95,7 @@ class AstraDBLoader(BaseLoader):
         )
         self.astra_db_env = astra_db_env
         self.filter = filter_criteria
-        self._projection: Optional[Dict[str, Any]] = (
+        self._projection: dict[str, Any] | None = (
             projection if projection is not _NOT_SET else {"*": True}
         )
         # warning if 'prefetched' passed
@@ -150,7 +146,7 @@ class AstraDBLoader(BaseLoader):
             }
         )
 
-    def _to_langchain_doc(self, doc: Dict[str, Any]) -> Document:
+    def _to_langchain_doc(self, doc: dict[str, Any]) -> Document:
         return Document(
             page_content=self.page_content_mapper(doc),
             metadata=self.metadata_mapper(doc),
@@ -166,7 +162,7 @@ class AstraDBLoader(BaseLoader):
         ):
             yield self._to_langchain_doc(doc)
 
-    async def aload(self) -> List[Document]:
+    async def aload(self) -> list[Document]:
         """Load data into Document objects."""
         return [doc async for doc in self.alazy_load()]
 

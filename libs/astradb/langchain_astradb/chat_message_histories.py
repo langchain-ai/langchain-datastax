@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import time
-from typing import List, Optional, Sequence, Union
+from typing import Sequence
 
 from astrapy.authentication import TokenProvider
 from astrapy.db import AstraDB, AsyncAstraDB
@@ -29,12 +29,12 @@ class AstraDBChatMessageHistory(BaseChatMessageHistory):
         *,
         session_id: str,
         collection_name: str = DEFAULT_COLLECTION_NAME,
-        token: Optional[Union[str, TokenProvider]] = None,
-        api_endpoint: Optional[str] = None,
-        environment: Optional[str] = None,
-        astra_db_client: Optional[AstraDB] = None,
-        async_astra_db_client: Optional[AsyncAstraDB] = None,
-        namespace: Optional[str] = None,
+        token: str | TokenProvider | None = None,
+        api_endpoint: str | None = None,
+        environment: str | None = None,
+        astra_db_client: AstraDB | None = None,
+        async_astra_db_client: AsyncAstraDB | None = None,
+        namespace: str | None = None,
         setup_mode: SetupMode = SetupMode.SYNC,
         pre_delete_collection: bool = False,
     ) -> None:
@@ -87,7 +87,7 @@ class AstraDBChatMessageHistory(BaseChatMessageHistory):
         self.collection_name = collection_name
 
     @property
-    def messages(self) -> List[BaseMessage]:
+    def messages(self) -> list[BaseMessage]:
         """Retrieve all session messages from DB"""
         self.astra_env.ensure_db_setup()
         message_blobs = [
@@ -110,10 +110,10 @@ class AstraDBChatMessageHistory(BaseChatMessageHistory):
         return messages
 
     @messages.setter
-    def messages(self, messages: List[BaseMessage]) -> None:
+    def messages(self, messages: list[BaseMessage]) -> None:
         raise NotImplementedError("Use add_messages instead")
 
-    async def aget_messages(self) -> List[BaseMessage]:
+    async def aget_messages(self) -> list[BaseMessage]:
         await self.astra_env.aensure_db_setup()
         docs = self.async_collection.find(
             filter={

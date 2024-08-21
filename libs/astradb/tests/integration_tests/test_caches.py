@@ -11,8 +11,10 @@ Required to run this test:
         export ASTRA_DB_KEYSPACE="my_keyspace"
 """
 
+from __future__ import annotations
+
 import os
-from typing import Any, AsyncIterator, Dict, Iterator, List, Mapping, Optional, cast
+from typing import Any, AsyncIterator, Iterator, Mapping, Optional, cast
 
 import pytest
 from astrapy.db import AstraDB
@@ -33,22 +35,22 @@ from .conftest import AstraDBCredentials, _has_env_vars
 class FakeEmbeddings(Embeddings):
     """Fake embeddings functionality for testing."""
 
-    def embed_documents(self, texts: List[str]) -> List[List[float]]:
+    def embed_documents(self, texts: list[str]) -> list[list[float]]:
         """Return simple embeddings.
         Embeddings encode each text as its index."""
         return [[float(1.0)] * 9 + [float(i)] for i in range(len(texts))]
 
-    async def aembed_documents(self, texts: List[str]) -> List[List[float]]:
+    async def aembed_documents(self, texts: list[str]) -> list[list[float]]:
         return self.embed_documents(texts)
 
-    def embed_query(self, text: str) -> List[float]:
+    def embed_query(self, text: str) -> list[float]:
         """Return constant query embeddings.
         Embeddings are identical to embed_documents(texts)[0].
         Distance to each text will be that text's index,
         as it was passed to embed_documents."""
         return [float(1.0)] * 9 + [float(0.0)]
 
-    async def aembed_query(self, text: str) -> List[float]:
+    async def aembed_query(self, text: str) -> list[float]:
         return self.embed_query(text)
 
 
@@ -61,8 +63,8 @@ class FakeLLM(LLM):
 
     @validator("queries", always=True)
     def check_queries_required(
-        cls, queries: Optional[Mapping], values: Mapping[str, Any]
-    ) -> Optional[Mapping]:
+        cls, queries: Mapping | None, values: Mapping[str, Any]
+    ) -> Mapping | None:
         if values.get("sequential_response") and not queries:
             raise ValueError(
                 "queries is required when sequential_response is set to True"
@@ -81,8 +83,8 @@ class FakeLLM(LLM):
     def _call(
         self,
         prompt: str,
-        stop: Optional[List[str]] = None,
-        run_manager: Optional[CallbackManagerForLLMRun] = None,
+        stop: list[str] | None = None,
+        run_manager: CallbackManagerForLLMRun | None = None,
         **kwargs: Any,
     ) -> str:
         if self.sequential_responses:
@@ -95,7 +97,7 @@ class FakeLLM(LLM):
             return "bar"
 
     @property
-    def _identifying_params(self) -> Dict[str, Any]:
+    def _identifying_params(self) -> dict[str, Any]:
         return {}
 
     @property
