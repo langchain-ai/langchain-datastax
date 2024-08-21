@@ -1,5 +1,4 @@
-"""
-Test AstraDB caches. Requires an Astra DB vector instance.
+"""Test AstraDB caches. Requires an Astra DB vector instance.
 
 Required to run this test:
     - a recent `astrapy` Python package available
@@ -37,7 +36,8 @@ class FakeEmbeddings(Embeddings):
 
     def embed_documents(self, texts: list[str]) -> list[list[float]]:
         """Return simple embeddings.
-        Embeddings encode each text as its index."""
+        Embeddings encode each text as its index.
+        """
         return [[float(1.0)] * 9 + [float(i)] for i in range(len(texts))]
 
     async def aembed_documents(self, texts: list[str]) -> list[list[float]]:
@@ -47,7 +47,8 @@ class FakeEmbeddings(Embeddings):
         """Return constant query embeddings.
         Embeddings are identical to embed_documents(texts)[0].
         Distance to each text will be that text's index,
-        as it was passed to embed_documents."""
+        as it was passed to embed_documents.
+        """
         return [float(1.0)] * 9 + [float(0.0)]
 
     async def aembed_query(self, text: str) -> list[float]:

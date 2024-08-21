@@ -14,7 +14,6 @@ from langchain_astradb.utils.astradb import (
 class TestAstraDBEnvironment:
     def test_initialization(self) -> None:
         """Test the various ways to initialize the environment."""
-
         a_e_string = (
             "https://01234567-89ab-cdef-0123-456789abcdef-us-east1"
             ".apps.astra.datastax.com"

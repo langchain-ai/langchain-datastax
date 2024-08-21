@@ -18,6 +18,7 @@ from astrapy.db import AstraDB, AsyncAstraDB
 from astrapy.exceptions import InsertManyException
 from astrapy.results import UpdateResult
 from langchain_core.stores import BaseStore, ByteStore
+from typing_extensions import override
 
 from langchain_astradb.utils.astradb import (
     MAX_CONCURRENT_DOCUMENT_INSERTIONS,
@@ -52,11 +53,11 @@ class AstraDBBaseStore(Generic[V], BaseStore[str, V], ABC):
 
     @abstractmethod
     def decode_value(self, value: Any) -> V | None:
-        """Decodes value from Astra DB"""
+        """Decodes value from Astra DB."""
 
     @abstractmethod
     def encode_value(self, value: V | None) -> Any:
-        """Encodes value for Astra DB"""
+        """Encodes value for Astra DB."""
 
     def mget(self, keys: Sequence[str]) -> list[V | None]:
         self.astra_env.ensure_db_setup()
@@ -68,6 +69,7 @@ class AstraDBBaseStore(Generic[V], BaseStore[str, V], ABC):
             docs_dict[doc["_id"]] = doc.get("value")
         return [self.decode_value(docs_dict.get(key)) for key in keys]
 
+    @override
     async def amget(self, keys: Sequence[str]) -> list[V | None]:
         await self.astra_env.aensure_db_setup()
         docs_dict = {}
@@ -78,6 +80,7 @@ class AstraDBBaseStore(Generic[V], BaseStore[str, V], ABC):
             docs_dict[doc["_id"]] = doc.get("value")
         return [self.decode_value(docs_dict.get(key)) for key in keys]
 
+    @override
     def mset(self, key_value_pairs: Sequence[tuple[str, V]]) -> None:
         self.astra_env.ensure_db_setup()
         documents_to_insert = [
@@ -133,6 +136,7 @@ class AstraDBBaseStore(Generic[V], BaseStore[str, V], ABC):
                     f"documents ({missing} failed replace_one calls)"
                 )
 
+    @override
     async def amset(self, key_value_pairs: Sequence[tuple[str, V]]) -> None:
         await self.astra_env.aensure_db_setup()
         documents_to_insert = [
@@ -188,14 +192,17 @@ class AstraDBBaseStore(Generic[V], BaseStore[str, V], ABC):
                     f"documents ({missing} failed replace_one calls)"
                 )
 
+    @override
     def mdelete(self, keys: Sequence[str]) -> None:
         self.astra_env.ensure_db_setup()
         self.collection.delete_many(filter={"_id": {"$in": list(keys)}})
 
+    @override
     async def amdelete(self, keys: Sequence[str]) -> None:
         await self.astra_env.aensure_db_setup()
         await self.async_collection.delete_many(filter={"_id": {"$in": list(keys)}})
 
+    @override
     def yield_keys(self, *, prefix: str | None = None) -> Iterator[str]:
         self.astra_env.ensure_db_setup()
         docs = self.collection.find()
@@ -204,6 +211,7 @@ class AstraDBBaseStore(Generic[V], BaseStore[str, V], ABC):
             if not prefix or key.startswith(prefix):
                 yield key
 
+    @override
     async def ayield_keys(self, *, prefix: str | None = None) -> AsyncIterator[str]:
         await self.astra_env.aensure_db_setup()
         async for doc in self.async_collection.find():
@@ -282,9 +290,11 @@ class AstraDBStore(AstraDBBaseStore[Any]):
             pre_delete_collection=pre_delete_collection,
         )
 
+    @override
     def decode_value(self, value: Any) -> Any:
         return value
 
+    @override
     def encode_value(self, value: Any) -> Any:
         return value
 
@@ -357,11 +367,13 @@ class AstraDBByteStore(AstraDBBaseStore[bytes], ByteStore):
             pre_delete_collection=pre_delete_collection,
         )
 
+    @override
     def decode_value(self, value: Any) -> bytes | None:
         if value is None:
             return None
         return base64.b64decode(value)
 
+    @override
     def encode_value(self, value: bytes | None) -> Any:
         if value is None:
             return None

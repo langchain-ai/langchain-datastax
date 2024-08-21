@@ -1,6 +1,5 @@
-"""
-General-purpose testing tools, such as:
-    - Ad-hoc embedding classes
+"""General-purpose testing tools, such as:
+- Ad-hoc embedding classes
 """
 
 from __future__ import annotations
@@ -11,8 +10,7 @@ from langchain_core.embeddings import Embeddings
 
 
 class SomeEmbeddings(Embeddings):
-    """
-    Turn a sentence into an embedding vector in some way.
+    """Turn a sentence into an embedding vector in some way.
     Not important how. It is deterministic is all that counts.
     """
 
@@ -39,8 +37,7 @@ class SomeEmbeddings(Embeddings):
 
 
 class ParserEmbeddings(Embeddings):
-    """
-    Parse input texts: if they are json for a List[float], fine.
+    """Parse input texts: if they are json for a List[float], fine.
     Otherwise, return all zeros and call it a day.
     """
 

@@ -35,6 +35,8 @@ logger = logging.getLogger()
 
 
 class SetupMode(Enum):
+    """Setup mode for the Astra DB collection."""
+
     SYNC = 1
     ASYNC = 2
     OFF = 3
@@ -300,13 +302,13 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
         requested_indexing_policy: dict[str, Any] | None,
         default_indexing_policy: dict[str, Any] | None,
     ) -> bool:
-        """
+        """Validate indexing policy.
+
         This is a validation helper, to be called when the collection-creation
         call has failed.
 
         Args:
-            detected_collection (List[CollectionDescriptor]):
-                the list of collection items returned by astrapy
+            collection_descriptors: collection descriptors for the database.
             collection_name (str): the name of the collection whose attempted
                 creation failed
             requested_indexing_policy: the 'indexing' part of the collection
