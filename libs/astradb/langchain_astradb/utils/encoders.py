@@ -23,7 +23,8 @@ def default_filter_encoder(filter_dict: Dict[str, Any]) -> Dict[str, Any]:
 
 class VSDocumentEncoder(ABC):
     """
-    TODO
+    A document encoder for the Astra DB vector store, able to encode/decode
+    documents consistently to and from Astra DB collections.
     """
 
     server_side_embeddings: bool
@@ -40,21 +41,22 @@ class VSDocumentEncoder(ABC):
         metadata: Optional[dict],
     ) -> Dict[str, Any]:
         """
-        TODO
+        Create a document for storage on Astra DB.
         """
         ...
 
     @abstractmethod
     def decode(self, astra_document: Dict[str, Any]) -> Document:
         """
-        TODO
+        Create a LangChain Document instance from a document retrieved from Astra DB.
         """
         ...
 
     @abstractmethod
     def encode_filter(self, filter_dict: Dict[str, Any]) -> Dict[str, Any]:
         """
-        TODO
+        Make a LangChain filter into a filter clause suitable for operations
+        against the Astra DB collection, consistently with the encoding scheme.
         """
         ...
 
@@ -72,7 +74,8 @@ class DefaultVSDocumentEncoder(VSDocumentEncoder):
         vector: Optional[List[float]],
         metadata: Optional[dict],
     ) -> Dict[str, Any]:
-        assert vector is not None  # TODO remove
+        if vector is None:
+            raise ValueError("Default encoder cannot receive null vector")
         return {
             "content": content,
             "_id": id,
@@ -108,7 +111,8 @@ class DefaultVectorizeVSDocumentEncoder(VSDocumentEncoder):
         vector: Optional[List[float]],
         metadata: Optional[dict],
     ) -> Dict[str, Any]:
-        assert vector is None  # TODO remove
+        if vector is not None:
+            raise ValueError("DefaultVectorize encoder cannot receive non-null vector")
         return {
             "$vectorize": content,
             "_id": id,
