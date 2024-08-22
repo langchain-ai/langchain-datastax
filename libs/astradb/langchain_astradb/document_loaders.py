@@ -4,25 +4,25 @@ import json
 import logging
 import warnings
 from typing import (
+    TYPE_CHECKING,
     Any,
     AsyncIterator,
     Callable,
-    Dict,
     Iterator,
-    List,
-    Optional,
-    Union,
 )
 
-from astrapy.authentication import TokenProvider
-from astrapy.db import AstraDB, AsyncAstraDB
 from langchain_core.document_loaders import BaseLoader
 from langchain_core.documents import Document
+from typing_extensions import override
 
 from langchain_astradb.utils.astradb import (
     SetupMode,
     _AstraDBCollectionEnvironment,
 )
+
+if TYPE_CHECKING:
+    from astrapy.authentication import TokenProvider
+    from astrapy.db import AstraDB, AsyncAstraDB
 
 logger = logging.getLogger(__name__)
 
@@ -34,19 +34,19 @@ class AstraDBLoader(BaseLoader):
         self,
         collection_name: str,
         *,
-        token: Optional[Union[str, TokenProvider]] = None,
-        api_endpoint: Optional[str] = None,
-        environment: Optional[str] = None,
-        astra_db_client: Optional[AstraDB] = None,
-        async_astra_db_client: Optional[AsyncAstraDB] = None,
-        namespace: Optional[str] = None,
-        filter_criteria: Optional[Dict[str, Any]] = None,
-        projection: Optional[Dict[str, Any]] = _NOT_SET,  # type: ignore[assignment]
-        find_options: Optional[Dict[str, Any]] = None,
-        limit: Optional[int] = None,
+        token: str | TokenProvider | None = None,
+        api_endpoint: str | None = None,
+        environment: str | None = None,
+        astra_db_client: AstraDB | None = None,
+        async_astra_db_client: AsyncAstraDB | None = None,
+        namespace: str | None = None,
+        filter_criteria: dict[str, Any] | None = None,
+        projection: dict[str, Any] | None = _NOT_SET,  # type: ignore[assignment]
+        find_options: dict[str, Any] | None = None,
+        limit: int | None = None,
         nb_prefetched: int = _NOT_SET,  # type: ignore[assignment]
-        page_content_mapper: Callable[[Dict], str] = json.dumps,
-        metadata_mapper: Optional[Callable[[Dict], Dict[str, Any]]] = None,
+        page_content_mapper: Callable[[dict], str] = json.dumps,
+        metadata_mapper: Callable[[dict], dict[str, Any]] | None = None,
     ) -> None:
         """Load DataStax Astra DB documents.
 
@@ -86,6 +86,9 @@ class AstraDBLoader(BaseLoader):
                 *IGNORED starting from v. 0.3.5: astrapy v1.0+ does not support it.*
             page_content_mapper: Function applied to collection documents to create
                 the `page_content` of the LangChain Document. Defaults to `json.dumps`.
+            metadata_mapper: Function applied to collection documents to create the
+                `metadata` of the LangChain Document. Defaults to returning the
+                 namespace, API endpoint and collection name.
         """
         astra_db_env = _AstraDBCollectionEnvironment(
             collection_name=collection_name,
@@ -99,7 +102,7 @@ class AstraDBLoader(BaseLoader):
         )
         self.astra_db_env = astra_db_env
         self.filter = filter_criteria
-        self._projection: Optional[Dict[str, Any]] = (
+        self._projection: dict[str, Any] | None = (
             projection if projection is not _NOT_SET else {"*": True}
         )
         # warning if 'prefetched' passed
@@ -110,6 +113,7 @@ class AstraDBLoader(BaseLoader):
                     "client and will be ignored in reading document."
                 ),
                 UserWarning,
+                stacklevel=2,
             )
 
         # normalizing limit and options and deprecations
@@ -120,16 +124,16 @@ class AstraDBLoader(BaseLoader):
                     "Duplicate 'limit' directive supplied. Please remove it "
                     "from the 'find_options' map parameter."
                 )
-            else:
-                warnings.warn(
-                    (
-                        "Passing 'limit' as part of the 'find_options' "
-                        "dictionary is deprecated starting from version 0.3.5. "
-                        "Please switch to passing 'limit=<number>' "
-                        "directly in the constructor."
-                    ),
-                    DeprecationWarning,
-                )
+            warnings.warn(
+                (
+                    "Passing 'limit' as part of the 'find_options' "
+                    "dictionary is deprecated starting from version 0.3.5. "
+                    "Please switch to passing 'limit=<number>' "
+                    "directly in the constructor."
+                ),
+                DeprecationWarning,
+                stacklevel=2,
+            )
         self.limit = _find_options.pop("limit", limit)
         if _find_options:
             warnings.warn(
@@ -138,8 +142,8 @@ class AstraDBLoader(BaseLoader):
                     "This parameter is deprecated starting from version 0.3.5."
                 ),
                 DeprecationWarning,
+                stacklevel=2,
             )
-        #
         self.nb_prefetched = nb_prefetched
         self.page_content_mapper = page_content_mapper
         self.metadata_mapper = metadata_mapper or (
@@ -150,12 +154,13 @@ class AstraDBLoader(BaseLoader):
             }
         )
 
-    def _to_langchain_doc(self, doc: Dict[str, Any]) -> Document:
+    def _to_langchain_doc(self, doc: dict[str, Any]) -> Document:
         return Document(
             page_content=self.page_content_mapper(doc),
             metadata=self.metadata_mapper(doc),
         )
 
+    @override
     def lazy_load(self) -> Iterator[Document]:
         for doc in self.astra_db_env.collection.find(
             filter=self.filter,
@@ -166,10 +171,11 @@ class AstraDBLoader(BaseLoader):
         ):
             yield self._to_langchain_doc(doc)
 
-    async def aload(self) -> List[Document]:
+    async def aload(self) -> list[Document]:
         """Load data into Document objects."""
         return [doc async for doc in self.alazy_load()]
 
+    @override
     async def alazy_load(self) -> AsyncIterator[Document]:
         async for doc in self.astra_db_env.async_collection.find(
             filter=self.filter,

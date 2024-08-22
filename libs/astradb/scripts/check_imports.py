@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import sys
 import traceback
 from importlib.machinery import SourceFileLoader

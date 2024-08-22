@@ -1,5 +1,4 @@
-"""
-Test of Astra DB vector store class `AstraDBVectorStore`
+"""Test of Astra DB vector store class `AstraDBVectorStore`
 
 Required to run this test:
     - a recent `astrapy` Python package available
@@ -19,24 +18,28 @@ Required to run this test:
         export ASTRA_DB_SKIP_COLLECTION_DELETIONS="0" ("1" = no deletions, default)
 """
 
+from __future__ import annotations
+
 import json
 import math
 import os
 import warnings
-from typing import Dict, Iterable, Optional
+from typing import TYPE_CHECKING, Iterable
 
 import pytest
-from astrapy import Database
 from astrapy.authentication import EmbeddingAPIKeyHeaderProvider, StaticTokenProvider
-from astrapy.db import AstraDB
 from astrapy.info import CollectionVectorServiceOptions
 from langchain_core.documents import Document
 
 from langchain_astradb.utils.astradb import SetupMode
 from langchain_astradb.vectorstores import AstraDBVectorStore
+from tests.conftest import ParserEmbeddings, SomeEmbeddings
 
-from ..conftest import ParserEmbeddings, SomeEmbeddings
 from .conftest import AstraDBCredentials, _has_env_vars
+
+if TYPE_CHECKING:
+    from astrapy import Database
+    from astrapy.db import AstraDB
 
 # Faster testing (no actual collection deletions). Off by default (=full tests)
 SKIP_COLLECTION_DELETE = (
@@ -80,7 +83,7 @@ def is_nvidia_vector_service_available() -> bool:
         return False
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture()
 def store_someemb(
     astra_db_credentials: AstraDBCredentials,
 ) -> Iterable[AstraDBVectorStore]:
@@ -103,7 +106,7 @@ def store_someemb(
         v_store.clear()
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture()
 def store_someemb_tokenprovider(
     astra_db_credentials: AstraDBCredentials,
 ) -> Iterable[AstraDBVectorStore]:
@@ -127,7 +130,7 @@ def store_someemb_tokenprovider(
         v_store.clear()
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture()
 def store_parseremb(
     astra_db_credentials: AstraDBCredentials,
 ) -> Iterable[AstraDBVectorStore]:
@@ -150,13 +153,11 @@ def store_parseremb(
         v_store.clear()
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture()
 def vectorize_store(
     astra_db_credentials: AstraDBCredentials,
 ) -> Iterable[AstraDBVectorStore]:
-    """
-    astra db vector store with server-side embeddings using openai + shared_secret
-    """
+    """Astra db vector store with server-side embeddings using openai + shared_secret"""
     if "SHARED_SECRET_NAME_OPENAI" not in os.environ:
         pytest.skip("OpenAI SHARED_SECRET key not set for KMS vectorize")
 
@@ -176,13 +177,11 @@ def vectorize_store(
     v_store.delete_collection()
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture()
 def vectorize_store_w_header(
     astra_db_credentials: AstraDBCredentials,
 ) -> Iterable[AstraDBVectorStore]:
-    """
-    astra db vector store with server-side embeddings using openai + header
-    """
+    """Astra db vector store with server-side embeddings using openai + header"""
     if not os.environ.get("OPENAI_API_KEY"):
         pytest.skip("OpenAI key not available")
 
@@ -203,12 +202,11 @@ def vectorize_store_w_header(
     v_store.delete_collection()
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture()
 def vectorize_store_w_header_and_provider(
     astra_db_credentials: AstraDBCredentials,
 ) -> Iterable[AstraDBVectorStore]:
-    """
-    astra db vector store with server-side embeddings using openai + header
+    """Astra db vector store with server-side embeddings using openai + header
     Variant initialized with a EmbeddingHeadersProvider instance for the header
     """
     if not os.environ.get("OPENAI_API_KEY"):
@@ -233,13 +231,11 @@ def vectorize_store_w_header_and_provider(
     v_store.delete_collection()
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture()
 def vectorize_store_nvidia(
     astra_db_credentials: AstraDBCredentials,
 ) -> Iterable[AstraDBVectorStore]:
-    """
-    astra db vector store with server-side embeddings using the nvidia model
-    """
+    """Astra db vector store with server-side embeddings using the nvidia model"""
     if not is_nvidia_vector_service_available():
         pytest.skip("vectorize/nvidia unavailable")
 
@@ -265,7 +261,6 @@ class TestAstraDBVectorStore:
         self, astra_db_credentials: AstraDBCredentials
     ) -> None:
         """Create and delete."""
-
         emb = SomeEmbeddings(dimension=2)
 
         v_store = AstraDBVectorStore(
@@ -844,16 +839,16 @@ class TestAstraDBVectorStore:
         store_someemb: AstraDBVectorStore,
     ) -> None:
         """Testing the insert-many-and-replace-some patterns thoroughly."""
-        FULL_SIZE = 300
-        FIRST_GROUP_SIZE = 150
-        SECOND_GROUP_SLICER = [30, 100, 2]
+        full_size = 300
+        first_group_size = 150
+        second_group_slicer = [30, 100, 2]
 
-        all_ids = [f"doc_{idx}" for idx in range(FULL_SIZE)]
-        all_texts = [f"document number {idx}" for idx in range(FULL_SIZE)]
+        all_ids = [f"doc_{idx}" for idx in range(full_size)]
+        all_texts = [f"document number {idx}" for idx in range(full_size)]
 
         # massive insertion on empty
-        group0_ids = all_ids[0:FIRST_GROUP_SIZE]
-        group0_texts = all_texts[0:FIRST_GROUP_SIZE]
+        group0_ids = all_ids[0:first_group_size]
+        group0_texts = all_texts[0:first_group_size]
         inserted_ids0 = store_someemb.add_texts(
             texts=group0_texts,
             ids=group0_ids,
@@ -861,11 +856,11 @@ class TestAstraDBVectorStore:
         assert set(inserted_ids0) == set(group0_ids)
         # massive insertion with many overwrites scattered through
         # (we change the text to later check on DB for successful update)
-        _s, _e, _st = SECOND_GROUP_SLICER
-        group1_ids = all_ids[_s:_e:_st] + all_ids[FIRST_GROUP_SIZE:FULL_SIZE]
+        _s, _e, _st = second_group_slicer
+        group1_ids = all_ids[_s:_e:_st] + all_ids[first_group_size:full_size]
         group1_texts = [
             txt.upper()
-            for txt in (all_texts[_s:_e:_st] + all_texts[FIRST_GROUP_SIZE:FULL_SIZE])
+            for txt in (all_texts[_s:_e:_st] + all_texts[first_group_size:full_size])
         ]
         inserted_ids1 = store_someemb.add_texts(
             texts=group1_texts,
@@ -874,12 +869,12 @@ class TestAstraDBVectorStore:
         assert set(inserted_ids1) == set(group1_ids)
         # final read (we want the IDs to do a full check)
         expected_text_by_id = {
-            **{d_id: d_tx for d_id, d_tx in zip(group0_ids, group0_texts)},
-            **{d_id: d_tx for d_id, d_tx in zip(group1_ids, group1_texts)},
+            **dict(zip(group0_ids, group0_texts)),
+            **dict(zip(group1_ids, group1_texts)),
         }
         full_results = store_someemb.similarity_search_with_score_id_by_vector(
             embedding=[1.0, 1.0],
-            k=FULL_SIZE,
+            k=full_size,
         )
         for doc, _, doc_id in full_results:
             assert doc.page_content == expected_text_by_id[doc_id]
@@ -889,16 +884,16 @@ class TestAstraDBVectorStore:
         store_someemb: AstraDBVectorStore,
     ) -> None:
         """Testing the insert-many-and-replace-some patterns thoroughly."""
-        FULL_SIZE = 300
-        FIRST_GROUP_SIZE = 150
-        SECOND_GROUP_SLICER = [30, 100, 2]
+        full_size = 300
+        first_group_size = 150
+        second_group_slicer = [30, 100, 2]
 
-        all_ids = [f"doc_{idx}" for idx in range(FULL_SIZE)]
-        all_texts = [f"document number {idx}" for idx in range(FULL_SIZE)]
+        all_ids = [f"doc_{idx}" for idx in range(full_size)]
+        all_texts = [f"document number {idx}" for idx in range(full_size)]
 
         # massive insertion on empty
-        group0_ids = all_ids[0:FIRST_GROUP_SIZE]
-        group0_texts = all_texts[0:FIRST_GROUP_SIZE]
+        group0_ids = all_ids[0:first_group_size]
+        group0_texts = all_texts[0:first_group_size]
 
         inserted_ids0 = await store_someemb.aadd_texts(
             texts=group0_texts,
@@ -907,11 +902,11 @@ class TestAstraDBVectorStore:
         assert set(inserted_ids0) == set(group0_ids)
         # massive insertion with many overwrites scattered through
         # (we change the text to later check on DB for successful update)
-        _s, _e, _st = SECOND_GROUP_SLICER
-        group1_ids = all_ids[_s:_e:_st] + all_ids[FIRST_GROUP_SIZE:FULL_SIZE]
+        _s, _e, _st = second_group_slicer
+        group1_ids = all_ids[_s:_e:_st] + all_ids[first_group_size:full_size]
         group1_texts = [
             txt.upper()
-            for txt in (all_texts[_s:_e:_st] + all_texts[FIRST_GROUP_SIZE:FULL_SIZE])
+            for txt in (all_texts[_s:_e:_st] + all_texts[first_group_size:full_size])
         ]
         inserted_ids1 = await store_someemb.aadd_texts(
             texts=group1_texts,
@@ -920,12 +915,12 @@ class TestAstraDBVectorStore:
         assert set(inserted_ids1) == set(group1_ids)
         # final read (we want the IDs to do a full check)
         expected_text_by_id = {
-            **{d_id: d_tx for d_id, d_tx in zip(group0_ids, group0_texts)},
-            **{d_id: d_tx for d_id, d_tx in zip(group1_ids, group1_texts)},
+            **dict(zip(group0_ids, group0_texts)),
+            **dict(zip(group1_ids, group1_texts)),
         }
         full_results = await store_someemb.asimilarity_search_with_score_id_by_vector(
             embedding=[1.0, 1.0],
-            k=FULL_SIZE,
+            k=full_size,
         )
         for doc, _, doc_id in full_results:
             assert doc.page_content == expected_text_by_id[doc_id]
@@ -933,24 +928,23 @@ class TestAstraDBVectorStore:
     def test_astradb_vectorstore_mmr_sync(
         self, store_parseremb: AstraDBVectorStore
     ) -> None:
-        """
-        MMR testing. We work on the unit circle with angle multiples
+        """MMR testing. We work on the unit circle with angle multiples
         of 2*pi/20 and prepare a store with known vectors for a controlled
         MMR outcome.
         """
 
-        def _v_from_i(i: int, N: int) -> str:
-            angle = 2 * math.pi * i / N
+        def _v_from_i(i: int, n: int) -> str:
+            angle = 2 * math.pi * i / n
             vector = [math.cos(angle), math.sin(angle)]
             return json.dumps(vector)
 
         i_vals = [0, 4, 5, 13]
-        N_val = 20
+        n_val = 20
         store_parseremb.add_texts(
-            [_v_from_i(i, N_val) for i in i_vals], metadatas=[{"i": i} for i in i_vals]
+            [_v_from_i(i, n_val) for i in i_vals], metadatas=[{"i": i} for i in i_vals]
         )
         res1 = store_parseremb.max_marginal_relevance_search(
-            _v_from_i(3, N_val),
+            _v_from_i(3, n_val),
             k=2,
             fetch_k=3,
         )
@@ -960,25 +954,24 @@ class TestAstraDBVectorStore:
     async def test_astradb_vectorstore_mmr_async(
         self, store_parseremb: AstraDBVectorStore
     ) -> None:
-        """
-        MMR testing. We work on the unit circle with angle multiples
+        """MMR testing. We work on the unit circle with angle multiples
         of 2*pi/20 and prepare a store with known vectors for a controlled
         MMR outcome.
         """
 
-        def _v_from_i(i: int, N: int) -> str:
-            angle = 2 * math.pi * i / N
+        def _v_from_i(i: int, n: int) -> str:
+            angle = 2 * math.pi * i / n
             vector = [math.cos(angle), math.sin(angle)]
             return json.dumps(vector)
 
         i_vals = [0, 4, 5, 13]
-        N_val = 20
+        n_val = 20
         await store_parseremb.aadd_texts(
-            [_v_from_i(i, N_val) for i in i_vals],
+            [_v_from_i(i, n_val) for i in i_vals],
             metadatas=[{"i": i} for i in i_vals],
         )
         res1 = await store_parseremb.amax_marginal_relevance_search(
-            _v_from_i(3, N_val),
+            _v_from_i(3, n_val),
             k=2,
             fetch_k=3,
         )
@@ -988,9 +981,7 @@ class TestAstraDBVectorStore:
     def test_astradb_vectorstore_mmr_vectorize_sync(
         self, vectorize_store: AstraDBVectorStore
     ) -> None:
-        """
-        MMR testing with vectorize, sync.
-        """
+        """MMR testing with vectorize, sync."""
         vectorize_store.add_texts(
             [
                 "Dog",
@@ -1007,9 +998,7 @@ class TestAstraDBVectorStore:
     async def test_astradb_vectorstore_mmr_vectorize_async(
         self, vectorize_store: AstraDBVectorStore
     ) -> None:
-        """
-        MMR async testing with vectorize, async.
-        """
+        """MMR async testing with vectorize, async."""
         await vectorize_store.aadd_texts(
             [
                 "Dog",
@@ -1120,7 +1109,8 @@ class TestAstraDBVectorStore:
         )
         scores = [sco for _, sco in res1]
         sco_near, sco_far = scores
-        assert abs(1 - sco_near) < MATCH_EPSILON and abs(sco_far) < MATCH_EPSILON
+        assert abs(1 - sco_near) < MATCH_EPSILON
+        assert abs(sco_far) < MATCH_EPSILON
 
     @pytest.mark.parametrize("vector_store", ["store_parseremb"])
     async def test_astradb_vectorstore_similarity_scale_async(
@@ -1141,7 +1131,8 @@ class TestAstraDBVectorStore:
         )
         scores = [sco for _, sco in res1]
         sco_near, sco_far = scores
-        assert abs(1 - sco_near) < MATCH_EPSILON and abs(sco_far) < MATCH_EPSILON
+        assert abs(1 - sco_near) < MATCH_EPSILON
+        assert abs(sco_far) < MATCH_EPSILON
 
     @pytest.mark.parametrize(
         "vector_store",
@@ -1157,20 +1148,20 @@ class TestAstraDBVectorStore:
     ) -> None:
         """Larger-scale bulk deletes."""
         vstore: AstraDBVectorStore = request.getfixturevalue(vector_store)
-        M = 150
-        texts = [str(i + 1 / 7.0) for i in range(2 * M)]
-        ids0 = ["doc_%i" % i for i in range(M)]
-        ids1 = ["doc_%i" % (i + M) for i in range(M)]
+        m = 150
+        texts = [str(i + 1 / 7.0) for i in range(2 * m)]
+        ids0 = ["doc_%i" % i for i in range(m)]
+        ids1 = ["doc_%i" % (i + m) for i in range(m)]
         ids = ids0 + ids1
         vstore.add_texts(texts=texts, ids=ids)
         # deleting a bunch of these
         del_res0 = vstore.delete(ids0)
         assert del_res0 is True
         # deleting the rest plus a fake one
-        del_res1 = vstore.delete(ids1 + ["ghost!"])
+        del_res1 = vstore.delete([*ids1, "ghost!"])
         assert del_res1 is True  # ensure no error
         # nothing left
-        assert vstore.similarity_search("x", k=2 * M) == []
+        assert vstore.similarity_search("x", k=2 * m) == []
 
     @pytest.mark.skipif(
         SKIP_COLLECTION_DELETE,
@@ -1179,7 +1170,7 @@ class TestAstraDBVectorStore:
     def test_astradb_vectorstore_delete_collection(
         self, astra_db_credentials: AstraDBCredentials
     ) -> None:
-        """behaviour of 'delete_collection'."""
+        """Behaviour of 'delete_collection'."""
         collection_name = COLLECTION_NAME_DIM2
         emb = SomeEmbeddings(dimension=2)
         v_store = AstraDBVectorStore(
@@ -1234,9 +1225,9 @@ class TestAstraDBVectorStore:
         )
         try:
             # add_texts
-            N = 50
-            texts = [str(i + 1 / 7.0) for i in range(N)]
-            ids = ["doc_%i" % i for i in range(N)]
+            n = 50
+            texts = [str(i + 1 / 7.0) for i in range(n)]
+            ids = ["doc_%i" % i for i in range(n)]
             v_store.add_texts(texts=texts, ids=ids)
             v_store.add_texts(
                 texts=texts,
@@ -1245,10 +1236,8 @@ class TestAstraDBVectorStore:
                 batch_concurrency=7,
                 overwrite_concurrency=13,
             )
-            #
-            _ = v_store.delete(ids[: N // 2])
-            _ = v_store.delete(ids[N // 2 :], concurrency=23)
-            #
+            _ = v_store.delete(ids[: n // 2])
+            _ = v_store.delete(ids[n // 2 :], concurrency=23)
         finally:
             if not SKIP_COLLECTION_DELETE:
                 v_store.delete_collection()
@@ -1274,9 +1263,9 @@ class TestAstraDBVectorStore:
         )
         try:
             # add_texts
-            N = 50
-            texts = [str(i + 1 / 7.0) for i in range(N)]
-            ids = ["doc_%i" % i for i in range(N)]
+            n = 50
+            texts = [str(i + 1 / 7.0) for i in range(n)]
+            ids = ["doc_%i" % i for i in range(n)]
             await v_store.aadd_texts(texts=texts, ids=ids)
             await v_store.aadd_texts(
                 texts=texts,
@@ -1285,10 +1274,8 @@ class TestAstraDBVectorStore:
                 batch_concurrency=7,
                 overwrite_concurrency=13,
             )
-            #
-            await v_store.adelete(ids[: N // 2])
-            await v_store.adelete(ids[N // 2 :], concurrency=23)
-            #
+            await v_store.adelete(ids[: n // 2])
+            await v_store.adelete(ids[n // 2 :], concurrency=23)
         finally:
             if not SKIP_COLLECTION_DELETE:
                 await v_store.adelete_collection()
@@ -1298,8 +1285,7 @@ class TestAstraDBVectorStore:
     def test_astradb_vectorstore_metrics(
         self, astra_db_credentials: AstraDBCredentials
     ) -> None:
-        """
-        Different choices of similarity metric.
+        """Different choices of similarity metric.
         Both stores (with "cosine" and "euclidea" metrics) contain these two:
             - a vector slightly rotated w.r.t query vector
             - a vector which is a long multiple of query vector
@@ -1392,11 +1378,10 @@ class TestAstraDBVectorStore:
 
     def test_astradb_vectorstore_indexing_sync(
         self,
-        astra_db_credentials: Dict[str, Optional[str]],
+        astra_db_credentials: dict[str, str | None],
         database: Database,
     ) -> None:
-        """
-        Test that the right errors/warnings are issued depending
+        """Test that the right errors/warnings are issued depending
         on the compatibility of on-DB indexing settings and the requested ones.
 
         We do NOT check for substrings in the warning messages: that would
@@ -1508,11 +1493,10 @@ class TestAstraDBVectorStore:
 
     async def test_astradb_vectorstore_indexing_async(
         self,
-        astra_db_credentials: Dict[str, Optional[str]],
+        astra_db_credentials: dict[str, str | None],
         database: Database,
     ) -> None:
-        """
-        Async version of the same test on warnings/errors related
+        """Async version of the same test on warnings/errors related
         to incompatible indexing choices.
         """
         embe = SomeEmbeddings(dimension=2)
@@ -1603,17 +1587,17 @@ class TestAstraDBVectorStore:
             )
             await cus_store.aadd_texts(["Not working."])
 
+        leg_store = AstraDBVectorStore(
+            collection_name="lc_legacy_coll",
+            embedding=embe,
+            token=astra_db_credentials["token"],
+            api_endpoint=astra_db_credentials["api_endpoint"],
+            namespace=astra_db_credentials["namespace"],
+            environment=astra_db_credentials["environment"],
+            metadata_indexing_exclude={"long_summary", "the_divine_comedy"},
+            setup_mode=SetupMode.ASYNC,
+        )
         with pytest.raises(ValueError):
-            leg_store = AstraDBVectorStore(
-                collection_name="lc_legacy_coll",
-                embedding=embe,
-                token=astra_db_credentials["token"],
-                api_endpoint=astra_db_credentials["api_endpoint"],
-                namespace=astra_db_credentials["namespace"],
-                environment=astra_db_credentials["environment"],
-                metadata_indexing_exclude={"long_summary", "the_divine_comedy"},
-                setup_mode=SetupMode.ASYNC,
-            )
             await leg_store.aadd_texts(["Not working."])
 
         # one case should result in just a warning:
@@ -1646,11 +1630,10 @@ class TestAstraDBVectorStore:
     )
     def test_astradb_vectorstore_coreclients_init_sync(
         self,
-        astra_db_credentials: Dict[str, Optional[str]],
+        astra_db_credentials: dict[str, str | None],
         core_astra_db: AstraDB,
     ) -> None:
         """A deprecation warning from passing a (core) AstraDB, but it works."""
-
         collection_name = "lc_test_vstore_coreclsync"
         emb = SomeEmbeddings(dimension=2)
 
@@ -1672,7 +1655,13 @@ class TestAstraDBVectorStore:
                 )
 
             results = v_store_init_core.similarity_search("another", k=1)
-            assert len(rec_warnings) == 1
+            # cleaning out 'spurious' "unclosed socket/transport..." warnings
+            f_rec_warnings = [
+                wrn
+                for wrn in rec_warnings
+                if not issubclass(wrn.category, ResourceWarning)
+            ]
+            assert len(f_rec_warnings) == 1
             assert len(results) == 1
             assert results[0].page_content == "One text"
         finally:
@@ -1687,11 +1676,10 @@ class TestAstraDBVectorStore:
     )
     async def test_astradb_vectorstore_coreclients_init_async(
         self,
-        astra_db_credentials: Dict[str, Optional[str]],
+        astra_db_credentials: dict[str, str | None],
         core_astra_db: AstraDB,
     ) -> None:
         """A deprecation warning from passing a (core) AstraDB, but it works."""
-
         collection_name = "lc_test_vstore_coreclasync"
         emb = SomeEmbeddings(dimension=2)
 

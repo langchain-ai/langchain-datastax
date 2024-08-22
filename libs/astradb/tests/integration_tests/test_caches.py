@@ -1,5 +1,4 @@
-"""
-Test AstraDB caches. Requires an Astra DB vector instance.
+"""Test AstraDB caches. Requires an Astra DB vector instance.
 
 Required to run this test:
     - a recent `astrapy` Python package available
@@ -11,44 +10,55 @@ Required to run this test:
         export ASTRA_DB_KEYSPACE="my_keyspace"
 """
 
+from __future__ import annotations
+
 import os
-from typing import Any, AsyncIterator, Dict, Iterator, List, Mapping, Optional, cast
+from typing import TYPE_CHECKING, Any, AsyncIterator, Iterator, Mapping, Optional, cast
 
 import pytest
-from astrapy.db import AstraDB
-from langchain_core.caches import BaseCache
-from langchain_core.callbacks import CallbackManagerForLLMRun
 from langchain_core.embeddings import Embeddings
 from langchain_core.globals import get_llm_cache, set_llm_cache
 from langchain_core.language_models import LLM
 from langchain_core.outputs import Generation, LLMResult
 from langchain_core.pydantic_v1 import validator
+from typing_extensions import override
 
 from langchain_astradb import AstraDBCache, AstraDBSemanticCache
 from langchain_astradb.utils.astradb import SetupMode
 
 from .conftest import AstraDBCredentials, _has_env_vars
 
+if TYPE_CHECKING:
+    from astrapy.db import AstraDB
+    from langchain_core.caches import BaseCache
+    from langchain_core.callbacks import CallbackManagerForLLMRun
+
 
 class FakeEmbeddings(Embeddings):
     """Fake embeddings functionality for testing."""
 
-    def embed_documents(self, texts: List[str]) -> List[List[float]]:
+    @override
+    def embed_documents(self, texts: list[str]) -> list[list[float]]:
         """Return simple embeddings.
-        Embeddings encode each text as its index."""
-        return [[float(1.0)] * 9 + [float(i)] for i in range(len(texts))]
+        Embeddings encode each text as its index.
+        """
+        return [[1.0] * 9 + [float(i)] for i in range(len(texts))]
 
-    async def aembed_documents(self, texts: List[str]) -> List[List[float]]:
+    @override
+    async def aembed_documents(self, texts: list[str]) -> list[list[float]]:
         return self.embed_documents(texts)
 
-    def embed_query(self, text: str) -> List[float]:
+    @override
+    def embed_query(self, text: str) -> list[float]:
         """Return constant query embeddings.
         Embeddings are identical to embed_documents(texts)[0].
         Distance to each text will be that text's index,
-        as it was passed to embed_documents."""
-        return [float(1.0)] * 9 + [float(0.0)]
+        as it was passed to embed_documents.
+        """
+        return [1.0] * 9 + [0.0]
 
-    async def aembed_query(self, text: str) -> List[float]:
+    @override
+    async def aembed_query(self, text: str) -> list[float]:
         return self.embed_query(text)
 
 
@@ -61,41 +71,42 @@ class FakeLLM(LLM):
 
     @validator("queries", always=True)
     def check_queries_required(
-        cls, queries: Optional[Mapping], values: Mapping[str, Any]
-    ) -> Optional[Mapping]:
+        cls, queries: Mapping | None, values: Mapping[str, Any]
+    ) -> Mapping | None:
         if values.get("sequential_response") and not queries:
             raise ValueError(
                 "queries is required when sequential_response is set to True"
             )
         return queries
 
+    @override
     def get_num_tokens(self, text: str) -> int:
         """Return number of tokens."""
         return len(text.split())
 
     @property
+    @override
     def _llm_type(self) -> str:
         """Return type of llm."""
         return "fake"
 
+    @override
     def _call(
         self,
         prompt: str,
-        stop: Optional[List[str]] = None,
-        run_manager: Optional[CallbackManagerForLLMRun] = None,
+        stop: list[str] | None = None,
+        run_manager: CallbackManagerForLLMRun | None = None,
         **kwargs: Any,
     ) -> str:
         if self.sequential_responses:
             return self._get_next_response_in_sequence
         if self.queries is not None:
             return self.queries[prompt]
-        if stop is None:
-            return "foo"
-        else:
-            return "bar"
+        return "foo" if stop is None else "bar"
 
     @property
-    def _identifying_params(self) -> Dict[str, Any]:
+    @override
+    def _identifying_params(self) -> dict[str, Any]:
         return {}
 
     @property
@@ -119,7 +130,7 @@ def astradb_cache(astra_db_credentials: AstraDBCredentials) -> Iterator[AstraDBC
     cache.collection.drop()
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture()
 async def async_astradb_cache(
     astra_db_credentials: AstraDBCredentials,
 ) -> AsyncIterator[AstraDBCache]:
@@ -152,7 +163,7 @@ def astradb_semantic_cache(
     sem_cache.collection.drop()
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture()
 async def async_astradb_semantic_cache(
     astra_db_credentials: AstraDBCredentials,
 ) -> AsyncIterator[AstraDBSemanticCache]:
@@ -207,7 +218,7 @@ class TestAstraDBCaches:
         set_llm_cache(cache)
         params = llm.dict()
         params["stop"] = None
-        llm_string = str(sorted([(k, v) for k, v in params.items()]))
+        llm_string = str(sorted(params.items()))
         get_llm_cache().update("foo", llm_string, [Generation(text="fizz")])
         output = llm.generate([prompt])
         expected_output = LLMResult(
@@ -223,7 +234,7 @@ class TestAstraDBCaches:
         set_llm_cache(cache)
         params = llm.dict()
         params["stop"] = None
-        llm_string = str(sorted([(k, v) for k, v in params.items()]))
+        llm_string = str(sorted(params.items()))
         await get_llm_cache().aupdate("foo", llm_string, [Generation(text="fizz")])
         output = await llm.agenerate([prompt])
         expected_output = LLMResult(

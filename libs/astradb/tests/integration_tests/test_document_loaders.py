@@ -1,5 +1,4 @@
-"""
-Test of Astra DB document loader class `AstraDBLoader`
+"""Test of Astra DB document loader class `AstraDBLoader`
 
 Required to run this test:
     - a recent `astrapy` Python package available
@@ -10,23 +9,26 @@ Required to run this test:
     - optionally this as well (otherwise defaults are used):
         export ASTRA_DB_KEYSPACE="my_keyspace"
 """
+
 from __future__ import annotations
 
 import json
 import os
 import uuid
-from typing import AsyncIterator, Iterator
+from typing import TYPE_CHECKING, AsyncIterator, Iterator
 
 import pytest
-from astrapy import AsyncCollection, Collection, Database
-from astrapy.db import AstraDB
 
 from langchain_astradb import AstraDBLoader
 
 from .conftest import AstraDBCredentials, _has_env_vars
 
+if TYPE_CHECKING:
+    from astrapy import AsyncCollection, Collection, Database
+    from astrapy.db import AstraDB
 
-@pytest.fixture
+
+@pytest.fixture()
 def collection(database: Database) -> Iterator[Collection]:
     collection_name = f"lc_test_loader_{str(uuid.uuid4()).split('-')[0]}"
     collection = database.create_collection(collection_name)
@@ -40,7 +42,7 @@ def collection(database: Database) -> Iterator[Collection]:
     collection.drop()
 
 
-@pytest.fixture
+@pytest.fixture()
 async def async_collection(database: Database) -> AsyncIterator[AsyncCollection]:
     adatabase = database.to_async()
     collection_name = f"lc_test_loader_{str(uuid.uuid4()).split('-')[0]}"
@@ -63,7 +65,7 @@ class TestAstraDB:
         collection: Collection,
         astra_db_credentials: AstraDBCredentials,
     ) -> None:
-        """using 'prefetched' should give a warning but work nonetheless."""
+        """Using 'prefetched' should give a warning but work nonetheless."""
         with pytest.warns(UserWarning) as rec_warnings:
             loader = AstraDBLoader(
                 collection.name,
@@ -157,7 +159,7 @@ class TestAstraDB:
         async_collection: AsyncCollection,
         astra_db_credentials: AstraDBCredentials,
     ) -> None:
-        """using 'prefetched' should give a warning but work nonetheless."""
+        """Using 'prefetched' should give a warning but work nonetheless."""
         with pytest.warns(UserWarning) as rec_warnings:
             loader = AstraDBLoader(
                 async_collection.name,

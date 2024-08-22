@@ -10,11 +10,12 @@ from langchain_astradb.utils.astradb import (
     _AstraDBEnvironment,
 )
 
+FAKE_TOKEN = "t"  # noqa: S105
+
 
 class TestAstraDBEnvironment:
     def test_initialization(self) -> None:
         """Test the various ways to initialize the environment."""
-
         a_e_string = (
             "https://01234567-89ab-cdef-0123-456789abcdef-us-east1"
             ".apps.astra.datastax.com"
@@ -24,29 +25,29 @@ class TestAstraDBEnvironment:
             ".apps.astra.datastax.com"
         )
         mock_astra_db = AstraDB(
-            token="t",
+            token=FAKE_TOKEN,
             api_endpoint=a_e_string,
             namespace="n",
         )
 
-        ENV_VARS_TO_RESTORE = {}
+        env_vars_to_restore = {}
         try:
             # clean environment
             if TOKEN_ENV_VAR in os.environ:
-                ENV_VARS_TO_RESTORE[TOKEN_ENV_VAR] = os.environ[TOKEN_ENV_VAR]
+                env_vars_to_restore[TOKEN_ENV_VAR] = os.environ[TOKEN_ENV_VAR]
                 del os.environ[TOKEN_ENV_VAR]
             if API_ENDPOINT_ENV_VAR in os.environ:
-                ENV_VARS_TO_RESTORE[API_ENDPOINT_ENV_VAR] = os.environ[
+                env_vars_to_restore[API_ENDPOINT_ENV_VAR] = os.environ[
                     API_ENDPOINT_ENV_VAR
                 ]
                 del os.environ[API_ENDPOINT_ENV_VAR]
             if NAMESPACE_ENV_VAR in os.environ:
-                ENV_VARS_TO_RESTORE[NAMESPACE_ENV_VAR] = os.environ[NAMESPACE_ENV_VAR]
+                env_vars_to_restore[NAMESPACE_ENV_VAR] = os.environ[NAMESPACE_ENV_VAR]
                 del os.environ[NAMESPACE_ENV_VAR]
 
             # token+endpoint
             env1 = _AstraDBEnvironment(
-                token="t",
+                token=FAKE_TOKEN,
                 api_endpoint=a_e_string,
                 namespace="n",
             )
@@ -62,13 +63,13 @@ class TestAstraDBEnvironment:
             # token+endpoint, but also a ready-made client
             with pytest.raises(ValueError):
                 _AstraDBEnvironment(
-                    token="t",
+                    token=FAKE_TOKEN,
                     api_endpoint=a_e_string,
                     astra_db_client=mock_astra_db,
                 )
             with pytest.raises(ValueError):
                 _AstraDBEnvironment(
-                    token="t",
+                    token=FAKE_TOKEN,
                     api_endpoint=a_e_string,
                     async_astra_db_client=mock_astra_db.to_async(),
                 )
@@ -76,7 +77,7 @@ class TestAstraDBEnvironment:
             # just tokenn, no endpoint
             with pytest.raises(ValueError):
                 _AstraDBEnvironment(
-                    token="t",
+                    token=FAKE_TOKEN,
                 )
 
             # just client(s)
@@ -96,41 +97,38 @@ class TestAstraDBEnvironment:
                 )
 
             # both sync and async, but mismatching in various ways
-            with pytest.raises(ValueError):
-                with pytest.warns(DeprecationWarning):
-                    _AstraDBEnvironment(
-                        async_astra_db_client=mock_astra_db.to_async(),
-                        astra_db_client=AstraDB(
-                            token="t",
-                            api_endpoint=a_e_string_2,
-                            namespace="n",
-                        ),
-                    )
-            with pytest.raises(ValueError):
-                with pytest.warns(DeprecationWarning):
-                    _AstraDBEnvironment(
-                        async_astra_db_client=mock_astra_db.to_async(),
-                        astra_db_client=AstraDB(
-                            token="t",
-                            api_endpoint=a_e_string,
-                            namespace="n2",
-                        ),
-                    )
-            with pytest.raises(ValueError):
-                with pytest.warns(DeprecationWarning):
-                    _AstraDBEnvironment(
-                        async_astra_db_client=mock_astra_db.to_async(),
-                        astra_db_client=AstraDB(
-                            token="t2",
-                            api_endpoint=a_e_string,
-                            namespace="n",
-                        ),
-                    )
+            with pytest.raises(ValueError), pytest.warns(DeprecationWarning):
+                _AstraDBEnvironment(
+                    async_astra_db_client=mock_astra_db.to_async(),
+                    astra_db_client=AstraDB(
+                        token=FAKE_TOKEN,
+                        api_endpoint=a_e_string_2,
+                        namespace="n",
+                    ),
+                )
+            with pytest.raises(ValueError), pytest.warns(DeprecationWarning):
+                _AstraDBEnvironment(
+                    async_astra_db_client=mock_astra_db.to_async(),
+                    astra_db_client=AstraDB(
+                        token=FAKE_TOKEN,
+                        api_endpoint=a_e_string,
+                        namespace="n2",
+                    ),
+                )
+            with pytest.raises(ValueError), pytest.warns(DeprecationWarning):
+                _AstraDBEnvironment(
+                    async_astra_db_client=mock_astra_db.to_async(),
+                    astra_db_client=AstraDB(
+                        token="t2",  # noqa: S106
+                        api_endpoint=a_e_string,
+                        namespace="n",
+                    ),
+                )
 
             # token+client
             with pytest.raises(ValueError):
                 _AstraDBEnvironment(
-                    token="t",
+                    token=FAKE_TOKEN,
                     astra_db_client=mock_astra_db,
                 )
             # endpoint+client
@@ -154,7 +152,7 @@ class TestAstraDBEnvironment:
             # endpoint via environment variable:
             os.environ[API_ENDPOINT_ENV_VAR] = a_e_string
             env5 = _AstraDBEnvironment(
-                token="t",
+                token=FAKE_TOKEN,
                 namespace="n",
             )
             del os.environ[API_ENDPOINT_ENV_VAR]
@@ -163,7 +161,7 @@ class TestAstraDBEnvironment:
             assert env1.async_database == env5.async_database
 
             # both and also namespace via env vars
-            os.environ[TOKEN_ENV_VAR] = "t"
+            os.environ[TOKEN_ENV_VAR] = FAKE_TOKEN
             os.environ[API_ENDPOINT_ENV_VAR] = a_e_string
             os.environ[NAMESPACE_ENV_VAR] = "n"
             env6 = _AstraDBEnvironment()
@@ -203,7 +201,7 @@ class TestAstraDBEnvironment:
 
             # env. vars do not interfere if parameters passed
             env8 = _AstraDBEnvironment(
-                token="t",
+                token=FAKE_TOKEN,
                 api_endpoint=a_e_string,
                 namespace="n",
             )
@@ -219,5 +217,5 @@ class TestAstraDBEnvironment:
                 del os.environ[API_ENDPOINT_ENV_VAR]
             if NAMESPACE_ENV_VAR in os.environ:
                 del os.environ[NAMESPACE_ENV_VAR]
-            for ENV_VAR_NAME, ENV_VAR_VALUE in ENV_VARS_TO_RESTORE.items():
-                os.environ[ENV_VAR_NAME] = ENV_VAR_VALUE
+            for env_var_name, env_var_value in env_vars_to_restore.items():
+                os.environ[env_var_name] = env_var_value

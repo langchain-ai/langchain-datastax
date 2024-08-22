@@ -5,24 +5,18 @@ import base64
 from abc import ABC, abstractmethod
 from concurrent.futures import ThreadPoolExecutor
 from typing import (
+    TYPE_CHECKING,
     Any,
     AsyncIterator,
-    Dict,
     Generic,
     Iterator,
-    List,
-    Optional,
     Sequence,
-    Tuple,
     TypeVar,
-    Union,
 )
 
-from astrapy.authentication import TokenProvider
-from astrapy.db import AstraDB, AsyncAstraDB
 from astrapy.exceptions import InsertManyException
-from astrapy.results import UpdateResult
 from langchain_core.stores import BaseStore, ByteStore
+from typing_extensions import override
 
 from langchain_astradb.utils.astradb import (
     MAX_CONCURRENT_DOCUMENT_INSERTIONS,
@@ -30,6 +24,11 @@ from langchain_astradb.utils.astradb import (
     SetupMode,
     _AstraDBCollectionEnvironment,
 )
+
+if TYPE_CHECKING:
+    from astrapy.authentication import TokenProvider
+    from astrapy.db import AstraDB, AsyncAstraDB
+    from astrapy.results import UpdateResult
 
 V = TypeVar("V")
 
@@ -56,14 +55,15 @@ class AstraDBBaseStore(Generic[V], BaseStore[str, V], ABC):
         self.async_collection = self.astra_env.async_collection
 
     @abstractmethod
-    def decode_value(self, value: Any) -> Optional[V]:
-        """Decodes value from Astra DB"""
+    def decode_value(self, value: Any) -> V | None:
+        """Decodes value from Astra DB."""
 
     @abstractmethod
-    def encode_value(self, value: Optional[V]) -> Any:
-        """Encodes value for Astra DB"""
+    def encode_value(self, value: V | None) -> Any:
+        """Encodes value for Astra DB."""
 
-    def mget(self, keys: Sequence[str]) -> List[Optional[V]]:
+    @override
+    def mget(self, keys: Sequence[str]) -> list[V | None]:
         self.astra_env.ensure_db_setup()
         docs_dict = {}
         for doc in self.collection.find(
@@ -73,7 +73,8 @@ class AstraDBBaseStore(Generic[V], BaseStore[str, V], ABC):
             docs_dict[doc["_id"]] = doc.get("value")
         return [self.decode_value(docs_dict.get(key)) for key in keys]
 
-    async def amget(self, keys: Sequence[str]) -> List[Optional[V]]:
+    @override
+    async def amget(self, keys: Sequence[str]) -> list[V | None]:
         await self.astra_env.aensure_db_setup()
         docs_dict = {}
         async for doc in self.async_collection.find(
@@ -83,13 +84,14 @@ class AstraDBBaseStore(Generic[V], BaseStore[str, V], ABC):
             docs_dict[doc["_id"]] = doc.get("value")
         return [self.decode_value(docs_dict.get(key)) for key in keys]
 
-    def mset(self, key_value_pairs: Sequence[Tuple[str, V]]) -> None:
+    @override
+    def mset(self, key_value_pairs: Sequence[tuple[str, V]]) -> None:
         self.astra_env.ensure_db_setup()
         documents_to_insert = [
             {"_id": k, "value": self.encode_value(v)} for k, v in key_value_pairs
         ]
         # perform an AstraPy insert_many, catching exceptions for overwriting docs
-        ids_to_replace: List[int]
+        ids_to_replace: list[int]
         try:
             self.collection.insert_many(
                 documents_to_insert,
@@ -117,7 +119,7 @@ class AstraDBBaseStore(Generic[V], BaseStore[str, V], ABC):
                 max_workers=MAX_CONCURRENT_DOCUMENT_REPLACEMENTS
             ) as executor:
 
-                def _replace_document(document: Dict[str, Any]) -> UpdateResult:
+                def _replace_document(document: dict[str, Any]) -> UpdateResult:
                     return self.collection.replace_one(
                         {"_id": document["_id"]},
                         document,
@@ -138,13 +140,14 @@ class AstraDBBaseStore(Generic[V], BaseStore[str, V], ABC):
                     f"documents ({missing} failed replace_one calls)"
                 )
 
-    async def amset(self, key_value_pairs: Sequence[Tuple[str, V]]) -> None:
+    @override
+    async def amset(self, key_value_pairs: Sequence[tuple[str, V]]) -> None:
         await self.astra_env.aensure_db_setup()
         documents_to_insert = [
             {"_id": k, "value": self.encode_value(v)} for k, v in key_value_pairs
         ]
         # perform an AstraPy insert_many, catching exceptions for overwriting docs
-        ids_to_replace: List[int]
+        ids_to_replace: list[int]
         try:
             await self.async_collection.insert_many(
                 documents_to_insert,
@@ -171,7 +174,7 @@ class AstraDBBaseStore(Generic[V], BaseStore[str, V], ABC):
 
             _async_collection = self.async_collection
 
-            async def _replace_document(document: Dict[str, Any]) -> UpdateResult:
+            async def _replace_document(document: dict[str, Any]) -> UpdateResult:
                 async with sem:
                     return await _async_collection.replace_one(
                         {"_id": document["_id"]},
@@ -193,15 +196,18 @@ class AstraDBBaseStore(Generic[V], BaseStore[str, V], ABC):
                     f"documents ({missing} failed replace_one calls)"
                 )
 
+    @override
     def mdelete(self, keys: Sequence[str]) -> None:
         self.astra_env.ensure_db_setup()
         self.collection.delete_many(filter={"_id": {"$in": list(keys)}})
 
+    @override
     async def amdelete(self, keys: Sequence[str]) -> None:
         await self.astra_env.aensure_db_setup()
         await self.async_collection.delete_many(filter={"_id": {"$in": list(keys)}})
 
-    def yield_keys(self, *, prefix: Optional[str] = None) -> Iterator[str]:
+    @override
+    def yield_keys(self, *, prefix: str | None = None) -> Iterator[str]:
         self.astra_env.ensure_db_setup()
         docs = self.collection.find()
         for doc in docs:
@@ -209,7 +215,8 @@ class AstraDBBaseStore(Generic[V], BaseStore[str, V], ABC):
             if not prefix or key.startswith(prefix):
                 yield key
 
-    async def ayield_keys(self, *, prefix: Optional[str] = None) -> AsyncIterator[str]:
+    @override
+    async def ayield_keys(self, *, prefix: str | None = None) -> AsyncIterator[str]:
         await self.astra_env.aensure_db_setup()
         async for doc in self.async_collection.find():
             key = doc["_id"]
@@ -222,12 +229,12 @@ class AstraDBStore(AstraDBBaseStore[Any]):
         self,
         collection_name: str,
         *,
-        token: Optional[Union[str, TokenProvider]] = None,
-        api_endpoint: Optional[str] = None,
-        environment: Optional[str] = None,
-        astra_db_client: Optional[AstraDB] = None,
-        namespace: Optional[str] = None,
-        async_astra_db_client: Optional[AsyncAstraDB] = None,
+        token: str | TokenProvider | None = None,
+        api_endpoint: str | None = None,
+        environment: str | None = None,
+        astra_db_client: AstraDB | None = None,
+        namespace: str | None = None,
+        async_astra_db_client: AsyncAstraDB | None = None,
         pre_delete_collection: bool = False,
         setup_mode: SetupMode = SetupMode.SYNC,
     ) -> None:
@@ -287,9 +294,11 @@ class AstraDBStore(AstraDBBaseStore[Any]):
             pre_delete_collection=pre_delete_collection,
         )
 
+    @override
     def decode_value(self, value: Any) -> Any:
         return value
 
+    @override
     def encode_value(self, value: Any) -> Any:
         return value
 
@@ -299,12 +308,12 @@ class AstraDBByteStore(AstraDBBaseStore[bytes], ByteStore):
         self,
         *,
         collection_name: str,
-        token: Optional[Union[str, TokenProvider]] = None,
-        api_endpoint: Optional[str] = None,
-        environment: Optional[str] = None,
-        astra_db_client: Optional[AstraDB] = None,
-        namespace: Optional[str] = None,
-        async_astra_db_client: Optional[AsyncAstraDB] = None,
+        token: str | TokenProvider | None = None,
+        api_endpoint: str | None = None,
+        environment: str | None = None,
+        astra_db_client: AstraDB | None = None,
+        namespace: str | None = None,
+        async_astra_db_client: AsyncAstraDB | None = None,
         pre_delete_collection: bool = False,
         setup_mode: SetupMode = SetupMode.SYNC,
     ) -> None:
@@ -362,12 +371,14 @@ class AstraDBByteStore(AstraDBBaseStore[bytes], ByteStore):
             pre_delete_collection=pre_delete_collection,
         )
 
-    def decode_value(self, value: Any) -> Optional[bytes]:
+    @override
+    def decode_value(self, value: Any) -> bytes | None:
         if value is None:
             return None
         return base64.b64decode(value)
 
-    def encode_value(self, value: Optional[bytes]) -> Any:
+    @override
+    def encode_value(self, value: bytes | None) -> Any:
         if value is None:
             return None
         return base64.b64encode(value).decode("ascii")

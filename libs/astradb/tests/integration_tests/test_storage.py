@@ -1,21 +1,24 @@
 """Implement integration tests for AstraDB storage."""
+
 from __future__ import annotations
 
 import os
-from typing import Dict, Optional
+from typing import TYPE_CHECKING
 
 import pytest
-from astrapy import Database
-from astrapy.db import AstraDB
 
 from langchain_astradb.storage import AstraDBByteStore, AstraDBStore
 from langchain_astradb.utils.astradb import SetupMode
 
 from .conftest import _has_env_vars
 
+if TYPE_CHECKING:
+    from astrapy import Database
+    from astrapy.db import AstraDB
+
 
 def init_store(
-    astra_db_credentials: Dict[str, Optional[str]],
+    astra_db_credentials: dict[str, str | None],
     collection_name: str,
 ) -> AstraDBStore:
     store = AstraDBStore(
@@ -30,7 +33,7 @@ def init_store(
 
 
 def init_bytestore(
-    astra_db_credentials: Dict[str, Optional[str]],
+    astra_db_credentials: dict[str, str | None],
     collection_name: str,
 ) -> AstraDBByteStore:
     store = AstraDBByteStore(
@@ -45,7 +48,7 @@ def init_bytestore(
 
 
 async def init_async_store(
-    astra_db_credentials: Dict[str, Optional[str]], collection_name: str
+    astra_db_credentials: dict[str, str | None], collection_name: str
 ) -> AstraDBStore:
     store = AstraDBStore(
         collection_name=collection_name,
@@ -63,7 +66,7 @@ async def init_async_store(
 class TestAstraDBStore:
     def test_mget(
         self,
-        astra_db_credentials: Dict[str, Optional[str]],
+        astra_db_credentials: dict[str, str | None],
     ) -> None:
         """Test AstraDBStore mget method."""
         collection_name = "lc_test_store_mget"
@@ -75,7 +78,7 @@ class TestAstraDBStore:
 
     async def test_amget(
         self,
-        astra_db_credentials: Dict[str, Optional[str]],
+        astra_db_credentials: dict[str, str | None],
     ) -> None:
         """Test AstraDBStore amget method."""
         collection_name = "lc_test_store_mget"
@@ -87,7 +90,7 @@ class TestAstraDBStore:
 
     def test_mset(
         self,
-        astra_db_credentials: Dict[str, Optional[str]],
+        astra_db_credentials: dict[str, str | None],
     ) -> None:
         """Test that multiple keys can be set with AstraDBStore."""
         collection_name = "lc_test_store_mset"
@@ -102,7 +105,7 @@ class TestAstraDBStore:
 
     async def test_amset(
         self,
-        astra_db_credentials: Dict[str, Optional[str]],
+        astra_db_credentials: dict[str, str | None],
     ) -> None:
         """Test that multiple keys can be set with AstraDBStore."""
         collection_name = "lc_test_store_mset"
@@ -117,13 +120,13 @@ class TestAstraDBStore:
 
     def test_store_massive_mset_with_replace(
         self,
-        astra_db_credentials: Dict[str, Optional[str]],
+        astra_db_credentials: dict[str, str | None],
     ) -> None:
         """Testing the insert-many-and-replace-some patterns thoroughly."""
-        FULL_SIZE = 300
-        FIRST_GROUP_SIZE = 150
-        SECOND_GROUP_SLICER = [30, 100, 2]
-        MAX_VALUES_IN_IN = 100
+        full_size = 300
+        first_group_size = 150
+        second_group_slicer = [30, 100, 2]
+        max_values_in_in = 100
         collection_name = "lc_test_store_massive_mset"
 
         ids_and_texts = [
@@ -131,7 +134,7 @@ class TestAstraDBStore:
                 f"doc_{idx}",
                 f"document number {idx}",
             )
-            for idx in range(FULL_SIZE)
+            for idx in range(full_size)
         ]
         try:
             store = AstraDBStore(
@@ -143,17 +146,17 @@ class TestAstraDBStore:
             )
 
             # massive insertion on empty (zip and rezip for uniformity with later)
-            group0_ids, group0_texts = list(zip(*ids_and_texts[0:FIRST_GROUP_SIZE]))
+            group0_ids, group0_texts = list(zip(*ids_and_texts[0:first_group_size]))
             store.mset(list(zip(group0_ids, group0_texts)))
 
             # massive insertion with many overwrites scattered through
             # (we change the text to later check on DB for successful update)
-            _s, _e, _st = SECOND_GROUP_SLICER
+            _s, _e, _st = second_group_slicer
             group1_ids, group1_texts_pre = list(
                 zip(
                     *(
                         ids_and_texts[_s:_e:_st]
-                        + ids_and_texts[FIRST_GROUP_SIZE:FULL_SIZE]
+                        + ids_and_texts[first_group_size:full_size]
                     )
                 )
             )
@@ -162,16 +165,16 @@ class TestAstraDBStore:
 
             # final read (we want the IDs to do a full check)
             expected_text_by_id = {
-                **{d_id: d_tx for d_id, d_tx in zip(group0_ids, group0_texts)},
-                **{d_id: d_tx for d_id, d_tx in zip(group1_ids, group1_texts)},
+                **dict(zip(group0_ids, group0_texts)),
+                **dict(zip(group1_ids, group1_texts)),
             }
             all_ids = [doc_id for doc_id, _ in ids_and_texts]
-            # The Data API can handle at most MAX_VALUES_IN_IN entries, let's chunk
+            # The Data API can handle at most max_values_in_in entries, let's chunk
             all_vals = [
                 val
-                for chunk_start in range(0, FULL_SIZE, MAX_VALUES_IN_IN)
+                for chunk_start in range(0, full_size, max_values_in_in)
                 for val in store.mget(
-                    all_ids[chunk_start : chunk_start + MAX_VALUES_IN_IN]
+                    all_ids[chunk_start : chunk_start + max_values_in_in]
                 )
             ]
             for val, doc_id in zip(all_vals, all_ids):
@@ -181,13 +184,13 @@ class TestAstraDBStore:
 
     async def test_store_massive_amset_with_replace(
         self,
-        astra_db_credentials: Dict[str, Optional[str]],
+        astra_db_credentials: dict[str, str | None],
     ) -> None:
         """Testing the insert-many-and-replace-some patterns thoroughly."""
-        FULL_SIZE = 300
-        FIRST_GROUP_SIZE = 150
-        SECOND_GROUP_SLICER = [30, 100, 2]
-        MAX_VALUES_IN_IN = 100
+        full_size = 300
+        first_group_size = 150
+        second_group_slicer = [30, 100, 2]
+        max_values_in_in = 100
         collection_name = "lc_test_store_massive_amset"
 
         ids_and_texts = [
@@ -195,7 +198,7 @@ class TestAstraDBStore:
                 f"doc_{idx}",
                 f"document number {idx}",
             )
-            for idx in range(FULL_SIZE)
+            for idx in range(full_size)
         ]
 
         try:
@@ -208,17 +211,17 @@ class TestAstraDBStore:
             )
 
             # massive insertion on empty (zip and rezip for uniformity with later)
-            group0_ids, group0_texts = list(zip(*ids_and_texts[0:FIRST_GROUP_SIZE]))
+            group0_ids, group0_texts = list(zip(*ids_and_texts[0:first_group_size]))
             await store.amset(list(zip(group0_ids, group0_texts)))
 
             # massive insertion with many overwrites scattered through
             # (we change the text to later check on DB for successful update)
-            _s, _e, _st = SECOND_GROUP_SLICER
+            _s, _e, _st = second_group_slicer
             group1_ids, group1_texts_pre = list(
                 zip(
                     *(
                         ids_and_texts[_s:_e:_st]
-                        + ids_and_texts[FIRST_GROUP_SIZE:FULL_SIZE]
+                        + ids_and_texts[first_group_size:full_size]
                     )
                 )
             )
@@ -227,16 +230,16 @@ class TestAstraDBStore:
 
             # final read (we want the IDs to do a full check)
             expected_text_by_id = {
-                **{d_id: d_tx for d_id, d_tx in zip(group0_ids, group0_texts)},
-                **{d_id: d_tx for d_id, d_tx in zip(group1_ids, group1_texts)},
+                **dict(zip(group0_ids, group0_texts)),
+                **dict(zip(group1_ids, group1_texts)),
             }
             all_ids = [doc_id for doc_id, _ in ids_and_texts]
-            # The Data API can handle at most MAX_VALUES_IN_IN entries, let's chunk
+            # The Data API can handle at most max_values_in_in entries, let's chunk
             all_vals = [
                 val
-                for chunk_start in range(0, FULL_SIZE, MAX_VALUES_IN_IN)
+                for chunk_start in range(0, full_size, max_values_in_in)
                 for val in await store.amget(
-                    all_ids[chunk_start : chunk_start + MAX_VALUES_IN_IN]
+                    all_ids[chunk_start : chunk_start + max_values_in_in]
                 )
             ]
             for val, doc_id in zip(all_vals, all_ids):
@@ -246,7 +249,7 @@ class TestAstraDBStore:
 
     def test_mdelete(
         self,
-        astra_db_credentials: Dict[str, Optional[str]],
+        astra_db_credentials: dict[str, str | None],
     ) -> None:
         """Test that deletion works as expected."""
         collection_name = "lc_test_store_mdelete"
@@ -260,7 +263,7 @@ class TestAstraDBStore:
 
     async def test_amdelete(
         self,
-        astra_db_credentials: Dict[str, Optional[str]],
+        astra_db_credentials: dict[str, str | None],
     ) -> None:
         """Test that deletion works as expected."""
         collection_name = "lc_test_store_mdelete"
@@ -274,7 +277,7 @@ class TestAstraDBStore:
 
     def test_yield_keys(
         self,
-        astra_db_credentials: Dict[str, Optional[str]],
+        astra_db_credentials: dict[str, str | None],
     ) -> None:
         collection_name = "lc_test_store_yield_keys"
         try:
@@ -287,7 +290,7 @@ class TestAstraDBStore:
 
     async def test_ayield_keys(
         self,
-        astra_db_credentials: Dict[str, Optional[str]],
+        astra_db_credentials: dict[str, str | None],
     ) -> None:
         collection_name = "lc_test_store_yield_keys"
         try:
@@ -303,7 +306,7 @@ class TestAstraDBStore:
 
     def test_bytestore_mget(
         self,
-        astra_db_credentials: Dict[str, Optional[str]],
+        astra_db_credentials: dict[str, str | None],
     ) -> None:
         """Test AstraDBByteStore mget method."""
         collection_name = "lc_test_bytestore_mget"
@@ -315,7 +318,7 @@ class TestAstraDBStore:
 
     def test_bytestore_mset(
         self,
-        astra_db_credentials: Dict[str, Optional[str]],
+        astra_db_credentials: dict[str, str | None],
     ) -> None:
         """Test that multiple keys can be set with AstraDBByteStore."""
         collection_name = "lc_test_bytestore_mset"
@@ -330,7 +333,7 @@ class TestAstraDBStore:
 
     def test_indexing_detection(
         self,
-        astra_db_credentials: Dict[str, Optional[str]],
+        astra_db_credentials: dict[str, str | None],
         database: Database,
     ) -> None:
         """Test the behaviour against preexisting legacy collections."""
@@ -384,7 +387,7 @@ class TestAstraDBStore:
     )
     def test_store_coreclients_init_sync(
         self,
-        astra_db_credentials: Dict[str, Optional[str]],
+        astra_db_credentials: dict[str, str | None],
         core_astra_db: AstraDB,
     ) -> None:
         """A deprecation warning from passing a (core) AstraDB, but it works."""
@@ -414,7 +417,7 @@ class TestAstraDBStore:
     )
     async def test_store_coreclients_init_async(
         self,
-        astra_db_credentials: Dict[str, Optional[str]],
+        astra_db_credentials: dict[str, str | None],
         core_astra_db: AstraDB,
     ) -> None:
         """A deprecation warning from passing a (core) AstraDB, but it works."""
