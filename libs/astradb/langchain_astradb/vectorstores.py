@@ -1233,7 +1233,7 @@ class AstraDBVectorStore(VectorStore):
         self,
         query: str,
         k: int = 4,
-        filter: dict[str, Any] | None = None,  # noqa: A002
+        filter: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> list[Document]:
         """Return docs most similar to query.
@@ -1268,7 +1268,7 @@ class AstraDBVectorStore(VectorStore):
         self,
         query: str,
         k: int = 4,
-        filter: dict[str, Any] | None = None,  # noqa: A002
+        filter: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> list[Document]:
         """Return docs most similar to query.
@@ -1307,7 +1307,7 @@ class AstraDBVectorStore(VectorStore):
         self,
         embedding: list[float],
         k: int = 4,
-        filter: dict[str, Any] | None = None,  # noqa: A002
+        filter: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> list[Document]:
         """Return docs most similar to embedding vector.
@@ -1334,7 +1334,7 @@ class AstraDBVectorStore(VectorStore):
         self,
         embedding: list[float],
         k: int = 4,
-        filter: dict[str, Any] | None = None,  # noqa: A002
+        filter: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> list[Document]:
         """Return docs most similar to embedding vector.
@@ -1361,7 +1361,7 @@ class AstraDBVectorStore(VectorStore):
         self,
         query: str,
         k: int = 4,
-        filter: dict[str, Any] | None = None,  # noqa: A002
+        filter: dict[str, Any] | None = None,
     ) -> list[tuple[Document, float]]:
         """Return docs most similar to query with score.
 
@@ -1399,7 +1399,7 @@ class AstraDBVectorStore(VectorStore):
         self,
         query: str,
         k: int = 4,
-        filter: dict[str, Any] | None = None,  # noqa: A002
+        filter: dict[str, Any] | None = None,
     ) -> list[tuple[Document, float]]:
         """Return docs most similar to query with score.
 
@@ -1530,7 +1530,7 @@ class AstraDBVectorStore(VectorStore):
         k: int = 4,
         fetch_k: int = 20,
         lambda_mult: float = 0.5,
-        filter: dict[str, Any] | None = None,  # noqa: A002
+        filter: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> list[Document]:
         """Return docs selected using the maximal marginal relevance.
@@ -1568,7 +1568,7 @@ class AstraDBVectorStore(VectorStore):
         k: int = 4,
         fetch_k: int = 20,
         lambda_mult: float = 0.5,
-        filter: dict[str, Any] | None = None,  # noqa: A002
+        filter: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> list[Document]:
         """Return docs selected using the maximal marginal relevance.
@@ -1606,7 +1606,7 @@ class AstraDBVectorStore(VectorStore):
         k: int = 4,
         fetch_k: int = 20,
         lambda_mult: float = 0.5,
-        filter: dict[str, Any] | None = None,  # noqa: A002
+        filter: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> list[Document]:
         """Return docs selected using the maximal marginal relevance.
@@ -1655,7 +1655,7 @@ class AstraDBVectorStore(VectorStore):
         k: int = 4,
         fetch_k: int = 20,
         lambda_mult: float = 0.5,
-        filter: dict[str, Any] | None = None,  # noqa: A002
+        filter: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> list[Document]:
         """Return docs selected using the maximal marginal relevance.

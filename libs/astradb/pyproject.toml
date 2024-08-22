@@ -63,10 +63,46 @@ optional = true
 langchain-core = { git = "https://github.com/langchain-ai/langchain.git", subdirectory = "libs/core" }
 
 [tool.ruff.lint]
-select = [
-  "E", # pycodestyle
-  "F", # pyflakes
-  "I", # isort
+pydocstyle.convention = "google"
+pep8-naming.classmethod-decorators = [
+    "langchain_core.pydantic_v1.validator",
+]
+select = ["ALL"]
+ignore = [
+    "ANN", # Already checked by mypy
+    "C90", # Do we want to activate (complexity) ?
+    "COM812", # Messes with the formatter
+    "D100", # Do we want to activate (docstring in module) ?
+    "D104", # Do we want to activate (docstring in package) ?
+    "D105", # Do we want to activate (docstring in magic method) ?
+    "D107", # Do we want to activate (docstring in __init__) ?
+    "EM", # Do we want to activate (error messages) ?
+    "ERA", # Do we want to activate (no commented code) ?
+    "FBT", # Do we want to activate (boolean trap) ?
+    "ISC001", # Messes with the formatter
+    "PERF203", # Incorrect detection
+    "PLR09", # TODO: do we enforce these ones (complexity) ?
+    "PTH", # Do we want to activate (use pathlib) ?
+    "TRY003", # A bit too strict ?
+
+    "BLE001", # TODO
+    "PT011", # TODO
+    "PT012", # TODO
+    "D101", # TODO
+    "D417", # TODO
+
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = [
+    "D",
+    "S101",
+    "SLF001",
+    "T201",
+    "PLR2004",
+]
+"scripts/*" = [
+    "T201",
 ]
 
 [tool.mypy]
