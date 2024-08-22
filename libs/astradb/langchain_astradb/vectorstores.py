@@ -1060,7 +1060,6 @@ class AstraDBVectorStore(VectorStore):
         Returns:
             The list of (Document, score, id), the most similar to the query.
         """
-
         if self.document_encoder.server_side_embeddings:
             return self._similarity_search_with_score_id_with_vectorize(
                 query=query,
