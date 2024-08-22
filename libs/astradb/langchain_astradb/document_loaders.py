@@ -120,10 +120,11 @@ class AstraDBLoader(BaseLoader):
         _find_options = find_options.copy() if find_options else {}
         if "limit" in _find_options:
             if limit is not None:
-                raise ValueError(
+                msg = (
                     "Duplicate 'limit' directive supplied. Please remove it "
                     "from the 'find_options' map parameter."
                 )
+                raise ValueError(msg)
             warnings.warn(
                 (
                     "Passing 'limit' as part of the 'find_options' "

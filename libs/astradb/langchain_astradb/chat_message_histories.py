@@ -115,8 +115,9 @@ class AstraDBChatMessageHistory(BaseChatMessageHistory):
         return messages_from_dict(items)
 
     @messages.setter
-    def messages(self, messages: list[BaseMessage]) -> None:
-        raise NotImplementedError("Use add_messages instead")
+    def messages(self, _: list[BaseMessage]) -> None:
+        msg = "Use add_messages instead"
+        raise NotImplementedError(msg)
 
     @override
     async def aget_messages(self) -> list[BaseMessage]:

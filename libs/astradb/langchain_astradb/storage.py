@@ -38,13 +38,11 @@ class AstraDBBaseStore(Generic[V], BaseStore[str, V], ABC):
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         if "requested_indexing_policy" in kwargs:
-            raise ValueError(
-                "Do not pass 'requested_indexing_policy' to AstraDBBaseStore init"
-            )
+            msg = "Do not pass 'requested_indexing_policy' to AstraDBBaseStore init"
+            raise ValueError(msg)
         if "default_indexing_policy" in kwargs:
-            raise ValueError(
-                "Do not pass 'default_indexing_policy' to AstraDBBaseStore init"
-            )
+            msg = "Do not pass 'default_indexing_policy' to AstraDBBaseStore init"
+            raise ValueError(msg)
         kwargs["requested_indexing_policy"] = {"allow": ["_id"]}
         kwargs["default_indexing_policy"] = {"allow": ["_id"]}
         self.astra_env = _AstraDBCollectionEnvironment(
@@ -135,10 +133,11 @@ class AstraDBBaseStore(Generic[V], BaseStore[str, V], ABC):
             replaced_count = sum(r_res.update_info["n"] for r_res in replace_results)
             if replaced_count != len(ids_to_replace):
                 missing = len(ids_to_replace) - replaced_count
-                raise ValueError(
+                msg = (
                     "AstraDBBaseStore.mset could not insert all requested "
                     f"documents ({missing} failed replace_one calls)"
                 )
+                raise ValueError(msg)
 
     @override
     async def amset(self, key_value_pairs: Sequence[tuple[str, V]]) -> None:
@@ -191,10 +190,11 @@ class AstraDBBaseStore(Generic[V], BaseStore[str, V], ABC):
             replaced_count = sum(r_res.update_info["n"] for r_res in replace_results)
             if replaced_count != len(ids_to_replace):
                 missing = len(ids_to_replace) - replaced_count
-                raise ValueError(
+                msg = (
                     "AstraDBBaseStore.mset could not insert all requested "
                     f"documents ({missing} failed replace_one calls)"
                 )
+                raise ValueError(msg)
 
     @override
     def mdelete(self, keys: Sequence[str]) -> None:

@@ -74,9 +74,8 @@ class FakeLLM(LLM):
         cls, queries: Mapping | None, values: Mapping[str, Any]
     ) -> Mapping | None:
         if values.get("sequential_response") and not queries:
-            raise ValueError(
-                "queries is required when sequential_response is set to True"
-            )
+            msg = "queries is required when sequential_response is set to True"
+            raise ValueError(msg)
         return queries
 
     @override

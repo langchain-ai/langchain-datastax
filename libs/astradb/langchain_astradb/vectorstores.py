@@ -232,11 +232,12 @@ class AstraDBVectorStore(VectorStore):
             collection_indexing_policy,
         ]
         if params.count(None) < len(params) - 1:
-            raise ValueError(
+            msg = (
                 "At most one of the parameters `metadata_indexing_include`,"
                 " `metadata_indexing_exclude` and `collection_indexing_policy`"
                 " can be specified as non null."
             )
+            raise ValueError(msg)
 
         if metadata_indexing_include is not None:
             return {
@@ -374,25 +375,28 @@ class AstraDBVectorStore(VectorStore):
         # Embedding and the server-side embeddings are mutually exclusive,
         # as both specify how to produce embeddings
         if embedding is None and collection_vector_service_options is None:
-            raise ValueError(
+            msg = (
                 "Either an `embedding` or a `collection_vector_service_options` "
                 "must be provided."
             )
+            raise ValueError(msg)
 
         if embedding is not None and collection_vector_service_options is not None:
-            raise ValueError(
+            msg = (
                 "Only one of `embedding` or `collection_vector_service_options` "
                 "can be provided."
             )
+            raise ValueError(msg)
 
         if (
             collection_vector_service_options is None
             and collection_embedding_api_key is not None
         ):
-            raise ValueError(
+            msg = (
                 "`collection_embedding_api_key` cannot be provided unless"
                 " `collection_vector_service_options` is also passed."
             )
+            raise ValueError(msg)
 
         self.embedding_dimension: int | None = None
         self.embedding = embedding
@@ -450,7 +454,8 @@ class AstraDBVectorStore(VectorStore):
 
     def _get_safe_embedding(self) -> Embeddings:
         if not self.embedding:
-            raise ValueError("Missing embedding")
+            msg = "Missing embedding"
+            raise ValueError(msg)
         return self.embedding
 
     def _get_embedding_dimension(self) -> int:
@@ -555,7 +560,8 @@ class AstraDBVectorStore(VectorStore):
             )
 
         if ids is None:
-            raise ValueError("No ids provided to delete.")
+            msg = "No ids provided to delete."
+            raise ValueError(msg)
 
         _max_workers = concurrency or self.bulk_delete_concurrency
         with ThreadPoolExecutor(max_workers=_max_workers) as tpe:
@@ -593,7 +599,8 @@ class AstraDBVectorStore(VectorStore):
             )
 
         if ids is None:
-            raise ValueError("No ids provided to delete.")
+            msg = "No ids provided to delete."
+            raise ValueError(msg)
 
         _max_workers = concurrency or self.bulk_delete_concurrency
         return all(
@@ -688,9 +695,8 @@ class AstraDBVectorStore(VectorStore):
         document_batch: list[DocDict], insert_result: dict[str, Any]
     ) -> tuple[list[str], list[DocDict]]:
         if "status" not in insert_result:
-            raise ValueError(
-                f"API Exception while running bulk insertion: {insert_result}"
-            )
+            msg = f"API Exception while running bulk insertion: {insert_result}"
+            raise ValueError(msg)
         batch_inserted = insert_result["status"]["insertedIds"]
         # estimation of the preexisting documents that failed
         missed_inserted_ids = {document["_id"] for document in document_batch} - set(
@@ -703,7 +709,8 @@ class AstraDBVectorStore(VectorStore):
             error.get("errorCode") != "DOCUMENT_ALREADY_EXISTS" for error in errors
         )
         if num_errors != len(missed_inserted_ids) or unexpected_errors:
-            raise ValueError(f"API Exception while running bulk insertion: {errors}")
+            msg = f"API Exception while running bulk insertion: {errors}"
+            raise ValueError(msg)
         # deal with the missing insertions as upserts
         missing_from_batch = [
             document
@@ -827,10 +834,11 @@ class AstraDBVectorStore(VectorStore):
             inserted_ids += [replaced_id for _, replaced_id in replace_results]
             if replaced_count != len(ids_to_replace):
                 missing = len(ids_to_replace) - replaced_count
-                raise ValueError(
+                msg = (
                     "AstraDBVectorStore.add_texts could not insert all requested "
                     f"documents ({missing} failed replace_one calls)"
                 )
+                raise ValueError(msg)
         return inserted_ids
 
     @override
@@ -952,10 +960,11 @@ class AstraDBVectorStore(VectorStore):
 
             if replaced_count != len(ids_to_replace):
                 missing = len(ids_to_replace) - replaced_count
-                raise ValueError(
+                msg = (
                     "AstraDBVectorStore.add_texts could not insert all requested "
                     f"documents ({missing} failed replace_one calls)"
                 )
+                raise ValueError(msg)
         return inserted_ids
 
     def similarity_search_with_score_id_by_vector(
