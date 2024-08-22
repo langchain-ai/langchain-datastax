@@ -18,7 +18,6 @@ from typing import (
 
 import numpy as np
 from astrapy.exceptions import InsertManyException
-from langchain_core.documents import Document
 from langchain_core.runnables.utils import gather_with_concurrency
 from langchain_core.vectorstores import VectorStore
 from typing_extensions import override
@@ -48,6 +47,7 @@ if TYPE_CHECKING:
     )
     from astrapy.info import CollectionVectorServiceOptions
     from astrapy.results import UpdateResult
+    from langchain_core.documents import Document
     from langchain_core.embeddings import Embeddings
 
 T = TypeVar("T")
@@ -204,8 +204,8 @@ class AstraDBVectorStore(VectorStore):
     def _filter_to_metadata(self, filter_dict: dict[str, Any] | None) -> dict[str, Any]:
         if filter_dict is None:
             return {}
-        else:
-            return self.document_encoder.encode_filter(filter_dict)
+
+        return self.document_encoder.encode_filter(filter_dict)
 
     @staticmethod
     def _normalize_metadata_indexing_policy(
