@@ -113,6 +113,7 @@ class AstraDBLoader(BaseLoader):
                     "client and will be ignored in reading document."
                 ),
                 UserWarning,
+                stacklevel=2,
             )
 
         # normalizing limit and options and deprecations
@@ -123,16 +124,16 @@ class AstraDBLoader(BaseLoader):
                     "Duplicate 'limit' directive supplied. Please remove it "
                     "from the 'find_options' map parameter."
                 )
-            else:
-                warnings.warn(
-                    (
-                        "Passing 'limit' as part of the 'find_options' "
-                        "dictionary is deprecated starting from version 0.3.5. "
-                        "Please switch to passing 'limit=<number>' "
-                        "directly in the constructor."
-                    ),
-                    DeprecationWarning,
-                )
+            warnings.warn(
+                (
+                    "Passing 'limit' as part of the 'find_options' "
+                    "dictionary is deprecated starting from version 0.3.5. "
+                    "Please switch to passing 'limit=<number>' "
+                    "directly in the constructor."
+                ),
+                DeprecationWarning,
+                stacklevel=2,
+            )
         self.limit = _find_options.pop("limit", limit)
         if _find_options:
             warnings.warn(
@@ -141,8 +142,8 @@ class AstraDBLoader(BaseLoader):
                     "This parameter is deprecated starting from version 0.3.5."
                 ),
                 DeprecationWarning,
+                stacklevel=2,
             )
-        #
         self.nb_prefetched = nb_prefetched
         self.page_content_mapper = page_content_mapper
         self.metadata_mapper = metadata_mapper or (

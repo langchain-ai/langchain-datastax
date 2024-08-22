@@ -9,6 +9,8 @@ from langchain_astradb.vectorstores import (
 )
 from tests.conftest import SomeEmbeddings
 
+FAKE_TOKEN = "t"  # noqa: S105
+
 
 class TestAstraDB:
     def test_initialization(self) -> None:
@@ -19,7 +21,7 @@ class TestAstraDB:
             ".apps.astra.datastax.com"
         )
         mock_astra_db = AstraDB(
-            token="t",
+            token=FAKE_TOKEN,
             api_endpoint=a_e_string,
             namespace="n",
         )
@@ -35,7 +37,7 @@ class TestAstraDB:
         # With an embedding class
         AstraDBVectorStore(
             collection_name="mock_coll_name",
-            token="t",
+            token=FAKE_TOKEN,
             api_endpoint=a_e_string,
             namespace="n",
             embedding=embedding,
@@ -48,7 +50,7 @@ class TestAstraDB:
         )
         AstraDBVectorStore(
             collection_name="mock_coll_name",
-            token="t",
+            token=FAKE_TOKEN,
             api_endpoint=a_e_string,
             namespace="n",
             collection_vector_service_options=vector_options,
@@ -56,11 +58,15 @@ class TestAstraDB:
         )
 
         # embedding and vectorize => error
-        with pytest.raises(ValueError):
+        with pytest.raises(
+            ValueError,
+            match="Only one of `embedding` or `collection_vector_service_options` can "
+            "be provided.",
+        ):
             AstraDBVectorStore(
                 embedding=embedding,
                 collection_name="mock_coll_name",
-                token="t",
+                token=FAKE_TOKEN,
                 api_endpoint=a_e_string,
                 namespace="n",
                 collection_vector_service_options=vector_options,
@@ -68,10 +74,14 @@ class TestAstraDB:
             )
 
         # no embedding and no vectorize => error
-        with pytest.raises(ValueError):
+        with pytest.raises(
+            ValueError,
+            match="Either an `embedding` or a `collection_vector_service_options` "
+            "must be provided.",
+        ):
             AstraDBVectorStore(
                 collection_name="mock_coll_name",
-                token="t",
+                token=FAKE_TOKEN,
                 api_endpoint=a_e_string,
                 namespace="n",
                 setup_mode=SetupMode.OFF,
@@ -110,28 +120,34 @@ class TestAstraDB:
         )
         assert cip_idx == custom_policy
 
-        with pytest.raises(ValueError):
+        error_msg = (
+            "At most one of the parameters `metadata_indexing_include`, "
+            "`metadata_indexing_exclude` and `collection_indexing_policy` "
+            "can be specified as non null."
+        )
+
+        with pytest.raises(ValueError, match=error_msg):
             AstraDBVectorStore._normalize_metadata_indexing_policy(
                 metadata_indexing_include=["a"],
                 metadata_indexing_exclude=["b"],
                 collection_indexing_policy=None,
             )
 
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match=error_msg):
             AstraDBVectorStore._normalize_metadata_indexing_policy(
                 metadata_indexing_include=["a"],
                 metadata_indexing_exclude=None,
                 collection_indexing_policy={"a": "z"},
             )
 
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match=error_msg):
             AstraDBVectorStore._normalize_metadata_indexing_policy(
                 metadata_indexing_include=None,
                 metadata_indexing_exclude=["b"],
                 collection_indexing_policy={"a": "z"},
             )
 
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match=error_msg):
             AstraDBVectorStore._normalize_metadata_indexing_policy(
                 metadata_indexing_include=["a"],
                 metadata_indexing_exclude=["b"],

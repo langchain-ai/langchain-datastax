@@ -123,10 +123,10 @@ class TestAstraDBStore:
         astra_db_credentials: dict[str, str | None],
     ) -> None:
         """Testing the insert-many-and-replace-some patterns thoroughly."""
-        FULL_SIZE = 300
-        FIRST_GROUP_SIZE = 150
-        SECOND_GROUP_SLICER = [30, 100, 2]
-        MAX_VALUES_IN_IN = 100
+        full_size = 300
+        first_group_size = 150
+        second_group_slicer = [30, 100, 2]
+        max_values_in_in = 100
         collection_name = "lc_test_store_massive_mset"
 
         ids_and_texts = [
@@ -134,7 +134,7 @@ class TestAstraDBStore:
                 f"doc_{idx}",
                 f"document number {idx}",
             )
-            for idx in range(FULL_SIZE)
+            for idx in range(full_size)
         ]
         try:
             store = AstraDBStore(
@@ -146,17 +146,17 @@ class TestAstraDBStore:
             )
 
             # massive insertion on empty (zip and rezip for uniformity with later)
-            group0_ids, group0_texts = list(zip(*ids_and_texts[0:FIRST_GROUP_SIZE]))
+            group0_ids, group0_texts = list(zip(*ids_and_texts[0:first_group_size]))
             store.mset(list(zip(group0_ids, group0_texts)))
 
             # massive insertion with many overwrites scattered through
             # (we change the text to later check on DB for successful update)
-            _s, _e, _st = SECOND_GROUP_SLICER
+            _s, _e, _st = second_group_slicer
             group1_ids, group1_texts_pre = list(
                 zip(
                     *(
                         ids_and_texts[_s:_e:_st]
-                        + ids_and_texts[FIRST_GROUP_SIZE:FULL_SIZE]
+                        + ids_and_texts[first_group_size:full_size]
                     )
                 )
             )
@@ -169,12 +169,12 @@ class TestAstraDBStore:
                 **dict(zip(group1_ids, group1_texts)),
             }
             all_ids = [doc_id for doc_id, _ in ids_and_texts]
-            # The Data API can handle at most MAX_VALUES_IN_IN entries, let's chunk
+            # The Data API can handle at most max_values_in_in entries, let's chunk
             all_vals = [
                 val
-                for chunk_start in range(0, FULL_SIZE, MAX_VALUES_IN_IN)
+                for chunk_start in range(0, full_size, max_values_in_in)
                 for val in store.mget(
-                    all_ids[chunk_start : chunk_start + MAX_VALUES_IN_IN]
+                    all_ids[chunk_start : chunk_start + max_values_in_in]
                 )
             ]
             for val, doc_id in zip(all_vals, all_ids):
@@ -187,10 +187,10 @@ class TestAstraDBStore:
         astra_db_credentials: dict[str, str | None],
     ) -> None:
         """Testing the insert-many-and-replace-some patterns thoroughly."""
-        FULL_SIZE = 300
-        FIRST_GROUP_SIZE = 150
-        SECOND_GROUP_SLICER = [30, 100, 2]
-        MAX_VALUES_IN_IN = 100
+        full_size = 300
+        first_group_size = 150
+        second_group_slicer = [30, 100, 2]
+        max_values_in_in = 100
         collection_name = "lc_test_store_massive_amset"
 
         ids_and_texts = [
@@ -198,7 +198,7 @@ class TestAstraDBStore:
                 f"doc_{idx}",
                 f"document number {idx}",
             )
-            for idx in range(FULL_SIZE)
+            for idx in range(full_size)
         ]
 
         try:
@@ -211,17 +211,17 @@ class TestAstraDBStore:
             )
 
             # massive insertion on empty (zip and rezip for uniformity with later)
-            group0_ids, group0_texts = list(zip(*ids_and_texts[0:FIRST_GROUP_SIZE]))
+            group0_ids, group0_texts = list(zip(*ids_and_texts[0:first_group_size]))
             await store.amset(list(zip(group0_ids, group0_texts)))
 
             # massive insertion with many overwrites scattered through
             # (we change the text to later check on DB for successful update)
-            _s, _e, _st = SECOND_GROUP_SLICER
+            _s, _e, _st = second_group_slicer
             group1_ids, group1_texts_pre = list(
                 zip(
                     *(
                         ids_and_texts[_s:_e:_st]
-                        + ids_and_texts[FIRST_GROUP_SIZE:FULL_SIZE]
+                        + ids_and_texts[first_group_size:full_size]
                     )
                 )
             )
@@ -234,12 +234,12 @@ class TestAstraDBStore:
                 **dict(zip(group1_ids, group1_texts)),
             }
             all_ids = [doc_id for doc_id, _ in ids_and_texts]
-            # The Data API can handle at most MAX_VALUES_IN_IN entries, let's chunk
+            # The Data API can handle at most max_values_in_in entries, let's chunk
             all_vals = [
                 val
-                for chunk_start in range(0, FULL_SIZE, MAX_VALUES_IN_IN)
+                for chunk_start in range(0, full_size, max_values_in_in)
                 for val in await store.amget(
-                    all_ids[chunk_start : chunk_start + MAX_VALUES_IN_IN]
+                    all_ids[chunk_start : chunk_start + max_values_in_in]
                 )
             ]
             for val, doc_id in zip(all_vals, all_ids):

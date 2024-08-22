@@ -3,13 +3,10 @@ from __future__ import annotations
 import hashlib
 import json
 from functools import lru_cache, wraps
-from typing import Any, Awaitable, Callable, Generator
+from typing import TYPE_CHECKING, Any, Awaitable, Callable, Generator
 
-from astrapy.authentication import TokenProvider
 from astrapy.db import AstraDB, AsyncAstraDB, logger
 from langchain_core.caches import RETURN_VAL_TYPE, BaseCache
-from langchain_core.embeddings import Embeddings
-from langchain_core.language_models import LLM
 from langchain_core.language_models.llms import aget_prompts, get_prompts
 from langchain_core.load.dump import dumps
 from langchain_core.load.load import loads
@@ -17,6 +14,11 @@ from langchain_core.outputs import Generation
 from typing_extensions import override
 
 from langchain_astradb.utils.astradb import SetupMode, _AstraDBCollectionEnvironment
+
+if TYPE_CHECKING:
+    from astrapy.authentication import TokenProvider
+    from langchain_core.embeddings import Embeddings
+    from langchain_core.language_models import LLM
 
 ASTRA_DB_CACHE_DEFAULT_COLLECTION_NAME = "langchain_astradb_cache"
 ASTRA_DB_SEMANTIC_CACHE_DEFAULT_COLLECTION_NAME = "langchain_astradb_semantic_cache"
@@ -26,7 +28,7 @@ ASTRA_DB_SEMANTIC_CACHE_EMBEDDING_CACHE_SIZE = 16
 
 def _hash(_input: str) -> str:
     """Use a deterministic hashing approach."""
-    return hashlib.md5(_input.encode()).hexdigest()
+    return hashlib.md5(_input.encode()).hexdigest()  # noqa: S324
 
 
 def _dumps_generations(generations: RETURN_VAL_TYPE) -> str:
@@ -75,16 +77,17 @@ def _loads_generations(generations_str: str) -> RETURN_VAL_TYPE | None:
     try:
         gen_dicts = json.loads(generations_str)
         # not relying on `_load_generations_from_json` (which could disappear):
-        generations = [Generation(**generation_dict) for generation_dict in gen_dicts]
-        logger.warning(
-            f"Legacy 'Generation' cached blob encountered: '{generations_str}'"
-        )
-        return generations
     except (json.JSONDecodeError, TypeError):
         logger.warning(
             f"Malformed/unparsable cached blob encountered: '{generations_str}'"
         )
         return None
+    else:
+        generations = [Generation(**generation_dict) for generation_dict in gen_dicts]
+        logger.warning(
+            f"Legacy 'Generation' cached blob encountered: '{generations_str}'"
+        )
+        return generations
 
 
 class AstraDBCache(BaseCache):
@@ -224,7 +227,7 @@ class AstraDBCache(BaseCache):
         In case the llm(prompt) calls have a `stop` param, you should pass it here.
         """
         llm_string = get_prompts(
-            {**llm.dict(), **{"stop": stop}},
+            {**llm.dict(), "stop": stop},
             [],
         )[1]
         return self.delete(prompt, llm_string=llm_string)
@@ -238,7 +241,7 @@ class AstraDBCache(BaseCache):
         """
         llm_string = (
             await aget_prompts(
-                {**llm.dict(), **{"stop": stop}},
+                {**llm.dict(), "stop": stop},
                 [],
             )
         )[1]
@@ -432,7 +435,6 @@ class AstraDBSemanticCache(BaseCache):
         llm_string_hash = _hash(llm_string)
         embedding_vector = self._get_embedding(text=prompt)
         body = _dumps_generations(return_val)
-        #
         self.collection.find_one_and_replace(
             {"_id": doc_id},
             {
@@ -453,7 +455,6 @@ class AstraDBSemanticCache(BaseCache):
         llm_string_hash = _hash(llm_string)
         embedding_vector = await self._aget_embedding(text=prompt)
         body = _dumps_generations(return_val)
-        #
         await self.async_collection.find_one_and_replace(
             {"_id": doc_id},
             {
@@ -468,18 +469,12 @@ class AstraDBSemanticCache(BaseCache):
     @override
     def lookup(self, prompt: str, llm_string: str) -> RETURN_VAL_TYPE | None:
         hit_with_id = self.lookup_with_id(prompt, llm_string)
-        if hit_with_id is not None:
-            return hit_with_id[1]
-        else:
-            return None
+        return hit_with_id[1] if hit_with_id is not None else None
 
     @override
     async def alookup(self, prompt: str, llm_string: str) -> RETURN_VAL_TYPE | None:
         hit_with_id = await self.alookup_with_id(prompt, llm_string)
-        if hit_with_id is not None:
-            return hit_with_id[1]
-        else:
-            return None
+        return hit_with_id[1] if hit_with_id is not None else None
 
     def lookup_with_id(
         self, prompt: str, llm_string: str
@@ -503,13 +498,13 @@ class AstraDBSemanticCache(BaseCache):
 
         if hit is None or hit["$similarity"] < self.similarity_threshold:
             return None
-        else:
-            generations = _loads_generations(hit["body_blob"])
-            if generations is not None:
-                # this protects against malformed cached items:
-                return hit["_id"], generations
-            else:
-                return None
+
+        generations = _loads_generations(hit["body_blob"])
+        if generations is None:
+            return None
+
+        # this protects against malformed cached items:
+        return hit["_id"], generations
 
     async def alookup_with_id(
         self, prompt: str, llm_string: str
@@ -533,13 +528,13 @@ class AstraDBSemanticCache(BaseCache):
 
         if hit is None or hit["$similarity"] < self.similarity_threshold:
             return None
-        else:
-            generations = _loads_generations(hit["body_blob"])
-            if generations is not None:
-                # this protects against malformed cached items:
-                return hit["_id"], generations
-            else:
-                return None
+
+        generations = _loads_generations(hit["body_blob"])
+        if generations is None:
+            return None
+
+        # this protects against malformed cached items:
+        return hit["_id"], generations
 
     def lookup_with_id_through_llm(
         self, prompt: str, llm: LLM, stop: list[str] | None = None
@@ -549,7 +544,7 @@ class AstraDBSemanticCache(BaseCache):
         If there are hits, return (document_id, cached_entry) for the top hit
         """
         llm_string = get_prompts(
-            {**llm.dict(), **{"stop": stop}},
+            {**llm.dict(), "stop": stop},
             [],
         )[1]
         return self.lookup_with_id(prompt, llm_string=llm_string)
@@ -563,7 +558,7 @@ class AstraDBSemanticCache(BaseCache):
         """
         llm_string = (
             await aget_prompts(
-                {**llm.dict(), **{"stop": stop}},
+                {**llm.dict(), "stop": stop},
                 [],
             )
         )[1]

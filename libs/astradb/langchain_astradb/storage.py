@@ -62,6 +62,7 @@ class AstraDBBaseStore(Generic[V], BaseStore[str, V], ABC):
     def encode_value(self, value: V | None) -> Any:
         """Encodes value for Astra DB."""
 
+    @override
     def mget(self, keys: Sequence[str]) -> list[V | None]:
         self.astra_env.ensure_db_setup()
         docs_dict = {}
