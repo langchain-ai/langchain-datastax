@@ -24,12 +24,10 @@ import json
 import math
 import os
 import warnings
-from typing import Iterable
+from typing import TYPE_CHECKING, Iterable
 
 import pytest
-from astrapy import Database
 from astrapy.authentication import EmbeddingAPIKeyHeaderProvider, StaticTokenProvider
-from astrapy.db import AstraDB
 from astrapy.info import CollectionVectorServiceOptions
 from langchain_core.documents import Document
 
@@ -38,6 +36,10 @@ from langchain_astradb.vectorstores import AstraDBVectorStore
 from tests.conftest import ParserEmbeddings, SomeEmbeddings
 
 from .conftest import AstraDBCredentials, _has_env_vars
+
+if TYPE_CHECKING:
+    from astrapy import Database
+    from astrapy.db import AstraDB
 
 # Faster testing (no actual collection deletions). Off by default (=full tests)
 SKIP_COLLECTION_DELETE = (
@@ -837,16 +839,16 @@ class TestAstraDBVectorStore:
         store_someemb: AstraDBVectorStore,
     ) -> None:
         """Testing the insert-many-and-replace-some patterns thoroughly."""
-        FULL_SIZE = 300
-        FIRST_GROUP_SIZE = 150
-        SECOND_GROUP_SLICER = [30, 100, 2]
+        full_size = 300
+        first_group_size = 150
+        second_group_slicer = [30, 100, 2]
 
-        all_ids = [f"doc_{idx}" for idx in range(FULL_SIZE)]
-        all_texts = [f"document number {idx}" for idx in range(FULL_SIZE)]
+        all_ids = [f"doc_{idx}" for idx in range(full_size)]
+        all_texts = [f"document number {idx}" for idx in range(full_size)]
 
         # massive insertion on empty
-        group0_ids = all_ids[0:FIRST_GROUP_SIZE]
-        group0_texts = all_texts[0:FIRST_GROUP_SIZE]
+        group0_ids = all_ids[0:first_group_size]
+        group0_texts = all_texts[0:first_group_size]
         inserted_ids0 = store_someemb.add_texts(
             texts=group0_texts,
             ids=group0_ids,
@@ -854,11 +856,11 @@ class TestAstraDBVectorStore:
         assert set(inserted_ids0) == set(group0_ids)
         # massive insertion with many overwrites scattered through
         # (we change the text to later check on DB for successful update)
-        _s, _e, _st = SECOND_GROUP_SLICER
-        group1_ids = all_ids[_s:_e:_st] + all_ids[FIRST_GROUP_SIZE:FULL_SIZE]
+        _s, _e, _st = second_group_slicer
+        group1_ids = all_ids[_s:_e:_st] + all_ids[first_group_size:full_size]
         group1_texts = [
             txt.upper()
-            for txt in (all_texts[_s:_e:_st] + all_texts[FIRST_GROUP_SIZE:FULL_SIZE])
+            for txt in (all_texts[_s:_e:_st] + all_texts[first_group_size:full_size])
         ]
         inserted_ids1 = store_someemb.add_texts(
             texts=group1_texts,
@@ -872,7 +874,7 @@ class TestAstraDBVectorStore:
         }
         full_results = store_someemb.similarity_search_with_score_id_by_vector(
             embedding=[1.0, 1.0],
-            k=FULL_SIZE,
+            k=full_size,
         )
         for doc, _, doc_id in full_results:
             assert doc.page_content == expected_text_by_id[doc_id]
@@ -882,16 +884,16 @@ class TestAstraDBVectorStore:
         store_someemb: AstraDBVectorStore,
     ) -> None:
         """Testing the insert-many-and-replace-some patterns thoroughly."""
-        FULL_SIZE = 300
-        FIRST_GROUP_SIZE = 150
-        SECOND_GROUP_SLICER = [30, 100, 2]
+        full_size = 300
+        first_group_size = 150
+        second_group_slicer = [30, 100, 2]
 
-        all_ids = [f"doc_{idx}" for idx in range(FULL_SIZE)]
-        all_texts = [f"document number {idx}" for idx in range(FULL_SIZE)]
+        all_ids = [f"doc_{idx}" for idx in range(full_size)]
+        all_texts = [f"document number {idx}" for idx in range(full_size)]
 
         # massive insertion on empty
-        group0_ids = all_ids[0:FIRST_GROUP_SIZE]
-        group0_texts = all_texts[0:FIRST_GROUP_SIZE]
+        group0_ids = all_ids[0:first_group_size]
+        group0_texts = all_texts[0:first_group_size]
 
         inserted_ids0 = await store_someemb.aadd_texts(
             texts=group0_texts,
@@ -900,11 +902,11 @@ class TestAstraDBVectorStore:
         assert set(inserted_ids0) == set(group0_ids)
         # massive insertion with many overwrites scattered through
         # (we change the text to later check on DB for successful update)
-        _s, _e, _st = SECOND_GROUP_SLICER
-        group1_ids = all_ids[_s:_e:_st] + all_ids[FIRST_GROUP_SIZE:FULL_SIZE]
+        _s, _e, _st = second_group_slicer
+        group1_ids = all_ids[_s:_e:_st] + all_ids[first_group_size:full_size]
         group1_texts = [
             txt.upper()
-            for txt in (all_texts[_s:_e:_st] + all_texts[FIRST_GROUP_SIZE:FULL_SIZE])
+            for txt in (all_texts[_s:_e:_st] + all_texts[first_group_size:full_size])
         ]
         inserted_ids1 = await store_someemb.aadd_texts(
             texts=group1_texts,
@@ -918,7 +920,7 @@ class TestAstraDBVectorStore:
         }
         full_results = await store_someemb.asimilarity_search_with_score_id_by_vector(
             embedding=[1.0, 1.0],
-            k=FULL_SIZE,
+            k=full_size,
         )
         for doc, _, doc_id in full_results:
             assert doc.page_content == expected_text_by_id[doc_id]
@@ -931,18 +933,18 @@ class TestAstraDBVectorStore:
         MMR outcome.
         """
 
-        def _v_from_i(i: int, N: int) -> str:
-            angle = 2 * math.pi * i / N
+        def _v_from_i(i: int, n: int) -> str:
+            angle = 2 * math.pi * i / n
             vector = [math.cos(angle), math.sin(angle)]
             return json.dumps(vector)
 
         i_vals = [0, 4, 5, 13]
-        N_val = 20
+        n_val = 20
         store_parseremb.add_texts(
-            [_v_from_i(i, N_val) for i in i_vals], metadatas=[{"i": i} for i in i_vals]
+            [_v_from_i(i, n_val) for i in i_vals], metadatas=[{"i": i} for i in i_vals]
         )
         res1 = store_parseremb.max_marginal_relevance_search(
-            _v_from_i(3, N_val),
+            _v_from_i(3, n_val),
             k=2,
             fetch_k=3,
         )
@@ -957,19 +959,19 @@ class TestAstraDBVectorStore:
         MMR outcome.
         """
 
-        def _v_from_i(i: int, N: int) -> str:
-            angle = 2 * math.pi * i / N
+        def _v_from_i(i: int, n: int) -> str:
+            angle = 2 * math.pi * i / n
             vector = [math.cos(angle), math.sin(angle)]
             return json.dumps(vector)
 
         i_vals = [0, 4, 5, 13]
-        N_val = 20
+        n_val = 20
         await store_parseremb.aadd_texts(
-            [_v_from_i(i, N_val) for i in i_vals],
+            [_v_from_i(i, n_val) for i in i_vals],
             metadatas=[{"i": i} for i in i_vals],
         )
         res1 = await store_parseremb.amax_marginal_relevance_search(
-            _v_from_i(3, N_val),
+            _v_from_i(3, n_val),
             k=2,
             fetch_k=3,
         )
@@ -1146,10 +1148,10 @@ class TestAstraDBVectorStore:
     ) -> None:
         """Larger-scale bulk deletes."""
         vstore: AstraDBVectorStore = request.getfixturevalue(vector_store)
-        M = 150
-        texts = [str(i + 1 / 7.0) for i in range(2 * M)]
-        ids0 = ["doc_%i" % i for i in range(M)]
-        ids1 = ["doc_%i" % (i + M) for i in range(M)]
+        m = 150
+        texts = [str(i + 1 / 7.0) for i in range(2 * m)]
+        ids0 = ["doc_%i" % i for i in range(m)]
+        ids1 = ["doc_%i" % (i + m) for i in range(m)]
         ids = ids0 + ids1
         vstore.add_texts(texts=texts, ids=ids)
         # deleting a bunch of these
@@ -1159,7 +1161,7 @@ class TestAstraDBVectorStore:
         del_res1 = vstore.delete([*ids1, "ghost!"])
         assert del_res1 is True  # ensure no error
         # nothing left
-        assert vstore.similarity_search("x", k=2 * M) == []
+        assert vstore.similarity_search("x", k=2 * m) == []
 
     @pytest.mark.skipif(
         SKIP_COLLECTION_DELETE,
@@ -1223,9 +1225,9 @@ class TestAstraDBVectorStore:
         )
         try:
             # add_texts
-            N = 50
-            texts = [str(i + 1 / 7.0) for i in range(N)]
-            ids = ["doc_%i" % i for i in range(N)]
+            n = 50
+            texts = [str(i + 1 / 7.0) for i in range(n)]
+            ids = ["doc_%i" % i for i in range(n)]
             v_store.add_texts(texts=texts, ids=ids)
             v_store.add_texts(
                 texts=texts,
@@ -1234,10 +1236,8 @@ class TestAstraDBVectorStore:
                 batch_concurrency=7,
                 overwrite_concurrency=13,
             )
-            #
-            _ = v_store.delete(ids[: N // 2])
-            _ = v_store.delete(ids[N // 2 :], concurrency=23)
-            #
+            _ = v_store.delete(ids[: n // 2])
+            _ = v_store.delete(ids[n // 2 :], concurrency=23)
         finally:
             if not SKIP_COLLECTION_DELETE:
                 v_store.delete_collection()
@@ -1263,9 +1263,9 @@ class TestAstraDBVectorStore:
         )
         try:
             # add_texts
-            N = 50
-            texts = [str(i + 1 / 7.0) for i in range(N)]
-            ids = ["doc_%i" % i for i in range(N)]
+            n = 50
+            texts = [str(i + 1 / 7.0) for i in range(n)]
+            ids = ["doc_%i" % i for i in range(n)]
             await v_store.aadd_texts(texts=texts, ids=ids)
             await v_store.aadd_texts(
                 texts=texts,
@@ -1274,10 +1274,8 @@ class TestAstraDBVectorStore:
                 batch_concurrency=7,
                 overwrite_concurrency=13,
             )
-            #
-            await v_store.adelete(ids[: N // 2])
-            await v_store.adelete(ids[N // 2 :], concurrency=23)
-            #
+            await v_store.adelete(ids[: n // 2])
+            await v_store.adelete(ids[n // 2 :], concurrency=23)
         finally:
             if not SKIP_COLLECTION_DELETE:
                 await v_store.adelete_collection()
@@ -1589,17 +1587,17 @@ class TestAstraDBVectorStore:
             )
             await cus_store.aadd_texts(["Not working."])
 
+        leg_store = AstraDBVectorStore(
+            collection_name="lc_legacy_coll",
+            embedding=embe,
+            token=astra_db_credentials["token"],
+            api_endpoint=astra_db_credentials["api_endpoint"],
+            namespace=astra_db_credentials["namespace"],
+            environment=astra_db_credentials["environment"],
+            metadata_indexing_exclude={"long_summary", "the_divine_comedy"},
+            setup_mode=SetupMode.ASYNC,
+        )
         with pytest.raises(ValueError):
-            leg_store = AstraDBVectorStore(
-                collection_name="lc_legacy_coll",
-                embedding=embe,
-                token=astra_db_credentials["token"],
-                api_endpoint=astra_db_credentials["api_endpoint"],
-                namespace=astra_db_credentials["namespace"],
-                environment=astra_db_credentials["environment"],
-                metadata_indexing_exclude={"long_summary", "the_divine_comedy"},
-                setup_mode=SetupMode.ASYNC,
-            )
             await leg_store.aadd_texts(["Not working."])
 
         # one case should result in just a warning:

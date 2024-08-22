@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     from astrapy.db import AstraDB, AsyncAstraDB
     from astrapy.info import CollectionDescriptor, CollectionVectorServiceOptions
 
-TOKEN_ENV_VAR = "ASTRA_DB_APPLICATION_TOKEN"
+TOKEN_ENV_VAR = "ASTRA_DB_APPLICATION_TOKEN"  # noqa: S105
 API_ENDPOINT_ENV_VAR = "ASTRA_DB_API_ENDPOINT"
 NAMESPACE_ENV_VAR = "ASTRA_DB_KEYSPACE"
 
@@ -138,8 +138,8 @@ class _AstraDBEnvironment:
             # secrets-based initialization
             if token is None:
                 logger.info(
-                    "Attempting to fetch token from environment "
-                    f"variable '{TOKEN_ENV_VAR}'"
+                    "Attempting to fetch token from environment " "variable '%s'",
+                    TOKEN_ENV_VAR,
                 )
                 _token = os.environ.get(TOKEN_ENV_VAR)
             else:
@@ -147,7 +147,8 @@ class _AstraDBEnvironment:
             if api_endpoint is None:
                 logger.info(
                     "Attempting to fetch API endpoint from environment "
-                    f"variable '{API_ENDPOINT_ENV_VAR}'"
+                    "variable '%s'",
+                    API_ENDPOINT_ENV_VAR,
                 )
                 _api_endpoint = os.environ.get(API_ENDPOINT_ENV_VAR)
             else:
@@ -270,29 +271,28 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
                     "Cannot use an awaitable embedding_dimension with async_setup "
                     "set to False"
                 )
-            else:
-                try:
-                    self.database.create_collection(
-                        name=collection_name,
-                        dimension=embedding_dimension,  # type: ignore[arg-type]
-                        metric=metric,
-                        indexing=requested_indexing_policy,
-                        # Used for enabling $vectorize on the collection
-                        service=collection_vector_service_options,
-                        check_exists=False,
-                    )
-                except DataAPIException:
-                    # possibly the collection is preexisting and may have legacy,
-                    # or custom, indexing settings: verify
-                    collection_descriptors = list(self.database.list_collections())
-                    if not self._validate_indexing_policy(
-                        collection_descriptors=collection_descriptors,
-                        collection_name=self.collection_name,
-                        requested_indexing_policy=requested_indexing_policy,
-                        default_indexing_policy=default_indexing_policy,
-                    ):
-                        # other reasons for the exception
-                        raise
+            try:
+                self.database.create_collection(
+                    name=collection_name,
+                    dimension=embedding_dimension,  # type: ignore[arg-type]
+                    metric=metric,
+                    indexing=requested_indexing_policy,
+                    # Used for enabling $vectorize on the collection
+                    service=collection_vector_service_options,
+                    check_exists=False,
+                )
+            except DataAPIException:
+                # possibly the collection is preexisting and may have legacy,
+                # or custom, indexing settings: verify
+                collection_descriptors = list(self.database.list_collections())
+                if not self._validate_indexing_policy(
+                    collection_descriptors=collection_descriptors,
+                    collection_name=self.collection_name,
+                    requested_indexing_policy=requested_indexing_policy,
+                    default_indexing_policy=default_indexing_policy,
+                ):
+                    # other reasons for the exception
+                    raise
 
     @staticmethod
     def _validate_indexing_policy(
@@ -343,78 +343,80 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
             for collection in collection_descriptors
             if collection.name == collection_name
         ]
-        if preexisting:
-            pre_collection = preexisting[0]
-            # if it has no "indexing", it is a legacy collection
-            pre_col_options = pre_collection.options
-            if not pre_col_options.indexing:
-                # legacy collection on DB
-                if requested_indexing_policy == default_indexing_policy:
-                    warnings.warn(
-                        (
-                            f"Astra DB collection '{collection_name}' is "
-                            "detected as having indexing turned on for all "
-                            "fields (either created manually or by older "
-                            "versions of this plugin). This implies stricter "
-                            "limitations on the amount of text each string in a "
-                            "document can store. Consider indexing anew on a "
-                            "fresh collection to be able to store longer texts. "
-                            "See https://github.com/langchain-ai/langchain-"
-                            "datastax/blob/main/libs/astradb/README.md#"
-                            "warnings-about-indexing for more details."
-                        ),
-                        UserWarning,
-                        stacklevel=2,
-                    )
-                else:
-                    raise ValueError(
-                        f"Astra DB collection '{collection_name}' is "
-                        "detected as having indexing turned on for all "
-                        "fields (either created manually or by older "
-                        "versions of this plugin). This is incompatible with "
-                        "the requested indexing policy for this object. "
-                        "Consider indexing anew on a fresh "
-                        "collection with the requested indexing "
-                        "policy, or alternatively leave the indexing "
-                        "settings for this object to their defaults "
-                        "to keep using this collection."
-                    )
-            elif pre_col_options.indexing != requested_indexing_policy:
-                # collection on DB has indexing settings, but different
-                options_json = json.dumps(pre_col_options.indexing)
-                if pre_col_options.indexing == default_indexing_policy:
-                    default_desc = " (default setting)"
-                else:
-                    default_desc = ""
-                raise ValueError(
-                    f"Astra DB collection '{collection_name}' is "
-                    "detected as having the following indexing policy: "
-                    f"{options_json}{default_desc}. This is incompatible "
-                    "with the requested indexing policy for this object. "
-                    "Consider indexing anew on a fresh "
-                    "collection with the requested indexing "
-                    "policy, or alternatively align the requested "
-                    "indexing settings to the collection to keep using it."
-                )
-            else:
-                # the discrepancies have to do with options other than indexing
-                return False
-            # the original exception, related to indexing, was handled here
-            return True
-        else:
+
+        if not preexisting:
             # foreign-origin for the original exception
             return False
+
+        pre_collection = preexisting[0]
+        # if it has no "indexing", it is a legacy collection
+        pre_col_options = pre_collection.options
+        if not pre_col_options.indexing:
+            # legacy collection on DB
+            if requested_indexing_policy != default_indexing_policy:
+                raise ValueError(
+                    f"Astra DB collection '{collection_name}' is "
+                    "detected as having indexing turned on for all "
+                    "fields (either created manually or by older "
+                    "versions of this plugin). This is incompatible with "
+                    "the requested indexing policy for this object. "
+                    "Consider indexing anew on a fresh "
+                    "collection with the requested indexing "
+                    "policy, or alternatively leave the indexing "
+                    "settings for this object to their defaults "
+                    "to keep using this collection."
+                )
+            warnings.warn(
+                (
+                    f"Astra DB collection '{collection_name}' is "
+                    "detected as having indexing turned on for all "
+                    "fields (either created manually or by older "
+                    "versions of this plugin). This implies stricter "
+                    "limitations on the amount of text each string in a "
+                    "document can store. Consider indexing anew on a "
+                    "fresh collection to be able to store longer texts. "
+                    "See https://github.com/langchain-ai/langchain-"
+                    "datastax/blob/main/libs/astradb/README.md#"
+                    "warnings-about-indexing for more details."
+                ),
+                UserWarning,
+                stacklevel=2,
+            )
+            # the original exception, related to indexing, was handled here
+            return True
+
+        if pre_col_options.indexing != requested_indexing_policy:
+            # collection on DB has indexing settings, but different
+            options_json = json.dumps(pre_col_options.indexing)
+            default_desc = (
+                " (default setting)"
+                if pre_col_options.indexing == default_indexing_policy
+                else ""
+            )
+            raise ValueError(
+                f"Astra DB collection '{collection_name}' is "
+                "detected as having the following indexing policy: "
+                f"{options_json}{default_desc}. This is incompatible "
+                "with the requested indexing policy for this object. "
+                "Consider indexing anew on a fresh "
+                "collection with the requested indexing "
+                "policy, or alternatively align the requested "
+                "indexing settings to the collection to keep using it."
+            )
+
+        # the discrepancies have to do with options other than indexing
+        return False
 
     def ensure_db_setup(self) -> None:
         if self.async_setup_db_task:
             try:
                 self.async_setup_db_task.result()
-            except InvalidStateError:
+            except InvalidStateError as e:
                 raise ValueError(
                     "Asynchronous setup of the DB not finished. "
                     "NB: Astra DB components sync methods shouldn't be called from the "
                     "event loop. Consider using their async equivalents."
-                )
+                ) from e
 
     async def aensure_db_setup(self) -> None:
         if self.async_setup_db_task:

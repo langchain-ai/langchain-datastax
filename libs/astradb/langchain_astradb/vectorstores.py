@@ -199,21 +199,21 @@ class AstraDBVectorStore(VectorStore):
     def _filter_to_metadata(filter_dict: dict[str, Any] | None) -> dict[str, Any]:
         if filter_dict is None:
             return {}
-        else:
-            metadata_filter = {}
-            for k, v in filter_dict.items():
-                if k and k[0] == "$":
-                    if isinstance(v, list):
-                        metadata_filter[k] = [
-                            AstraDBVectorStore._filter_to_metadata(f) for f in v
-                        ]
-                    else:
-                        # assume each list item can be fed back to this function
-                        metadata_filter[k] = AstraDBVectorStore._filter_to_metadata(v)  # type: ignore[assignment]
-                else:
-                    metadata_filter[f"metadata.{k}"] = v
 
-            return metadata_filter
+        metadata_filter = {}
+        for k, v in filter_dict.items():
+            if k and k[0] == "$":
+                if isinstance(v, list):
+                    metadata_filter[k] = [
+                        AstraDBVectorStore._filter_to_metadata(f) for f in v
+                    ]
+                else:
+                    # assume each list item can be fed back to this function
+                    metadata_filter[k] = AstraDBVectorStore._filter_to_metadata(v)  # type: ignore[assignment]
+            else:
+                metadata_filter[f"metadata.{k}"] = v
+
+        return metadata_filter
 
     @staticmethod
     def _normalize_metadata_indexing_policy(
@@ -226,39 +226,35 @@ class AstraDBVectorStore(VectorStore):
         Validate the constructor indexing parameters and normalize them
         into a ready-to-use dict for the 'options' when creating a collection.
         """
-        none_count = sum(
-            [
-                1 if var is None else 0
-                for var in [
-                    metadata_indexing_include,
-                    metadata_indexing_exclude,
-                    collection_indexing_policy,
-                ]
-            ]
-        )
-        if none_count >= 2:
-            if metadata_indexing_include is not None:
-                return {
-                    "allow": [
-                        f"metadata.{md_field}" for md_field in metadata_indexing_include
-                    ]
-                }
-            elif metadata_indexing_exclude is not None:
-                return {
-                    "deny": [
-                        f"metadata.{md_field}" for md_field in metadata_indexing_exclude
-                    ]
-                }
-            elif collection_indexing_policy is not None:
-                return collection_indexing_policy
-            else:
-                return DEFAULT_INDEXING_OPTIONS
-        else:
+        params = [
+            metadata_indexing_include,
+            metadata_indexing_exclude,
+            collection_indexing_policy,
+        ]
+        if params.count(None) < len(params) - 1:
             raise ValueError(
                 "At most one of the parameters `metadata_indexing_include`,"
                 " `metadata_indexing_exclude` and `collection_indexing_policy`"
                 " can be specified as non null."
             )
+
+        if metadata_indexing_include is not None:
+            return {
+                "allow": [
+                    f"metadata.{md_field}" for md_field in metadata_indexing_include
+                ]
+            }
+        if metadata_indexing_exclude is not None:
+            return {
+                "deny": [
+                    f"metadata.{md_field}" for md_field in metadata_indexing_exclude
+                ]
+            }
+        return (
+            collection_indexing_policy
+            if collection_indexing_policy is not None
+            else DEFAULT_INDEXING_OPTIONS
+        )
 
     def __init__(
         self,
@@ -379,14 +375,14 @@ class AstraDBVectorStore(VectorStore):
         # as both specify how to produce embeddings
         if embedding is None and collection_vector_service_options is None:
             raise ValueError(
-                "Either an `embedding` or a `collection_vector_service_options`\
-                    must be provided."
+                "Either an `embedding` or a `collection_vector_service_options` "
+                "must be provided."
             )
 
         if embedding is not None and collection_vector_service_options is not None:
             raise ValueError(
-                "Only one of `embedding` or `collection_vector_service_options`\
-                    can be provided."
+                "Only one of `embedding` or `collection_vector_service_options` "
+                "can be provided."
             )
 
         if (
@@ -452,21 +448,26 @@ class AstraDBVectorStore(VectorStore):
             collection_embedding_api_key=self.collection_embedding_api_key,
         )
 
-    def _get_embedding_dimension(self) -> int:
-        assert self.embedding is not None
+    def _get_safe_embedding(self) -> Embeddings:
+        if not self.embedding:
+            raise ValueError("Missing embedding")
+        return self.embedding
 
+    def _get_embedding_dimension(self) -> int:
         if self.embedding_dimension is None:
             self.embedding_dimension = len(
-                self.embedding.embed_query(text="This is a sample sentence.")
+                self._get_safe_embedding().embed_query(
+                    text="This is a sample sentence."
+                )
             )
         return self.embedding_dimension
 
     async def _aget_embedding_dimension(self) -> int:
-        assert self.embedding is not None
-
         if self.embedding_dimension is None:
             self.embedding_dimension = len(
-                await self.embedding.aembed_query(text="This is a sample sentence.")
+                await self._get_safe_embedding().aembed_query(
+                    text="This is a sample sentence."
+                )
             )
         return self.embedding_dimension
 
@@ -549,7 +550,8 @@ class AstraDBVectorStore(VectorStore):
             warnings.warn(
                 "Method 'delete' of AstraDBVectorStore vector store invoked with "
                 f"unsupported arguments ({', '.join(sorted(kwargs.keys()))}), "
-                "which will be ignored."
+                "which will be ignored.",
+                stacklevel=2,
             )
 
         if ids is None:
@@ -586,7 +588,8 @@ class AstraDBVectorStore(VectorStore):
             warnings.warn(
                 "Method 'adelete' of AstraDBVectorStore invoked with "
                 f"unsupported arguments ({', '.join(sorted(kwargs.keys()))}), "
-                "which will be ignored."
+                "which will be ignored.",
+                stacklevel=2,
             )
 
         if ids is None:
@@ -632,7 +635,6 @@ class AstraDBVectorStore(VectorStore):
             ids = [uuid.uuid4().hex for _ in texts]
         if metadatas is None:
             metadatas = [{} for _ in texts]
-        #
         documents_to_insert = [
             {
                 "content": b_txt,
@@ -663,7 +665,6 @@ class AstraDBVectorStore(VectorStore):
             ids = [uuid.uuid4().hex for _ in texts]
         if metadatas is None:
             metadatas = [{} for _ in texts]
-        #
         documents_to_insert = [
             {
                 "_id": b_id,
@@ -756,7 +757,8 @@ class AstraDBVectorStore(VectorStore):
             warnings.warn(
                 "Method 'add_texts' of AstraDBVectorStore vector store invoked with "
                 f"unsupported arguments ({', '.join(sorted(kwargs.keys()))}), "
-                "which will be ignored."
+                "which will be ignored.",
+                stacklevel=2,
             )
         self.astra_env.ensure_db_setup()
 
@@ -765,8 +767,7 @@ class AstraDBVectorStore(VectorStore):
                 texts, metadatas, ids
             )
         else:
-            assert self.embedding is not None
-            embedding_vectors = self.embedding.embed_documents(list(texts))
+            embedding_vectors = self._get_safe_embedding().embed_documents(list(texts))
             documents_to_insert = self._get_documents_to_insert(
                 texts, embedding_vectors, metadatas, ids
             )
@@ -877,7 +878,8 @@ class AstraDBVectorStore(VectorStore):
             warnings.warn(
                 "Method 'aadd_texts' of AstraDBVectorStore invoked with "
                 f"unsupported arguments ({', '.join(sorted(kwargs.keys()))}), "
-                "which will be ignored."
+                "which will be ignored.",
+                stacklevel=2,
             )
         await self.astra_env.aensure_db_setup()
 
@@ -887,8 +889,9 @@ class AstraDBVectorStore(VectorStore):
                 texts, metadatas, ids
             )
         else:
-            assert self.embedding is not None
-            embedding_vectors = await self.embedding.aembed_documents(list(texts))
+            embedding_vectors = await self._get_safe_embedding().aembed_documents(
+                list(texts)
+            )
             documents_to_insert = self._get_documents_to_insert(
                 texts, embedding_vectors, metadatas, ids
             )
@@ -959,7 +962,7 @@ class AstraDBVectorStore(VectorStore):
         self,
         embedding: list[float],
         k: int = 4,
-        filter: dict[str, Any] | None = None,
+        filter: dict[str, Any] | None = None,  # noqa: A002
     ) -> list[tuple[Document, float, str]]:
         """Return docs most similar to embedding vector with score and id.
 
@@ -973,7 +976,6 @@ class AstraDBVectorStore(VectorStore):
         """
         self.astra_env.ensure_db_setup()
         metadata_parameter = self._filter_to_metadata(filter)
-        #
         hits = list(
             self.astra_env.collection.find(
                 filter=metadata_parameter,
@@ -987,7 +989,6 @@ class AstraDBVectorStore(VectorStore):
                 sort={"$vector": embedding},
             )
         )
-        #
         return [
             (
                 Document(
@@ -1004,7 +1005,7 @@ class AstraDBVectorStore(VectorStore):
         self,
         embedding: list[float],
         k: int = 4,
-        filter: dict[str, Any] | None = None,
+        filter: dict[str, Any] | None = None,  # noqa: A002
     ) -> list[tuple[Document, float, str]]:
         """Return docs most similar to embedding vector with score and id.
 
@@ -1018,7 +1019,6 @@ class AstraDBVectorStore(VectorStore):
         """
         await self.astra_env.aensure_db_setup()
         metadata_parameter = self._filter_to_metadata(filter)
-        #
         return [
             (
                 Document(
@@ -1045,7 +1045,7 @@ class AstraDBVectorStore(VectorStore):
         self,
         query: str,
         k: int = 4,
-        filter: dict[str, Any] | None = None,
+        filter: dict[str, Any] | None = None,  # noqa: A002
     ) -> list[tuple[Document, float, str]]:
         """Return docs most similar to the query with score and id using $vectorize.
 
@@ -1053,7 +1053,6 @@ class AstraDBVectorStore(VectorStore):
         """
         self.astra_env.ensure_db_setup()
         metadata_parameter = self._filter_to_metadata(filter)
-        #
         hits = list(
             self.astra_env.collection.find(
                 filter=metadata_parameter,
@@ -1067,7 +1066,6 @@ class AstraDBVectorStore(VectorStore):
                 sort={"$vectorize": query},
             )
         )
-        #
         return [
             (
                 Document(
@@ -1085,7 +1083,7 @@ class AstraDBVectorStore(VectorStore):
         self,
         query: str,
         k: int = 4,
-        filter: dict[str, Any] | None = None,
+        filter: dict[str, Any] | None = None,  # noqa: A002
     ) -> list[tuple[Document, float, str]]:
         """Return docs most similar to the query with score and id using $vectorize.
 
@@ -1093,7 +1091,6 @@ class AstraDBVectorStore(VectorStore):
         """
         await self.astra_env.aensure_db_setup()
         metadata_parameter = self._filter_to_metadata(filter)
-        #
         return [
             (
                 Document(
@@ -1121,7 +1118,7 @@ class AstraDBVectorStore(VectorStore):
         self,
         query: str,
         k: int = 4,
-        filter: dict[str, Any] | None = None,
+        filter: dict[str, Any] | None = None,  # noqa: A002
     ) -> list[tuple[Document, float, str]]:
         """Return docs most similar to the query with score and id.
 
@@ -1139,20 +1136,19 @@ class AstraDBVectorStore(VectorStore):
                 k=k,
                 filter=filter,
             )
-        else:
-            assert self.embedding is not None
-            embedding_vector = self.embedding.embed_query(query)
-            return self.similarity_search_with_score_id_by_vector(
-                embedding=embedding_vector,
-                k=k,
-                filter=filter,
-            )
+
+        embedding_vector = self._get_safe_embedding().embed_query(query)
+        return self.similarity_search_with_score_id_by_vector(
+            embedding=embedding_vector,
+            k=k,
+            filter=filter,
+        )
 
     async def asimilarity_search_with_score_id(
         self,
         query: str,
         k: int = 4,
-        filter: dict[str, Any] | None = None,
+        filter: dict[str, Any] | None = None,  # noqa: A002
     ) -> list[tuple[Document, float, str]]:
         """Return docs most similar to the query with score and id.
 
@@ -1170,20 +1166,19 @@ class AstraDBVectorStore(VectorStore):
                 k=k,
                 filter=filter,
             )
-        else:
-            assert self.embedding is not None
-            embedding_vector = await self.embedding.aembed_query(query)
-            return await self.asimilarity_search_with_score_id_by_vector(
-                embedding=embedding_vector,
-                k=k,
-                filter=filter,
-            )
+
+        embedding_vector = await self._get_safe_embedding().aembed_query(query)
+        return await self.asimilarity_search_with_score_id_by_vector(
+            embedding=embedding_vector,
+            k=k,
+            filter=filter,
+        )
 
     def similarity_search_with_score_by_vector(
         self,
         embedding: list[float],
         k: int = 4,
-        filter: dict[str, Any] | None = None,
+        filter: dict[str, Any] | None = None,  # noqa: A002
     ) -> list[tuple[Document, float]]:
         """Return docs most similar to embedding vector with score.
 
@@ -1208,7 +1203,7 @@ class AstraDBVectorStore(VectorStore):
         self,
         embedding: list[float],
         k: int = 4,
-        filter: dict[str, Any] | None = None,
+        filter: dict[str, Any] | None = None,  # noqa: A002
     ) -> list[tuple[Document, float]]:
         """Return docs most similar to embedding vector with score.
 
@@ -1238,7 +1233,7 @@ class AstraDBVectorStore(VectorStore):
         self,
         query: str,
         k: int = 4,
-        filter: dict[str, Any] | None = None,
+        filter: dict[str, Any] | None = None,  # noqa: A002
         **kwargs: Any,
     ) -> list[Document]:
         """Return docs most similar to query.
@@ -1260,21 +1255,20 @@ class AstraDBVectorStore(VectorStore):
                     filter=filter,
                 )
             ]
-        else:
-            assert self.embedding is not None
-            embedding_vector = self.embedding.embed_query(query)
-            return self.similarity_search_by_vector(
-                embedding_vector,
-                k,
-                filter=filter,
-            )
+
+        embedding_vector = self._get_safe_embedding().embed_query(query)
+        return self.similarity_search_by_vector(
+            embedding_vector,
+            k,
+            filter=filter,
+        )
 
     @override
     async def asimilarity_search(
         self,
         query: str,
         k: int = 4,
-        filter: dict[str, Any] | None = None,
+        filter: dict[str, Any] | None = None,  # noqa: A002
         **kwargs: Any,
     ) -> list[Document]:
         """Return docs most similar to query.
@@ -1300,21 +1294,20 @@ class AstraDBVectorStore(VectorStore):
                     filter=filter,
                 )
             ]
-        else:
-            assert self.embedding is not None
-            embedding_vector = await self.embedding.aembed_query(query)
-            return await self.asimilarity_search_by_vector(
-                embedding_vector,
-                k,
-                filter=filter,
-            )
+
+        embedding_vector = await self._get_safe_embedding().aembed_query(query)
+        return await self.asimilarity_search_by_vector(
+            embedding_vector,
+            k,
+            filter=filter,
+        )
 
     @override
     def similarity_search_by_vector(
         self,
         embedding: list[float],
         k: int = 4,
-        filter: dict[str, Any] | None = None,
+        filter: dict[str, Any] | None = None,  # noqa: A002
         **kwargs: Any,
     ) -> list[Document]:
         """Return docs most similar to embedding vector.
@@ -1341,7 +1334,7 @@ class AstraDBVectorStore(VectorStore):
         self,
         embedding: list[float],
         k: int = 4,
-        filter: dict[str, Any] | None = None,
+        filter: dict[str, Any] | None = None,  # noqa: A002
         **kwargs: Any,
     ) -> list[Document]:
         """Return docs most similar to embedding vector.
@@ -1368,7 +1361,7 @@ class AstraDBVectorStore(VectorStore):
         self,
         query: str,
         k: int = 4,
-        filter: dict[str, Any] | None = None,
+        filter: dict[str, Any] | None = None,  # noqa: A002
     ) -> list[tuple[Document, float]]:
         """Return docs most similar to query with score.
 
@@ -1393,21 +1386,20 @@ class AstraDBVectorStore(VectorStore):
                     filter=filter,
                 )
             ]
-        else:
-            assert self.embedding is not None
-            embedding_vector = self.embedding.embed_query(query)
-            return self.similarity_search_with_score_by_vector(
-                embedding_vector,
-                k,
-                filter=filter,
-            )
+
+        embedding_vector = self._get_safe_embedding().embed_query(query)
+        return self.similarity_search_with_score_by_vector(
+            embedding_vector,
+            k,
+            filter=filter,
+        )
 
     @override
     async def asimilarity_search_with_score(
         self,
         query: str,
         k: int = 4,
-        filter: dict[str, Any] | None = None,
+        filter: dict[str, Any] | None = None,  # noqa: A002
     ) -> list[tuple[Document, float]]:
         """Return docs most similar to query with score.
 
@@ -1432,14 +1424,13 @@ class AstraDBVectorStore(VectorStore):
                     filter=filter,
                 )
             ]
-        else:
-            assert self.embedding is not None
-            embedding_vector = await self.embedding.aembed_query(query)
-            return await self.asimilarity_search_with_score_by_vector(
-                embedding_vector,
-                k,
-                filter=filter,
-            )
+
+        embedding_vector = await self._get_safe_embedding().aembed_query(query)
+        return await self.asimilarity_search_with_score_by_vector(
+            embedding_vector,
+            k,
+            filter=filter,
+        )
 
     def _run_mmr_query_by_sort(
         self,
@@ -1448,7 +1439,6 @@ class AstraDBVectorStore(VectorStore):
         fetch_k: int,
         lambda_mult: float,
         metadata_parameter: dict[str, Any],
-        **kwargs: Any,
     ) -> list[Document]:
         prefetch_cursor = self.astra_env.collection.find(
             filter=metadata_parameter,
@@ -1481,7 +1471,6 @@ class AstraDBVectorStore(VectorStore):
         fetch_k: int,
         lambda_mult: float,
         metadata_parameter: dict[str, Any],
-        **kwargs: Any,
     ) -> list[Document]:
         prefetch_cursor = self.astra_env.async_collection.find(
             filter=metadata_parameter,
@@ -1541,7 +1530,7 @@ class AstraDBVectorStore(VectorStore):
         k: int = 4,
         fetch_k: int = 20,
         lambda_mult: float = 0.5,
-        filter: dict[str, Any] | None = None,
+        filter: dict[str, Any] | None = None,  # noqa: A002
         **kwargs: Any,
     ) -> list[Document]:
         """Return docs selected using the maximal marginal relevance.
@@ -1579,7 +1568,7 @@ class AstraDBVectorStore(VectorStore):
         k: int = 4,
         fetch_k: int = 20,
         lambda_mult: float = 0.5,
-        filter: dict[str, Any] | None = None,
+        filter: dict[str, Any] | None = None,  # noqa: A002
         **kwargs: Any,
     ) -> list[Document]:
         """Return docs selected using the maximal marginal relevance.
@@ -1617,7 +1606,7 @@ class AstraDBVectorStore(VectorStore):
         k: int = 4,
         fetch_k: int = 20,
         lambda_mult: float = 0.5,
-        filter: dict[str, Any] | None = None,
+        filter: dict[str, Any] | None = None,  # noqa: A002
         **kwargs: Any,
     ) -> list[Document]:
         """Return docs selected using the maximal marginal relevance.
@@ -1649,16 +1638,15 @@ class AstraDBVectorStore(VectorStore):
                 lambda_mult=lambda_mult,
                 metadata_parameter=metadata_parameter,
             )
-        else:
-            assert self.embedding is not None
-            embedding_vector = self.embedding.embed_query(query)
-            return self.max_marginal_relevance_search_by_vector(
-                embedding_vector,
-                k,
-                fetch_k,
-                lambda_mult=lambda_mult,
-                filter=filter,
-            )
+
+        embedding_vector = self._get_safe_embedding().embed_query(query)
+        return self.max_marginal_relevance_search_by_vector(
+            embedding_vector,
+            k,
+            fetch_k,
+            lambda_mult=lambda_mult,
+            filter=filter,
+        )
 
     @override
     async def amax_marginal_relevance_search(
@@ -1667,7 +1655,7 @@ class AstraDBVectorStore(VectorStore):
         k: int = 4,
         fetch_k: int = 20,
         lambda_mult: float = 0.5,
-        filter: dict[str, Any] | None = None,
+        filter: dict[str, Any] | None = None,  # noqa: A002
         **kwargs: Any,
     ) -> list[Document]:
         """Return docs selected using the maximal marginal relevance.
@@ -1699,16 +1687,15 @@ class AstraDBVectorStore(VectorStore):
                 lambda_mult=lambda_mult,
                 metadata_parameter=metadata_parameter,
             )
-        else:
-            assert self.embedding is not None
-            embedding_vector = await self.embedding.aembed_query(query)
-            return await self.amax_marginal_relevance_search_by_vector(
-                embedding_vector,
-                k,
-                fetch_k,
-                lambda_mult=lambda_mult,
-                filter=filter,
-            )
+
+        embedding_vector = await self._get_safe_embedding().aembed_query(query)
+        return await self.amax_marginal_relevance_search_by_vector(
+            embedding_vector,
+            k,
+            fetch_k,
+            lambda_mult=lambda_mult,
+            filter=filter,
+        )
 
     @classmethod
     def _from_kwargs(
@@ -1729,6 +1716,7 @@ class AstraDBVectorStore(VectorStore):
                         "which will be ignored."
                     ),
                     UserWarning,
+                    stacklevel=3,
                 )
 
         known_kwargs = {k: v for k, v in kwargs.items() if k in known_kwarg_keys}

@@ -52,11 +52,12 @@ class ParserEmbeddings(Embeddings):
     def embed_query(self, text: str) -> list[float]:
         try:
             vals = json.loads(text)
-            assert len(vals) == self.dimension
-            return vals
-        except Exception:
+        except json.JSONDecodeError:
             print(f'[ParserEmbeddings] Returning a moot vector for "{text}"')
             return [0.0] * self.dimension
+        else:
+            assert len(vals) == self.dimension
+            return vals
 
     async def aembed_query(self, text: str) -> list[float]:
         return self.embed_query(text)

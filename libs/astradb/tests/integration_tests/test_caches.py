@@ -13,36 +13,42 @@ Required to run this test:
 from __future__ import annotations
 
 import os
-from typing import Any, AsyncIterator, Iterator, Mapping, Optional, cast
+from typing import TYPE_CHECKING, Any, AsyncIterator, Iterator, Mapping, Optional, cast
 
 import pytest
-from astrapy.db import AstraDB
-from langchain_core.caches import BaseCache
-from langchain_core.callbacks import CallbackManagerForLLMRun
 from langchain_core.embeddings import Embeddings
 from langchain_core.globals import get_llm_cache, set_llm_cache
 from langchain_core.language_models import LLM
 from langchain_core.outputs import Generation, LLMResult
 from langchain_core.pydantic_v1 import validator
+from typing_extensions import override
 
 from langchain_astradb import AstraDBCache, AstraDBSemanticCache
 from langchain_astradb.utils.astradb import SetupMode
 
 from .conftest import AstraDBCredentials, _has_env_vars
 
+if TYPE_CHECKING:
+    from astrapy.db import AstraDB
+    from langchain_core.caches import BaseCache
+    from langchain_core.callbacks import CallbackManagerForLLMRun
+
 
 class FakeEmbeddings(Embeddings):
     """Fake embeddings functionality for testing."""
 
+    @override
     def embed_documents(self, texts: list[str]) -> list[list[float]]:
         """Return simple embeddings.
         Embeddings encode each text as its index.
         """
         return [[1.0] * 9 + [float(i)] for i in range(len(texts))]
 
+    @override
     async def aembed_documents(self, texts: list[str]) -> list[list[float]]:
         return self.embed_documents(texts)
 
+    @override
     def embed_query(self, text: str) -> list[float]:
         """Return constant query embeddings.
         Embeddings are identical to embed_documents(texts)[0].
@@ -51,6 +57,7 @@ class FakeEmbeddings(Embeddings):
         """
         return [1.0] * 9 + [0.0]
 
+    @override
     async def aembed_query(self, text: str) -> list[float]:
         return self.embed_query(text)
 
@@ -72,15 +79,18 @@ class FakeLLM(LLM):
             )
         return queries
 
+    @override
     def get_num_tokens(self, text: str) -> int:
         """Return number of tokens."""
         return len(text.split())
 
     @property
+    @override
     def _llm_type(self) -> str:
         """Return type of llm."""
         return "fake"
 
+    @override
     def _call(
         self,
         prompt: str,
@@ -92,12 +102,10 @@ class FakeLLM(LLM):
             return self._get_next_response_in_sequence
         if self.queries is not None:
             return self.queries[prompt]
-        if stop is None:
-            return "foo"
-        else:
-            return "bar"
+        return "foo" if stop is None else "bar"
 
     @property
+    @override
     def _identifying_params(self) -> dict[str, Any]:
         return {}
 
