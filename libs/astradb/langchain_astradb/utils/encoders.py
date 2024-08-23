@@ -127,7 +127,8 @@ class DefaultVSDocumentEncoder(VSDocumentEncoder):
         metadata: dict | None,
     ) -> dict[str, Any]:
         if vector is None:
-            raise ValueError("Default encoder cannot receive null vector")
+            msg = "Default encoder cannot receive null vector"
+            raise ValueError(msg)
         return {
             "content": content,
             "_id": document_id,
@@ -176,7 +177,8 @@ class DefaultVectorizeVSDocumentEncoder(VSDocumentEncoder):
         metadata: dict | None,
     ) -> dict[str, Any]:
         if vector is not None:
-            raise ValueError("DefaultVectorize encoder cannot receive non-null vector")
+            msg = "DefaultVectorize encoder cannot receive non-null vector"
+            raise ValueError(msg)
         return {
             "$vectorize": content,
             "_id": document_id,
