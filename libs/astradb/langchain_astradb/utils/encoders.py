@@ -7,19 +7,19 @@ from langchain_core.documents import Document
 from typing_extensions import override
 
 
-def _default_filter_encoder(filter_dict: dict[str, Any]) -> dict[str, Any]:
+def _default_encode_filter(filter_dict: dict[str, Any]) -> dict[str, Any]:
     metadata_filter = {}
     for k, v in filter_dict.items():
         # Key in this dict starting with $ are supposedly operators and as such
         # should not be nested within the `metadata.` prefix. For instance,
-        # >>> _default_filter_encoder({'a':1, '$or': [{'b':2}, {'c': 3}]})
+        # >>> _default_encode_filter({'a':1, '$or': [{'b':2}, {'c': 3}]})
         #     {'metadata.a': 1, '$or': [{'metadata.b': 2}, {'metadata.c': 3}]}
         if k and k[0] == "$":
             if isinstance(v, list):
-                metadata_filter[k] = [_default_filter_encoder(f) for f in v]
+                metadata_filter[k] = [_default_encode_filter(f) for f in v]
             else:
                 # assume each list item can be fed back to this function
-                metadata_filter[k] = _default_filter_encoder(v)  # type: ignore[assignment]
+                metadata_filter[k] = _default_encode_filter(v)  # type: ignore[assignment]
         else:
             metadata_filter[f"metadata.{k}"] = v
 
@@ -68,7 +68,6 @@ class VSDocumentEncoder(ABC):
         Returns:
             a dictionary ready for storage onto Astra DB.
         """
-        ...
 
     @abstractmethod
     def decode(self, astra_document: dict[str, Any]) -> Document:
@@ -80,7 +79,6 @@ class VSDocumentEncoder(ABC):
         Returns:
             a (langchain) Document corresponding to the input.
         """
-        ...
 
     @abstractmethod
     def encode_filter(self, filter_dict: dict[str, Any]) -> dict[str, Any]:
@@ -96,7 +94,6 @@ class VSDocumentEncoder(ABC):
         Returns:
             an equivalent filter clause for use in Astra DB's find queries.
         """
-        ...
 
 
 class DefaultVSDocumentEncoder(VSDocumentEncoder):
@@ -145,7 +142,7 @@ class DefaultVSDocumentEncoder(VSDocumentEncoder):
 
     @override
     def encode_filter(self, filter_dict: dict[str, Any]) -> dict[str, Any]:
-        return _default_filter_encoder(filter_dict)
+        return _default_encode_filter(filter_dict)
 
 
 class DefaultVectorizeVSDocumentEncoder(VSDocumentEncoder):
@@ -177,7 +174,7 @@ class DefaultVectorizeVSDocumentEncoder(VSDocumentEncoder):
         metadata: dict | None,
     ) -> dict[str, Any]:
         if vector is not None:
-            msg = "DefaultVectorize encoder cannot receive non-null vector"
+            msg = f"DefaultVectorize encoder got a non-null vector: {vector}"
             raise ValueError(msg)
         return {
             "$vectorize": content,
@@ -194,4 +191,4 @@ class DefaultVectorizeVSDocumentEncoder(VSDocumentEncoder):
 
     @override
     def encode_filter(self, filter_dict: dict[str, Any]) -> dict[str, Any]:
-        return _default_filter_encoder(filter_dict)
+        return _default_encode_filter(filter_dict)

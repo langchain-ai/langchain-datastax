@@ -859,7 +859,9 @@ class AstraDBVectorStore(VectorStore):
         if self.document_encoder.server_side_embeddings:
             embedding_vectors = [None for _ in list(texts)]
         else:
-            embedding_vectors = await self.embedding.aembed_documents(list(texts))  # type: ignore[union-attr]
+            embedding_vectors = await self._get_safe_embedding().aembed_documents(
+                list(texts)
+            )
         documents_to_insert = self._get_documents_to_insert(
             texts, embedding_vectors, metadatas, ids
         )
