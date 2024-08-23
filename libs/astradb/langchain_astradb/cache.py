@@ -296,14 +296,14 @@ def _reawaitable(func: Callable) -> Callable:
     return wrapper
 
 
-def _async_lru_cache(maxsize: int = 128, typed: bool = False) -> Callable:
+def _async_lru_cache(maxsize: int = 128) -> Callable:
     """Least-recently-used async cache decorator.
 
     Equivalent to functools.lru_cache for async functions.
     """
 
     def decorating_function(user_function: Callable) -> Callable:
-        return lru_cache(maxsize, typed)(_reawaitable(user_function))
+        return lru_cache(maxsize)(_reawaitable(user_function))
 
     return decorating_function
 
