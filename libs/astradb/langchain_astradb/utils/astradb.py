@@ -65,11 +65,12 @@ class _AstraDBEnvironment:
 
         if astra_db_client is not None or async_astra_db_client is not None:
             if token is not None or api_endpoint is not None or environment is not None:
-                raise ValueError(
+                msg = (
                     "You cannot pass 'astra_db_client' or 'async_astra_db_client' "
                     "to AstraDBEnvironment if passing 'token', 'api_endpoint' or "
                     "'environment'."
                 )
+                raise ValueError(msg)
             _astra_db = astra_db_client.copy() if astra_db_client is not None else None
             if async_astra_db_client is not None:
                 _async_astra_db = async_astra_db_client.copy()
@@ -112,23 +113,26 @@ class _AstraDBEnvironment:
                 }
             )
             if len(_tokens) != 1:
-                raise ValueError(
+                msg = (
                     "Conflicting tokens found in the sync and async AstraDB "
                     "constructor parameters. Please check the tokens and "
                     "ensure they match."
                 )
+                raise ValueError(msg)
             if len(_api_endpoints) != 1:
-                raise ValueError(
+                msg = (
                     "Conflicting API endpoints found in the sync and async "
                     "AstraDB constructor parameters. Please check the tokens "
                     "and ensure they match."
                 )
+                raise ValueError(msg)
             if len(_namespaces) != 1:
-                raise ValueError(
+                msg = (
                     "Conflicting namespaces found in the sync and async "
                     "AstraDB constructor parameters. Please check the tokens "
                     "and ensure they match."
                 )
+                raise ValueError(msg)
             # all good: these are 1-element lists here
             self.token = _tokens[0]
             self.api_endpoint = _api_endpoints[0]
@@ -167,11 +171,12 @@ class _AstraDBEnvironment:
         # init parameters are normalized to self.{token, api_endpoint, namespace}.
         # Proceed. Namespace and token can be None (resp. on Astra DB and non-Astra)
         if self.api_endpoint is None:
-            raise ValueError(
+            msg = (
                 "API endpoint for Data API not provided. "
                 "Either pass it explicitly to the object constructor "
                 f"or set the {API_ENDPOINT_ENV_VAR} environment variable."
             )
+            raise ValueError(msg)
 
         # create the clients
         caller_name = "langchain"
@@ -267,10 +272,11 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
             if pre_delete_collection:
                 self.database.drop_collection(collection_name)
             if inspect.isawaitable(embedding_dimension):
-                raise ValueError(
+                msg = (
                     "Cannot use an awaitable embedding_dimension with async_setup "
                     "set to False"
                 )
+                raise ValueError(msg)
             try:
                 self.database.create_collection(
                     name=collection_name,
@@ -331,12 +337,13 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
               has to reraise it.
         """
         if requested_indexing_policy is None and default_indexing_policy is not None:
-            raise ValueError(
+            msg = (
                 "Cannot specify a default indexing policy "
                 "when no indexing policy is requested for this collection "
                 "(requested_indexing_policy is None, "
                 "default_indexing_policy is not None)."
             )
+            raise ValueError(msg)
 
         preexisting = [
             collection
@@ -354,7 +361,7 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
         if not pre_col_options.indexing:
             # legacy collection on DB
             if requested_indexing_policy != default_indexing_policy:
-                raise ValueError(
+                msg = (
                     f"Astra DB collection '{collection_name}' is "
                     "detected as having indexing turned on for all "
                     "fields (either created manually or by older "
@@ -366,6 +373,7 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
                     "settings for this object to their defaults "
                     "to keep using this collection."
                 )
+                raise ValueError(msg)
             warnings.warn(
                 (
                     f"Astra DB collection '{collection_name}' is "
@@ -393,7 +401,7 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
                 if pre_col_options.indexing == default_indexing_policy
                 else ""
             )
-            raise ValueError(
+            msg = (
                 f"Astra DB collection '{collection_name}' is "
                 "detected as having the following indexing policy: "
                 f"{options_json}{default_desc}. This is incompatible "
@@ -403,6 +411,7 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
                 "policy, or alternatively align the requested "
                 "indexing settings to the collection to keep using it."
             )
+            raise ValueError(msg)
 
         # the discrepancies have to do with options other than indexing
         return False
@@ -412,11 +421,12 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
             try:
                 self.async_setup_db_task.result()
             except InvalidStateError as e:
-                raise ValueError(
+                msg = (
                     "Asynchronous setup of the DB not finished. "
                     "NB: Astra DB components sync methods shouldn't be called from the "
                     "event loop. Consider using their async equivalents."
-                ) from e
+                )
+                raise ValueError(msg) from e
 
     async def aensure_db_setup(self) -> None:
         if self.async_setup_db_task:

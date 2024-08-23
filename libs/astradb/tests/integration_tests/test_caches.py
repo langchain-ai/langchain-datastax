@@ -65,8 +65,8 @@ class FakeEmbeddings(Embeddings):
 class FakeLLM(LLM):
     """Fake LLM wrapper for testing purposes."""
 
-    queries: Optional[Mapping] = None
-    sequential_responses: Optional[bool] = False
+    queries: Optional[Mapping] = None  # noqa: UP007
+    sequential_responses: Optional[bool] = False  # noqa: UP007
     response_index: int = 0
 
     @validator("queries", always=True)
@@ -74,9 +74,8 @@ class FakeLLM(LLM):
         cls, queries: Mapping | None, values: Mapping[str, Any]
     ) -> Mapping | None:
         if values.get("sequential_response") and not queries:
-            raise ValueError(
-                "queries is required when sequential_response is set to True"
-            )
+            msg = "queries is required when sequential_response is set to True"
+            raise ValueError(msg)
         return queries
 
     @override
