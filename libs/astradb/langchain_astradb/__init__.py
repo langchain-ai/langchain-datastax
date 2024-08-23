@@ -1,3 +1,5 @@
+"""Astra DB integration for LangChain."""
+
 from astrapy.info import CollectionVectorServiceOptions
 
 from langchain_astradb.cache import AstraDBCache, AstraDBSemanticCache

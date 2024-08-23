@@ -1,3 +1,5 @@
+"""Astra DB - based storages."""
+
 from __future__ import annotations
 
 import asyncio
@@ -34,9 +36,8 @@ V = TypeVar("V")
 
 
 class AstraDBBaseStore(Generic[V], BaseStore[str, V], ABC):
-    """Base class for the DataStax Astra DB data store."""
-
     def __init__(self, *args: Any, **kwargs: Any) -> None:
+        """Base class for the DataStax Astra DB data store."""
         if "requested_indexing_policy" in kwargs:
             msg = "Do not pass 'requested_indexing_policy' to AstraDBBaseStore init"
             raise ValueError(msg)

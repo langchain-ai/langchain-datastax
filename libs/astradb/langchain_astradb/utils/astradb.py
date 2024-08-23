@@ -1,3 +1,5 @@
+"""Utilities for AstraDB setup and management."""
+
 from __future__ import annotations
 
 import asyncio

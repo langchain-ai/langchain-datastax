@@ -72,10 +72,6 @@ ignore = [
     "ANN", # Already checked by mypy
     "C90", # Do we want to activate (complexity) ?
     "COM812", # Messes with the formatter
-    "D100", # Do we want to activate (docstring in module) ?
-    "D104", # Do we want to activate (docstring in package) ?
-    "D105", # Do we want to activate (docstring in magic method) ?
-    "D107", # Do we want to activate (docstring in __init__) ?
     "ERA", # Do we want to activate (no commented code) ?
     "FBT", # Do we want to activate (boolean trap) ?
     "ISC001", # Messes with the formatter
@@ -101,6 +97,7 @@ ignore = [
     "PLR2004",
 ]
 "scripts/*" = [
+    "D",
     "T201",
 ]
 
