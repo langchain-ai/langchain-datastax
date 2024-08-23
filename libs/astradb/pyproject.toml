@@ -78,7 +78,6 @@ ignore = [
     "D107", # Do we want to activate (docstring in __init__) ?
     "ERA", # Do we want to activate (no commented code) ?
     "ISC001", # Messes with the formatter
-    "PERF203", # Incorrect detection
     "PLR09", # TODO: do we enforce these ones (complexity) ?
     "PTH", # Do we want to activate (use pathlib) ?
 
