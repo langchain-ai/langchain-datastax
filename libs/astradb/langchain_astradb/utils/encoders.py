@@ -10,6 +10,10 @@ from typing_extensions import override
 def _default_filter_encoder(filter_dict: dict[str, Any]) -> dict[str, Any]:
     metadata_filter = {}
     for k, v in filter_dict.items():
+        # Key in this dict starting with $ are supposedly operators and as such
+        # should not be nested within the `metadata.` prefix. For instance,
+        # >>> _default_filter_encoder({'a':1, '$or': [{'b':2}, {'c': 3}]})
+        #     {'metadata.a': 1, '$or': [{'metadata.b': 2}, {'metadata.c': 3}]}
         if k and k[0] == "$":
             if isinstance(v, list):
                 metadata_filter[k] = [_default_filter_encoder(f) for f in v]
@@ -48,7 +52,7 @@ class VSDocumentEncoder(ABC):
     def encode(
         self,
         content: str,
-        id: str,  # noqa: A002
+        document_id: str,
         vector: list[float] | None,
         metadata: dict | None,
     ) -> dict[str, Any]:
@@ -56,7 +60,7 @@ class VSDocumentEncoder(ABC):
 
         Args:
             content: textual content for the (LangChain) `Document`.
-            id: unique ID for the (LangChain) `Document`.
+            document_id: unique ID for the (LangChain) `Document`.
             vector: a vector associated to the (LangChain) `Document`. This
                 parameter must be None for and only for server-side embeddings.
             metadata: a metadata dictionary for the (LangChain) `Document`.
@@ -118,7 +122,7 @@ class DefaultVSDocumentEncoder(VSDocumentEncoder):
     def encode(
         self,
         content: str,
-        id: str,  # noqa: A002
+        document_id: str,
         vector: list[float] | None,
         metadata: dict | None,
     ) -> dict[str, Any]:
@@ -126,7 +130,7 @@ class DefaultVSDocumentEncoder(VSDocumentEncoder):
             raise ValueError("Default encoder cannot receive null vector")
         return {
             "content": content,
-            "_id": id,
+            "_id": document_id,
             "$vector": vector,
             "metadata": metadata,
         }
@@ -167,7 +171,7 @@ class DefaultVectorizeVSDocumentEncoder(VSDocumentEncoder):
     def encode(
         self,
         content: str,
-        id: str,  # noqa: A002
+        document_id: str,
         vector: list[float] | None,
         metadata: dict | None,
     ) -> dict[str, Any]:
@@ -175,7 +179,7 @@ class DefaultVectorizeVSDocumentEncoder(VSDocumentEncoder):
             raise ValueError("DefaultVectorize encoder cannot receive non-null vector")
         return {
             "$vectorize": content,
-            "_id": id,
+            "_id": document_id,
             "metadata": metadata,
         }
 

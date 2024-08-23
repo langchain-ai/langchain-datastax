@@ -631,7 +631,7 @@ class AstraDBVectorStore(VectorStore):
         documents_to_insert = [
             self.document_encoder.encode(
                 content=b_txt,
-                id=b_id,
+                document_id=b_id,
                 vector=b_emb,
                 metadata=b_md,
             )
