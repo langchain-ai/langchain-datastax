@@ -283,7 +283,6 @@ class TestAstraDB:
         self,
         astra_db_credentials: AstraDBCredentials,
         collection: Collection,
-        core_astra_db: AstraDB,
     ) -> None:
         """Test deprecation of 'find_options' and related warnings/errors."""
         loader0 = AstraDBLoader(
