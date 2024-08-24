@@ -1,3 +1,5 @@
+"""Loader for loading documents from DataStax Astra DB."""
+
 from __future__ import annotations
 
 import json

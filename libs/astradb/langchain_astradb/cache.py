@@ -1,3 +1,5 @@
+"""Astra DB - based caches."""
+
 from __future__ import annotations
 
 import hashlib

@@ -1,3 +1,5 @@
+"""Classes to handle encoding of documents on DB for the Vector Store.."""
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
@@ -107,6 +109,7 @@ class DefaultVSDocumentEncoder(VSDocumentEncoder):
     content_field = "content"
 
     def __init__(self) -> None:
+        """Initialize a new DefaultVSDocumentEncoder."""
         self.base_projection = {"_id": True, "content": True, "metadata": True}
         self.full_projection = {
             "_id": True,
@@ -157,6 +160,7 @@ class DefaultVectorizeVSDocumentEncoder(VSDocumentEncoder):
     content_field = "$vectorize"
 
     def __init__(self) -> None:
+        """Initialize a new DefaultVectorizeVSDocumentEncoder."""
         self.base_projection = {"_id": True, "$vectorize": True, "metadata": True}
         self.full_projection = {
             "_id": True,
