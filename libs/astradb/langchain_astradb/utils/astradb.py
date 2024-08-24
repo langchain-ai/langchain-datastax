@@ -199,6 +199,7 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
     def __init__(
         self,
         collection_name: str,
+        *,
         token: str | TokenProvider | None = None,
         api_endpoint: str | None = None,
         environment: str | None = None,

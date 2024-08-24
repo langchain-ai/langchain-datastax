@@ -77,7 +77,6 @@ ignore = [
     "D105", # Do we want to activate (docstring in magic method) ?
     "D107", # Do we want to activate (docstring in __init__) ?
     "ERA", # Do we want to activate (no commented code) ?
-    "FBT", # Do we want to activate (boolean trap) ?
     "ISC001", # Messes with the formatter
     "PLR09", # TODO: do we enforce these ones (complexity) ?
     "PTH", # Do we want to activate (use pathlib) ?
