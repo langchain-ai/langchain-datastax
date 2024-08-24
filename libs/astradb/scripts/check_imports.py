@@ -10,7 +10,7 @@ if __name__ == "__main__":
     for file in files:
         try:
             SourceFileLoader("x", file).load_module()
-        except Exception:
+        except (ImportError, FileNotFoundError):  # noqa: PERF203
             has_faillure = True
             print(file)
             traceback.print_exc()

@@ -73,9 +73,7 @@ ignore = [
     "C90", # Do we want to activate (complexity) ?
     "COM812", # Messes with the formatter
     "ERA", # Do we want to activate (no commented code) ?
-    "FBT", # Do we want to activate (boolean trap) ?
     "ISC001", # Messes with the formatter
-    "PERF203", # Incorrect detection
     "PLR09", # TODO: do we enforce these ones (complexity) ?
     "PTH", # Do we want to activate (use pathlib) ?
 
