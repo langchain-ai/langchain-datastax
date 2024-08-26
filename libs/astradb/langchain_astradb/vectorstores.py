@@ -33,9 +33,9 @@ from langchain_astradb.utils.astradb import (
     _AstraDBCollectionEnvironment,
 )
 from langchain_astradb.utils.encoders import (
-    DefaultVectorizeVSDocumentEncoder,
-    DefaultVSDocumentEncoder,
-    VSDocumentEncoder,
+    AstraDBVectorStoreDocumentEncoder,
+    _DefaultVectorizeVSDocumentEncoder,
+    _DefaultVSDocumentEncoder,
 )
 from langchain_astradb.utils.mmr import maximal_marginal_relevance
 
@@ -400,11 +400,11 @@ class AstraDBVectorStore(VectorStore):
         self.environment = environment
         self.namespace = namespace
         self.collection_vector_service_options = collection_vector_service_options
-        self.document_encoder: VSDocumentEncoder
+        self.document_encoder: AstraDBVectorStoreDocumentEncoder
         if self.collection_vector_service_options is not None:
-            self.document_encoder = DefaultVectorizeVSDocumentEncoder()
+            self.document_encoder = _DefaultVectorizeVSDocumentEncoder()
         else:
-            self.document_encoder = DefaultVSDocumentEncoder()
+            self.document_encoder = _DefaultVSDocumentEncoder()
         self.collection_embedding_api_key = collection_embedding_api_key
         # Concurrency settings
         self.batch_size: int | None = batch_size or DEFAULT_DOCUMENT_CHUNK_SIZE

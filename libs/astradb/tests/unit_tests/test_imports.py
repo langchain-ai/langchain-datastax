@@ -9,6 +9,7 @@ EXPECTED_ALL = [
     "AstraDBLoader",
     "AstraDBVectorStore",
     "CollectionVectorServiceOptions",
+    "AstraDBVectorStoreDocumentEncoder",
 ]
 
 
