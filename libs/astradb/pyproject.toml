@@ -78,8 +78,6 @@ ignore = [
     "PTH", # Do we want to activate (use pathlib) ?
 
     "BLE001", # TODO
-    "PT011", # TODO
-    "PT012", # TODO
     "D101", # TODO
     "D417", # TODO
     "PTH", # TODO
