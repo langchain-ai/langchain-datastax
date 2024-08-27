@@ -74,13 +74,7 @@ nvidia_vectorize_options = CollectionVectorServiceOptions(
 
 def is_nvidia_vector_service_available() -> bool:
     # For the time being, this is manually controlled
-    if os.environ.get("NVIDIA_VECTORIZE_AVAILABLE"):
-        try:
-            return int(os.environ["NVIDIA_VECTORIZE_AVAILABLE"]) != 0
-        except Exception:
-            return False
-    else:
-        return False
+    return os.getenv("NVIDIA_VECTORIZE_AVAILABLE") == "1"
 
 
 @pytest.fixture()
