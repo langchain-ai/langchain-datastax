@@ -4,6 +4,8 @@ import pytest
 from langchain_core.documents import Document
 
 from langchain_astradb.utils.encoders import (
+    NO_NULL_VECTOR_MSG,
+    VECTOR_REQUIRED_PREAMBLE_MSG,
     _DefaultVectorizeVSDocumentEncoder,
     _DefaultVSDocumentEncoder,
 )
@@ -46,7 +48,10 @@ class TestVSDocEncoders:
     def test_default_novectorize_vector_required(self) -> None:
         """Test vector is required for default encoding, no-vectorize."""
         encoder = _DefaultVSDocumentEncoder()
-        with pytest.raises(ValueError):
+        with pytest.raises(
+            ValueError,
+            match=NO_NULL_VECTOR_MSG,
+        ):
             encoder.encode(
                 content=CONTENT,
                 document_id=DOCUMENT_ID,
@@ -80,7 +85,10 @@ class TestVSDocEncoders:
     def test_default_vectorize_vector_forbidden(self) -> None:
         """Test vector is not allowed for default encoding, vectorize."""
         encoder = _DefaultVectorizeVSDocumentEncoder()
-        with pytest.raises(ValueError):
+        with pytest.raises(
+            ValueError,
+            match=VECTOR_REQUIRED_PREAMBLE_MSG,
+        ):
             encoder.encode(
                 content=CONTENT,
                 document_id=DOCUMENT_ID,

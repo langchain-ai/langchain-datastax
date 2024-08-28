@@ -8,6 +8,9 @@ from typing import Any
 from langchain_core.documents import Document
 from typing_extensions import override
 
+NO_NULL_VECTOR_MSG = "Default encoder cannot receive null vector"
+VECTOR_REQUIRED_PREAMBLE_MSG = "DefaultVectorize encoder got a non-null vector"
+
 
 def _default_encode_filter(filter_dict: dict[str, Any]) -> dict[str, Any]:
     metadata_filter = {}
@@ -127,8 +130,7 @@ class _DefaultVSDocumentEncoder(_AstraDBVectorStoreDocumentEncoder):
         metadata: dict | None,
     ) -> dict[str, Any]:
         if vector is None:
-            msg = "Default encoder cannot receive null vector"
-            raise ValueError(msg)
+            raise ValueError(NO_NULL_VECTOR_MSG)
         return {
             "content": content,
             "_id": document_id,
@@ -178,7 +180,7 @@ class _DefaultVectorizeVSDocumentEncoder(_AstraDBVectorStoreDocumentEncoder):
         metadata: dict | None,
     ) -> dict[str, Any]:
         if vector is not None:
-            msg = f"DefaultVectorize encoder got a non-null vector: {vector}"
+            msg = f"{VECTOR_REQUIRED_PREAMBLE_MSG}: {vector}"
             raise ValueError(msg)
         return {
             "$vectorize": content,

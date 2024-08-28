@@ -368,7 +368,9 @@ class TestAstraDBStore:
             )
             assert len(rec_warnings) == 1
         # on a custom collection must error
-        with pytest.raises(ValueError):
+        with pytest.raises(
+            ValueError, match="is detected as having the following indexing policy"
+        ):
             AstraDBStore(
                 collection_name="lc_test_custom_store",
                 token=astra_db_credentials["token"],

@@ -13,6 +13,12 @@ from langchain_astradb.utils.astradb import (
 FAKE_TOKEN = "t"  # noqa: S105
 
 
+CLIENT_PARAM_CONFLICT_MSG = (
+    "You cannot pass 'astra_db_client' or 'async_astra_db_client' to "
+    "AstraDBEnvironment if passing 'token', 'api_endpoint' or 'environment'."
+)
+
+
 class TestAstraDBEnvironment:
     def test_initialization(self) -> None:
         """Test the various ways to initialize the environment."""
@@ -61,13 +67,19 @@ class TestAstraDBEnvironment:
             assert env1.async_database == env2.async_database
 
             # token+endpoint, but also a ready-made client
-            with pytest.raises(ValueError):
+            with pytest.raises(
+                ValueError,
+                match=CLIENT_PARAM_CONFLICT_MSG,
+            ):
                 _AstraDBEnvironment(
                     token=FAKE_TOKEN,
                     api_endpoint=a_e_string,
                     astra_db_client=mock_astra_db,
                 )
-            with pytest.raises(ValueError):
+            with pytest.raises(
+                ValueError,
+                match=CLIENT_PARAM_CONFLICT_MSG,
+            ):
                 _AstraDBEnvironment(
                     token=FAKE_TOKEN,
                     api_endpoint=a_e_string,
@@ -75,7 +87,9 @@ class TestAstraDBEnvironment:
                 )
 
             # just tokenn, no endpoint
-            with pytest.raises(ValueError):
+            with pytest.raises(
+                ValueError, match="API endpoint for Data API not provided."
+            ):
                 _AstraDBEnvironment(
                     token=FAKE_TOKEN,
                 )
@@ -97,7 +111,11 @@ class TestAstraDBEnvironment:
                 )
 
             # both sync and async, but mismatching in various ways
-            with pytest.raises(ValueError), pytest.warns(DeprecationWarning):
+            with pytest.raises(
+                ValueError,
+                match="Conflicting API endpoints found in the sync and async AstraDB "
+                "constructor parameters.",
+            ), pytest.warns(DeprecationWarning):
                 _AstraDBEnvironment(
                     async_astra_db_client=mock_astra_db.to_async(),
                     astra_db_client=AstraDB(
@@ -106,7 +124,11 @@ class TestAstraDBEnvironment:
                         namespace="n",
                     ),
                 )
-            with pytest.raises(ValueError), pytest.warns(DeprecationWarning):
+            with pytest.raises(
+                ValueError,
+                match="Conflicting namespaces found in the sync and async AstraDB "
+                "constructor parameters.",
+            ), pytest.warns(DeprecationWarning):
                 _AstraDBEnvironment(
                     async_astra_db_client=mock_astra_db.to_async(),
                     astra_db_client=AstraDB(
@@ -115,7 +137,11 @@ class TestAstraDBEnvironment:
                         namespace="n2",
                     ),
                 )
-            with pytest.raises(ValueError), pytest.warns(DeprecationWarning):
+            with pytest.raises(
+                ValueError,
+                match="Conflicting tokens found in the sync and async AstraDB "
+                "constructor parameters.",
+            ), pytest.warns(DeprecationWarning):
                 _AstraDBEnvironment(
                     async_astra_db_client=mock_astra_db.to_async(),
                     astra_db_client=AstraDB(
@@ -126,13 +152,19 @@ class TestAstraDBEnvironment:
                 )
 
             # token+client
-            with pytest.raises(ValueError):
+            with pytest.raises(
+                ValueError,
+                match=CLIENT_PARAM_CONFLICT_MSG,
+            ):
                 _AstraDBEnvironment(
                     token=FAKE_TOKEN,
                     astra_db_client=mock_astra_db,
                 )
             # endpoint+client
-            with pytest.raises(ValueError):
+            with pytest.raises(
+                ValueError,
+                match=CLIENT_PARAM_CONFLICT_MSG,
+            ):
                 _AstraDBEnvironment(
                     api_endpoint=a_e_string,
                     async_astra_db_client=mock_astra_db.to_async(),

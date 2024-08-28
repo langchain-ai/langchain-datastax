@@ -307,7 +307,7 @@ class TestAstraDB:
         assert len(rec_warnings) == 1
         assert loader_lo.load() == docs0
 
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="Duplicate 'limit' directive supplied."):
             AstraDBLoader(
                 collection_name=collection.name,
                 token=astra_db_credentials["token"],
