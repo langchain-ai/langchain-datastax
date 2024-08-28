@@ -28,7 +28,7 @@ if TYPE_CHECKING:
     from astrapy.db import AstraDB
 
 
-@pytest.fixture()
+@pytest.fixture
 def collection(database: Database) -> Iterator[Collection]:
     collection_name = f"lc_test_loader_{str(uuid.uuid4()).split('-')[0]}"
     collection = database.create_collection(collection_name)
@@ -42,7 +42,7 @@ def collection(database: Database) -> Iterator[Collection]:
     collection.drop()
 
 
-@pytest.fixture()
+@pytest.fixture
 async def async_collection(database: Database) -> AsyncIterator[AsyncCollection]:
     adatabase = database.to_async()
     collection_name = f"lc_test_loader_{str(uuid.uuid4()).split('-')[0]}"
@@ -307,7 +307,7 @@ class TestAstraDB:
         assert len(rec_warnings) == 1
         assert loader_lo.load() == docs0
 
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="Duplicate 'limit' directive supplied."):
             AstraDBLoader(
                 collection_name=collection.name,
                 token=astra_db_credentials["token"],

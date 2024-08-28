@@ -50,7 +50,7 @@ optional = true
 optional = true
 
 [tool.poetry.group.lint.dependencies]
-ruff = "^0.5"
+ruff = "^0.6"
 
 [tool.poetry.group.typing.dependencies]
 mypy = "^0.991"
@@ -67,21 +67,18 @@ pydocstyle.convention = "google"
 pep8-naming.classmethod-decorators = [
     "langchain_core.pydantic_v1.validator",
 ]
+flake8-annotations.allow-star-arg-any = true
+flake8-annotations.mypy-init-return = true
 select = ["ALL"]
 ignore = [
-    "ANN", # Already checked by mypy
+    "C90", # Do we want to activate (complexity) ?
     "COM812", # Messes with the formatter
     "ERA", # Do we want to activate (no commented code) ?
     "ISC001", # Messes with the formatter
     "PLR09", # TODO: do we enforce these ones (complexity) ?
-    "PTH", # Do we want to activate (use pathlib) ?
 
-    "BLE001", # TODO
-    "PT011", # TODO
-    "PT012", # TODO
     "D101", # TODO
     "D417", # TODO
-    "PTH", # TODO
 
 ]
 

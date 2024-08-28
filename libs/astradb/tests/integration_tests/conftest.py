@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from typing import TypedDict
 
 import pytest
@@ -8,16 +9,16 @@ from astrapy import Database
 from astrapy.db import AstraDB
 
 # Getting the absolute path of the current file's directory
-ABS_PATH = os.path.dirname(os.path.abspath(__file__))
+ABS_PATH = (Path(__file__)).parent
 
 # Getting the absolute path of the project's root directory
-PROJECT_DIR = os.path.abspath(os.path.join(ABS_PATH, os.pardir, os.pardir))
+PROJECT_DIR = Path(ABS_PATH).parent.parent
 
 
 # Loading the .env file if it exists
 def _load_env() -> None:
-    dotenv_path = os.path.join(PROJECT_DIR, "tests", "integration_tests", ".env")
-    if os.path.exists(dotenv_path):
+    dotenv_path = Path(PROJECT_DIR) / "tests" / "integration_tests" / ".env"
+    if Path(dotenv_path).exists():
         from dotenv import load_dotenv
 
         load_dotenv(dotenv_path)

@@ -71,19 +71,23 @@ nvidia_vectorize_options = CollectionVectorServiceOptions(
     model_name="NV-Embed-QA",
 )
 
+INCOMPATIBLE_INDEXING_MSG = "is detected as having the following indexing policy"
+
 
 def is_nvidia_vector_service_available() -> bool:
     # For the time being, this is manually controlled
     if os.environ.get("NVIDIA_VECTORIZE_AVAILABLE"):
         try:
+            # any non-zero counts as true:
             return int(os.environ["NVIDIA_VECTORIZE_AVAILABLE"]) != 0
-        except Exception:
+        except (TypeError, ValueError):
+            # the env var has unparsable contents:
             return False
     else:
         return False
 
 
-@pytest.fixture()
+@pytest.fixture
 def store_someemb(
     astra_db_credentials: AstraDBCredentials,
 ) -> Iterable[AstraDBVectorStore]:
@@ -106,7 +110,7 @@ def store_someemb(
         v_store.clear()
 
 
-@pytest.fixture()
+@pytest.fixture
 def store_someemb_tokenprovider(
     astra_db_credentials: AstraDBCredentials,
 ) -> Iterable[AstraDBVectorStore]:
@@ -130,7 +134,7 @@ def store_someemb_tokenprovider(
         v_store.clear()
 
 
-@pytest.fixture()
+@pytest.fixture
 def store_parseremb(
     astra_db_credentials: AstraDBCredentials,
 ) -> Iterable[AstraDBVectorStore]:
@@ -153,7 +157,7 @@ def store_parseremb(
         v_store.clear()
 
 
-@pytest.fixture()
+@pytest.fixture
 def vectorize_store(
     astra_db_credentials: AstraDBCredentials,
 ) -> Iterable[AstraDBVectorStore]:
@@ -177,7 +181,7 @@ def vectorize_store(
     v_store.delete_collection()
 
 
-@pytest.fixture()
+@pytest.fixture
 def vectorize_store_w_header(
     astra_db_credentials: AstraDBCredentials,
 ) -> Iterable[AstraDBVectorStore]:
@@ -202,7 +206,7 @@ def vectorize_store_w_header(
     v_store.delete_collection()
 
 
-@pytest.fixture()
+@pytest.fixture
 def vectorize_store_w_header_and_provider(
     astra_db_credentials: AstraDBCredentials,
 ) -> Iterable[AstraDBVectorStore]:
@@ -231,7 +235,7 @@ def vectorize_store_w_header_and_provider(
     v_store.delete_collection()
 
 
-@pytest.fixture()
+@pytest.fixture
 def vectorize_store_nvidia(
     astra_db_credentials: AstraDBCredentials,
 ) -> Iterable[AstraDBVectorStore]:
@@ -1194,7 +1198,7 @@ class TestAstraDBVectorStore:
         )
         v_store_kenny.delete_collection()
         # dropped on DB, but 'v_store' should have no clue:
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="Collection does not exist"):
             _ = v_store.similarity_search("hah", k=10)
 
     def test_astradb_vectorstore_custom_params_sync(
@@ -1431,7 +1435,7 @@ class TestAstraDBVectorStore:
             )
 
         # some are to throw an error:
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match=INCOMPATIBLE_INDEXING_MSG):
             AstraDBVectorStore(
                 collection_name="lc_default_idx",
                 embedding=embe,
@@ -1442,7 +1446,7 @@ class TestAstraDBVectorStore:
                 metadata_indexing_exclude={"long_summary", "the_divine_comedy"},
             )
 
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match=INCOMPATIBLE_INDEXING_MSG):
             AstraDBVectorStore(
                 collection_name="lc_custom_idx",
                 embedding=embe,
@@ -1453,7 +1457,7 @@ class TestAstraDBVectorStore:
                 metadata_indexing_exclude={"changed_fields"},
             )
 
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match=INCOMPATIBLE_INDEXING_MSG):
             AstraDBVectorStore(
                 collection_name="lc_custom_idx",
                 embedding=embe,
@@ -1463,7 +1467,11 @@ class TestAstraDBVectorStore:
                 environment=astra_db_credentials["environment"],
             )
 
-        with pytest.raises(ValueError):
+        with pytest.raises(
+            ValueError,
+            match="Astra DB collection 'lc_legacy_coll' is detected as having "
+            "indexing turned on for all fields",
+        ):
             AstraDBVectorStore(
                 collection_name="lc_legacy_coll",
                 embedding=embe,
@@ -1549,42 +1557,42 @@ class TestAstraDBVectorStore:
             await cus_store.aadd_texts(["All good."])
 
         # some are to throw an error:
-        with pytest.raises(ValueError):
-            def_store = AstraDBVectorStore(
-                collection_name="lc_default_idx",
-                embedding=embe,
-                token=astra_db_credentials["token"],
-                api_endpoint=astra_db_credentials["api_endpoint"],
-                namespace=astra_db_credentials["namespace"],
-                environment=astra_db_credentials["environment"],
-                metadata_indexing_exclude={"long_summary", "the_divine_comedy"},
-                setup_mode=SetupMode.ASYNC,
-            )
+        def_store = AstraDBVectorStore(
+            collection_name="lc_default_idx",
+            embedding=embe,
+            token=astra_db_credentials["token"],
+            api_endpoint=astra_db_credentials["api_endpoint"],
+            namespace=astra_db_credentials["namespace"],
+            environment=astra_db_credentials["environment"],
+            metadata_indexing_exclude={"long_summary", "the_divine_comedy"},
+            setup_mode=SetupMode.ASYNC,
+        )
+        with pytest.raises(ValueError, match=INCOMPATIBLE_INDEXING_MSG):
             await def_store.aadd_texts(["Not working."])
 
-        with pytest.raises(ValueError):
-            cus_store = AstraDBVectorStore(
-                collection_name="lc_custom_idx",
-                embedding=embe,
-                token=astra_db_credentials["token"],
-                api_endpoint=astra_db_credentials["api_endpoint"],
-                namespace=astra_db_credentials["namespace"],
-                environment=astra_db_credentials["environment"],
-                metadata_indexing_exclude={"changed_fields"},
-                setup_mode=SetupMode.ASYNC,
-            )
+        cus_store = AstraDBVectorStore(
+            collection_name="lc_custom_idx",
+            embedding=embe,
+            token=astra_db_credentials["token"],
+            api_endpoint=astra_db_credentials["api_endpoint"],
+            namespace=astra_db_credentials["namespace"],
+            environment=astra_db_credentials["environment"],
+            metadata_indexing_exclude={"changed_fields"},
+            setup_mode=SetupMode.ASYNC,
+        )
+        with pytest.raises(ValueError, match=INCOMPATIBLE_INDEXING_MSG):
             await cus_store.aadd_texts(["Not working."])
 
-        with pytest.raises(ValueError):
-            cus_store = AstraDBVectorStore(
-                collection_name="lc_custom_idx",
-                embedding=embe,
-                token=astra_db_credentials["token"],
-                api_endpoint=astra_db_credentials["api_endpoint"],
-                namespace=astra_db_credentials["namespace"],
-                environment=astra_db_credentials["environment"],
-                setup_mode=SetupMode.ASYNC,
-            )
+        cus_store = AstraDBVectorStore(
+            collection_name="lc_custom_idx",
+            embedding=embe,
+            token=astra_db_credentials["token"],
+            api_endpoint=astra_db_credentials["api_endpoint"],
+            namespace=astra_db_credentials["namespace"],
+            environment=astra_db_credentials["environment"],
+            setup_mode=SetupMode.ASYNC,
+        )
+        with pytest.raises(ValueError, match=INCOMPATIBLE_INDEXING_MSG):
             await cus_store.aadd_texts(["Not working."])
 
         leg_store = AstraDBVectorStore(
@@ -1597,7 +1605,11 @@ class TestAstraDBVectorStore:
             metadata_indexing_exclude={"long_summary", "the_divine_comedy"},
             setup_mode=SetupMode.ASYNC,
         )
-        with pytest.raises(ValueError):
+        with pytest.raises(
+            ValueError,
+            match="Astra DB collection 'lc_legacy_coll' is detected as having "
+            "indexing turned on for all fields",
+        ):
             await leg_store.aadd_texts(["Not working."])
 
         # one case should result in just a warning:
