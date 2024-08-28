@@ -77,7 +77,6 @@ ignore = [
     "ISC001", # Messes with the formatter
     "PLR09", # TODO: do we enforce these ones (complexity) ?
 
-    "BLE001", # TODO
     "PT011", # TODO
     "PT012", # TODO
     "D101", # TODO
