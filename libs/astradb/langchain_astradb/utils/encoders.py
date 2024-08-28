@@ -28,7 +28,7 @@ def _default_encode_filter(filter_dict: dict[str, Any]) -> dict[str, Any]:
     return metadata_filter
 
 
-class VSDocumentEncoder(ABC):
+class _AstraDBVectorStoreDocumentEncoder(ABC):
     """A document encoder for the Astra DB vector store.
 
     The document encoder contains the information for consistent interaction
@@ -36,8 +36,8 @@ class VSDocumentEncoder(ABC):
 
     Implementations of this class must:
     - define how to encode/decode documents consistently to and from
-      Astra DB collections. The two operations must combine to the identity
-      on both sides.
+      Astra DB collections. The two operations must, so to speak, combine
+      to the identity on both sides (except for the quirks of their signatures).
     - provide the adequate projection dictionaries for running find
       operations on Astra DB, with and without the field containing the vector.
     - encode IDs to the `_id` field on Astra DB.
@@ -98,7 +98,7 @@ class VSDocumentEncoder(ABC):
         """
 
 
-class DefaultVSDocumentEncoder(VSDocumentEncoder):
+class _DefaultVSDocumentEncoder(_AstraDBVectorStoreDocumentEncoder):
     """Encoder for the default vector store usage with client-side embeddings.
 
     This encoder expresses how document are stored for collections created
@@ -148,7 +148,7 @@ class DefaultVSDocumentEncoder(VSDocumentEncoder):
         return _default_encode_filter(filter_dict)
 
 
-class DefaultVectorizeVSDocumentEncoder(VSDocumentEncoder):
+class _DefaultVectorizeVSDocumentEncoder(_AstraDBVectorStoreDocumentEncoder):
     """Encoder for the default vector store usage with server-side embeddings.
 
     This encoder expresses how document are stored for collections created

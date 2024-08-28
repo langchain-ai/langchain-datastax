@@ -54,11 +54,11 @@ class AstraDBBaseStore(Generic[V], BaseStore[str, V], ABC):
         self.async_collection = self.astra_env.async_collection
 
     @abstractmethod
-    def decode_value(self, value: Any) -> V | None:
+    def decode_value(self, value: Any) -> V | None:  # noqa: ANN401
         """Decodes value from Astra DB."""
 
     @abstractmethod
-    def encode_value(self, value: V | None) -> Any:
+    def encode_value(self, value: V | None) -> Any:  # noqa: ANN401
         """Encodes value for Astra DB."""
 
     @override

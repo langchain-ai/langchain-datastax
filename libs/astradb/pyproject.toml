@@ -67,9 +67,10 @@ pydocstyle.convention = "google"
 pep8-naming.classmethod-decorators = [
     "langchain_core.pydantic_v1.validator",
 ]
+flake8-annotations.allow-star-arg-any = true
+flake8-annotations.mypy-init-return = true
 select = ["ALL"]
 ignore = [
-    "ANN", # Already checked by mypy
     "C90", # Do we want to activate (complexity) ?
     "COM812", # Messes with the formatter
     "ERA", # Do we want to activate (no commented code) ?
