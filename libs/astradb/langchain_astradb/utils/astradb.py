@@ -74,10 +74,11 @@ class _AstraDBEnvironment:
                 )
                 raise ValueError(msg)
             _astra_db = astra_db_client.copy() if astra_db_client is not None else None
-            if async_astra_db_client is not None:
-                _async_astra_db = async_astra_db_client.copy()
-            else:
-                _async_astra_db = None
+            _async_astra_db = (
+                async_astra_db_client.copy()
+                if async_astra_db_client is not None
+                else None
+            )
 
             # deprecation of the 'core classes' in constructor and conversion
             # to token/endpoint(-environment) based init, with checks
@@ -234,43 +235,16 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
 
         self.async_setup_db_task: Task | None = None
         if setup_mode == SetupMode.ASYNC:
-            async_database = self.async_database
-
-            async def _setup_db() -> None:
-                if pre_delete_collection:
-                    await async_database.drop_collection(collection_name)
-                if inspect.isawaitable(embedding_dimension):
-                    dimension = await embedding_dimension
-                else:
-                    dimension = embedding_dimension
-
-                try:
-                    await async_database.create_collection(
-                        name=collection_name,
-                        dimension=dimension,
-                        metric=metric,
-                        indexing=requested_indexing_policy,
-                        # Used for enabling $vectorize on the collection
-                        service=collection_vector_service_options,
-                        check_exists=False,
-                    )
-                except DataAPIException:
-                    # possibly the collection is preexisting and may have legacy,
-                    # or custom, indexing settings: verify
-                    collection_descriptors = [
-                        coll_desc
-                        async for coll_desc in async_database.list_collections()
-                    ]
-                    if not self._validate_indexing_policy(
-                        collection_descriptors=collection_descriptors,
-                        collection_name=self.collection_name,
-                        requested_indexing_policy=requested_indexing_policy,
-                        default_indexing_policy=default_indexing_policy,
-                    ):
-                        # other reasons for the exception
-                        raise
-
-            self.async_setup_db_task = asyncio.create_task(_setup_db())
+            self.async_setup_db_task = asyncio.create_task(
+                self._asetup_db(
+                    pre_delete_collection=pre_delete_collection,
+                    embedding_dimension=embedding_dimension,
+                    metric=metric,
+                    default_indexing_policy=default_indexing_policy,
+                    requested_indexing_policy=requested_indexing_policy,
+                    collection_vector_service_options=collection_vector_service_options,
+                )
+            )
         elif setup_mode == SetupMode.SYNC:
             if pre_delete_collection:
                 self.database.drop_collection(collection_name)
@@ -283,7 +257,7 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
             try:
                 self.database.create_collection(
                     name=collection_name,
-                    dimension=embedding_dimension,  # type: ignore[arg-type]
+                    dimension=embedding_dimension,
                     metric=metric,
                     indexing=requested_indexing_policy,
                     # Used for enabling $vectorize on the collection
@@ -303,6 +277,48 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
                     # other reasons for the exception
                     raise
 
+    async def _asetup_db(
+        self,
+        *,
+        pre_delete_collection: bool,
+        embedding_dimension: int | Awaitable[int] | None,
+        metric: str | None,
+        requested_indexing_policy: dict[str, Any] | None,
+        default_indexing_policy: dict[str, Any] | None,
+        collection_vector_service_options: CollectionVectorServiceOptions | None,
+    ) -> None:
+        if pre_delete_collection:
+            await self.async_database.drop_collection(self.collection_name)
+        if inspect.isawaitable(embedding_dimension):
+            dimension = await embedding_dimension
+        else:
+            dimension = embedding_dimension
+
+        try:
+            await self.async_database.create_collection(
+                name=self.collection_name,
+                dimension=dimension,
+                metric=metric,
+                indexing=requested_indexing_policy,
+                # Used for enabling $vectorize on the collection
+                service=collection_vector_service_options,
+                check_exists=False,
+            )
+        except DataAPIException:
+            # possibly the collection is preexisting and may have legacy,
+            # or custom, indexing settings: verify
+            collection_descriptors = [
+                coll_desc async for coll_desc in self.async_database.list_collections()
+            ]
+            if not self._validate_indexing_policy(
+                collection_descriptors=collection_descriptors,
+                collection_name=self.collection_name,
+                requested_indexing_policy=requested_indexing_policy,
+                default_indexing_policy=default_indexing_policy,
+            ):
+                # other reasons for the exception
+                raise
+
     @staticmethod
     def _validate_indexing_policy(
         collection_descriptors: list[CollectionDescriptor],
@@ -317,7 +333,7 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
 
         Args:
             collection_descriptors: collection descriptors for the database.
-            collection_name (str): the name of the collection whose attempted
+            collection_name: the name of the collection whose attempted
                 creation failed
             requested_indexing_policy: the 'indexing' part of the collection
                 options, e.g. `{"deny": ["field1", "field2"]}`.

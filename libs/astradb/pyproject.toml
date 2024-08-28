@@ -70,7 +70,6 @@ pep8-naming.classmethod-decorators = [
 select = ["ALL"]
 ignore = [
     "ANN", # Already checked by mypy
-    "C90", # Do we want to activate (complexity) ?
     "COM812", # Messes with the formatter
     "ERA", # Do we want to activate (no commented code) ?
     "ISC001", # Messes with the formatter

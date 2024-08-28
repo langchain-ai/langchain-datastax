@@ -53,7 +53,7 @@ def astra_db_credentials() -> AstraDBCredentials:
 def database(astra_db_credentials: AstraDBCredentials) -> Database:
     return Database(
         token=astra_db_credentials["token"],
-        api_endpoint=astra_db_credentials["api_endpoint"],  # type: ignore[arg-type]
+        api_endpoint=astra_db_credentials["api_endpoint"],
         namespace=astra_db_credentials["namespace"],
         environment=astra_db_credentials["environment"],
     )
@@ -63,7 +63,7 @@ def database(astra_db_credentials: AstraDBCredentials) -> Database:
 def core_astra_db(astra_db_credentials: AstraDBCredentials) -> AstraDB:
     return AstraDB(
         token=astra_db_credentials["token"],
-        api_endpoint=astra_db_credentials["api_endpoint"],  # type: ignore[arg-type]
+        api_endpoint=astra_db_credentials["api_endpoint"],
         namespace=astra_db_credentials["namespace"],
     )
 
