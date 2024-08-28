@@ -14,7 +14,7 @@ from langchain_astradb.utils.astradb import SetupMode
 from .conftest import AstraDBCredentials, _has_env_vars
 
 
-@pytest.fixture()
+@pytest.fixture
 def history1(
     astra_db_credentials: AstraDBCredentials,
 ) -> Iterable[AstraDBChatMessageHistory]:
@@ -30,7 +30,7 @@ def history1(
     history1.collection.drop()
 
 
-@pytest.fixture()
+@pytest.fixture
 def history2(
     history1: AstraDBChatMessageHistory,
     astra_db_credentials: AstraDBCredentials,
@@ -49,7 +49,7 @@ def history2(
     # no deletion here, this is riding on history1
 
 
-@pytest.fixture()
+@pytest.fixture
 async def async_history1(
     astra_db_credentials: AstraDBCredentials,
 ) -> AsyncIterable[AstraDBChatMessageHistory]:
@@ -66,7 +66,7 @@ async def async_history1(
     await history1.async_collection.drop()
 
 
-@pytest.fixture()
+@pytest.fixture
 async def async_history2(
     history1: AstraDBChatMessageHistory,
     astra_db_credentials: AstraDBCredentials,
