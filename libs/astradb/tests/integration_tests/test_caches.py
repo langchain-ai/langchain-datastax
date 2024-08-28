@@ -129,7 +129,7 @@ def astradb_cache(astra_db_credentials: AstraDBCredentials) -> Iterator[AstraDBC
     cache.collection.drop()
 
 
-@pytest.fixture()
+@pytest.fixture
 async def async_astradb_cache(
     astra_db_credentials: AstraDBCredentials,
 ) -> AsyncIterator[AstraDBCache]:
@@ -162,7 +162,7 @@ def astradb_semantic_cache(
     sem_cache.collection.drop()
 
 
-@pytest.fixture()
+@pytest.fixture
 async def async_astradb_semantic_cache(
     astra_db_credentials: AstraDBCredentials,
 ) -> AsyncIterator[AstraDBSemanticCache]:

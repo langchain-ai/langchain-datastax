@@ -28,7 +28,7 @@ if TYPE_CHECKING:
     from astrapy.db import AstraDB
 
 
-@pytest.fixture()
+@pytest.fixture
 def collection(database: Database) -> Iterator[Collection]:
     collection_name = f"lc_test_loader_{str(uuid.uuid4()).split('-')[0]}"
     collection = database.create_collection(collection_name)
@@ -42,7 +42,7 @@ def collection(database: Database) -> Iterator[Collection]:
     collection.drop()
 
 
-@pytest.fixture()
+@pytest.fixture
 async def async_collection(database: Database) -> AsyncIterator[AsyncCollection]:
     adatabase = database.to_async()
     collection_name = f"lc_test_loader_{str(uuid.uuid4()).split('-')[0]}"
