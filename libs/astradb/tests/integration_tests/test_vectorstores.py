@@ -77,7 +77,7 @@ def is_nvidia_vector_service_available() -> bool:
     return os.getenv("NVIDIA_VECTORIZE_AVAILABLE") == "1"
 
 
-@pytest.fixture()
+@pytest.fixture
 def store_someemb(
     astra_db_credentials: AstraDBCredentials,
 ) -> Iterable[AstraDBVectorStore]:
@@ -100,7 +100,7 @@ def store_someemb(
         v_store.clear()
 
 
-@pytest.fixture()
+@pytest.fixture
 def store_someemb_tokenprovider(
     astra_db_credentials: AstraDBCredentials,
 ) -> Iterable[AstraDBVectorStore]:
@@ -124,7 +124,7 @@ def store_someemb_tokenprovider(
         v_store.clear()
 
 
-@pytest.fixture()
+@pytest.fixture
 def store_parseremb(
     astra_db_credentials: AstraDBCredentials,
 ) -> Iterable[AstraDBVectorStore]:
@@ -147,7 +147,7 @@ def store_parseremb(
         v_store.clear()
 
 
-@pytest.fixture()
+@pytest.fixture
 def vectorize_store(
     astra_db_credentials: AstraDBCredentials,
 ) -> Iterable[AstraDBVectorStore]:
@@ -171,7 +171,7 @@ def vectorize_store(
     v_store.delete_collection()
 
 
-@pytest.fixture()
+@pytest.fixture
 def vectorize_store_w_header(
     astra_db_credentials: AstraDBCredentials,
 ) -> Iterable[AstraDBVectorStore]:
@@ -196,7 +196,7 @@ def vectorize_store_w_header(
     v_store.delete_collection()
 
 
-@pytest.fixture()
+@pytest.fixture
 def vectorize_store_w_header_and_provider(
     astra_db_credentials: AstraDBCredentials,
 ) -> Iterable[AstraDBVectorStore]:
@@ -225,7 +225,7 @@ def vectorize_store_w_header_and_provider(
     v_store.delete_collection()
 
 
-@pytest.fixture()
+@pytest.fixture
 def vectorize_store_nvidia(
     astra_db_credentials: AstraDBCredentials,
 ) -> Iterable[AstraDBVectorStore]:

@@ -33,9 +33,9 @@ from langchain_astradb.utils.astradb import (
     _AstraDBCollectionEnvironment,
 )
 from langchain_astradb.utils.encoders import (
-    DefaultVectorizeVSDocumentEncoder,
-    DefaultVSDocumentEncoder,
-    VSDocumentEncoder,
+    _AstraDBVectorStoreDocumentEncoder,
+    _DefaultVectorizeVSDocumentEncoder,
+    _DefaultVSDocumentEncoder,
 )
 from langchain_astradb.utils.mmr import maximal_marginal_relevance
 
@@ -400,11 +400,11 @@ class AstraDBVectorStore(VectorStore):
         self.environment = environment
         self.namespace = namespace
         self.collection_vector_service_options = collection_vector_service_options
-        self.document_encoder: VSDocumentEncoder
+        self.document_encoder: _AstraDBVectorStoreDocumentEncoder
         if self.collection_vector_service_options is not None:
-            self.document_encoder = DefaultVectorizeVSDocumentEncoder()
+            self.document_encoder = _DefaultVectorizeVSDocumentEncoder()
         else:
-            self.document_encoder = DefaultVSDocumentEncoder()
+            self.document_encoder = _DefaultVSDocumentEncoder()
         self.collection_embedding_api_key = collection_embedding_api_key
         # Concurrency settings
         self.batch_size: int | None = batch_size or DEFAULT_DOCUMENT_CHUNK_SIZE
@@ -931,129 +931,56 @@ class AstraDBVectorStore(VectorStore):
                 raise ValueError(msg)
         return inserted_ids
 
-    def similarity_search_with_score_id_by_vector(
+    @override
+    def similarity_search(
         self,
-        embedding: list[float],
+        query: str,
         k: int = 4,
-        filter: dict[str, Any] | None = None,  # noqa: A002
-    ) -> list[tuple[Document, float, str]]:
-        """Return docs most similar to embedding vector with score and id.
+        filter: dict[str, Any] | None = None,
+        **kwargs: Any,
+    ) -> list[Document]:
+        """Return docs most similar to query.
 
         Args:
-            embedding: Embedding to look up documents similar to.
+            query: Query to look up documents similar to.
             k: Number of Documents to return. Defaults to 4.
             filter: Filter on the metadata to apply.
 
         Returns:
-            The list of (Document, score, id), the most similar to the query vector.
+            The list of Documents most similar to the query.
         """
-        self.astra_env.ensure_db_setup()
-        metadata_parameter = self._filter_to_metadata(filter)
-        hits = list(
-            self.astra_env.collection.find(
-                filter=metadata_parameter,
-                projection=self.document_encoder.base_projection,
-                limit=k,
-                include_similarity=True,
-                sort={"$vector": embedding},
-            )
-        )
         return [
-            (
-                self.document_encoder.decode(hit),
-                hit["$similarity"],
-                hit["_id"],
+            doc
+            for (doc, _, _) in self.similarity_search_with_score_id(
+                query=query,
+                k=k,
+                filter=filter,
             )
-            for hit in hits
         ]
 
-    async def asimilarity_search_with_score_id_by_vector(
+    @override
+    def similarity_search_with_score(
         self,
-        embedding: list[float],
+        query: str,
         k: int = 4,
-        filter: dict[str, Any] | None = None,  # noqa: A002
-    ) -> list[tuple[Document, float, str]]:
-        """Return docs most similar to embedding vector with score and id.
+        filter: dict[str, Any] | None = None,
+    ) -> list[tuple[Document, float]]:
+        """Return docs most similar to query with score.
 
         Args:
-            embedding: Embedding to look up documents similar to.
+            query: Query to look up documents similar to.
             k: Number of Documents to return. Defaults to 4.
             filter: Filter on the metadata to apply.
 
         Returns:
-            The list of (Document, score, id), the most similar to the query vector.
+            The list of (Document, score), the most similar to the query vector.
         """
-        await self.astra_env.aensure_db_setup()
-        metadata_parameter = self._filter_to_metadata(filter)
         return [
-            (
-                self.document_encoder.decode(hit),
-                hit["$similarity"],
-                hit["_id"],
-            )
-            async for hit in self.astra_env.async_collection.find(
-                filter=metadata_parameter,
-                projection=self.document_encoder.base_projection,
-                limit=k,
-                include_similarity=True,
-                sort={"$vector": embedding},
-            )
-        ]
-
-    def _similarity_search_with_score_id_with_vectorize(
-        self,
-        query: str,
-        k: int = 4,
-        filter: dict[str, Any] | None = None,  # noqa: A002
-    ) -> list[tuple[Document, float, str]]:
-        """Return docs most similar to the query with score and id using $vectorize.
-
-        This is only available when using server-side embeddings.
-        """
-        self.astra_env.ensure_db_setup()
-        metadata_parameter = self._filter_to_metadata(filter)
-        hits = list(
-            self.astra_env.collection.find(
-                filter=metadata_parameter,
-                projection=self.document_encoder.base_projection,
-                limit=k,
-                include_similarity=True,
-                sort={"$vectorize": query},
-            )
-        )
-        return [
-            (
-                self.document_encoder.decode(hit),
-                hit["$similarity"],
-                hit["_id"],
-            )
-            for hit in hits
-        ]
-
-    async def _asimilarity_search_with_score_id_with_vectorize(
-        self,
-        query: str,
-        k: int = 4,
-        filter: dict[str, Any] | None = None,  # noqa: A002
-    ) -> list[tuple[Document, float, str]]:
-        """Return docs most similar to the query with score and id using $vectorize.
-
-        This is only available when using server-side embeddings.
-        """
-        await self.astra_env.aensure_db_setup()
-        metadata_parameter = self._filter_to_metadata(filter)
-        return [
-            (
-                self.document_encoder.decode(hit),
-                hit["$similarity"],
-                hit["_id"],
-            )
-            async for hit in self.astra_env.async_collection.find(
-                filter=metadata_parameter,
-                projection=self.document_encoder.base_projection,
-                limit=k,
-                include_similarity=True,
-                sort={"$vectorize": query},
+            (doc, score)
+            for (doc, score, _) in self.similarity_search_with_score_id(
+                query=query,
+                k=k,
+                filter=filter,
             )
         ]
 
@@ -1074,8 +1001,9 @@ class AstraDBVectorStore(VectorStore):
             The list of (Document, score, id), the most similar to the query.
         """
         if self.document_encoder.server_side_embeddings:
-            return self._similarity_search_with_score_id_with_vectorize(
-                query=query,
+            sort = {"$vectorize": query}
+            return self._similarity_search_with_score_id_by_sort(
+                sort=sort,
                 k=k,
                 filter=filter,
             )
@@ -1084,164 +1012,6 @@ class AstraDBVectorStore(VectorStore):
         return self.similarity_search_with_score_id_by_vector(
             embedding=embedding_vector,
             k=k,
-            filter=filter,
-        )
-
-    async def asimilarity_search_with_score_id(
-        self,
-        query: str,
-        k: int = 4,
-        filter: dict[str, Any] | None = None,  # noqa: A002
-    ) -> list[tuple[Document, float, str]]:
-        """Return docs most similar to the query with score and id.
-
-        Args:
-            query: Query to look up documents similar to.
-            k: Number of Documents to return. Defaults to 4.
-            filter: Filter on the metadata to apply.
-
-        Returns:
-            The list of (Document, score, id), the most similar to the query.
-        """
-        if self.document_encoder.server_side_embeddings:
-            return await self._asimilarity_search_with_score_id_with_vectorize(
-                query=query,
-                k=k,
-                filter=filter,
-            )
-
-        embedding_vector = await self._get_safe_embedding().aembed_query(query)
-        return await self.asimilarity_search_with_score_id_by_vector(
-            embedding=embedding_vector,
-            k=k,
-            filter=filter,
-        )
-
-    def similarity_search_with_score_by_vector(
-        self,
-        embedding: list[float],
-        k: int = 4,
-        filter: dict[str, Any] | None = None,  # noqa: A002
-    ) -> list[tuple[Document, float]]:
-        """Return docs most similar to embedding vector with score.
-
-        Args:
-            embedding: Embedding to look up documents similar to.
-            k: Number of Documents to return. Defaults to 4.
-            filter: Filter on the metadata to apply.
-
-        Returns:
-            The list of (Document, score), the most similar to the query vector.
-        """
-        return [
-            (doc, score)
-            for (doc, score, doc_id) in self.similarity_search_with_score_id_by_vector(
-                embedding=embedding,
-                k=k,
-                filter=filter,
-            )
-        ]
-
-    async def asimilarity_search_with_score_by_vector(
-        self,
-        embedding: list[float],
-        k: int = 4,
-        filter: dict[str, Any] | None = None,  # noqa: A002
-    ) -> list[tuple[Document, float]]:
-        """Return docs most similar to embedding vector with score.
-
-        Args:
-            embedding: Embedding to look up documents similar to.
-            k: Number of Documents to return. Defaults to 4.
-            filter: Filter on the metadata to apply.
-
-        Returns:
-            The list of (Document, score), the most similar to the query vector.
-        """
-        return [
-            (doc, score)
-            for (
-                doc,
-                score,
-                doc_id,
-            ) in await self.asimilarity_search_with_score_id_by_vector(
-                embedding=embedding,
-                k=k,
-                filter=filter,
-            )
-        ]
-
-    @override
-    def similarity_search(
-        self,
-        query: str,
-        k: int = 4,
-        filter: dict[str, Any] | None = None,
-        **kwargs: Any,
-    ) -> list[Document]:
-        """Return docs most similar to query.
-
-        Args:
-            query: Query to look up documents similar to.
-            k: Number of Documents to return. Defaults to 4.
-            filter: Filter on the metadata to apply.
-
-        Returns:
-            The list of Documents most similar to the query.
-        """
-        if self.document_encoder.server_side_embeddings:
-            return [
-                doc
-                for (doc, _, _) in self._similarity_search_with_score_id_with_vectorize(
-                    query,
-                    k,
-                    filter=filter,
-                )
-            ]
-
-        embedding_vector = self._get_safe_embedding().embed_query(query)
-        return self.similarity_search_by_vector(
-            embedding_vector,
-            k,
-            filter=filter,
-        )
-
-    @override
-    async def asimilarity_search(
-        self,
-        query: str,
-        k: int = 4,
-        filter: dict[str, Any] | None = None,
-        **kwargs: Any,
-    ) -> list[Document]:
-        """Return docs most similar to query.
-
-        Args:
-            query: Query to look up documents similar to.
-            k: Number of Documents to return. Defaults to 4.
-            filter: Filter on the metadata to apply.
-
-        Returns:
-            The list of Documents most similar to the query.
-        """
-        if self.document_encoder.server_side_embeddings:
-            return [
-                doc
-                for (
-                    doc,
-                    _,
-                    _,
-                ) in await self._asimilarity_search_with_score_id_with_vectorize(
-                    query,
-                    k,
-                    filter=filter,
-                )
-            ]
-
-        embedding_vector = await self._get_safe_embedding().aembed_query(query)
-        return await self.asimilarity_search_by_vector(
-            embedding_vector,
-            k,
             filter=filter,
         )
 
@@ -1265,12 +1035,175 @@ class AstraDBVectorStore(VectorStore):
         """
         return [
             doc
-            for doc, _ in self.similarity_search_with_score_by_vector(
-                embedding,
-                k,
+            for (doc, _, _) in self.similarity_search_with_score_id_by_vector(
+                embedding=embedding,
+                k=k,
                 filter=filter,
             )
         ]
+
+    def similarity_search_with_score_by_vector(
+        self,
+        embedding: list[float],
+        k: int = 4,
+        filter: dict[str, Any] | None = None,  # noqa: A002
+    ) -> list[tuple[Document, float]]:
+        """Return docs most similar to embedding vector with score.
+
+        Args:
+            embedding: Embedding to look up documents similar to.
+            k: Number of Documents to return. Defaults to 4.
+            filter: Filter on the metadata to apply.
+
+        Returns:
+            The list of (Document, score), the most similar to the query vector.
+        """
+        return [
+            (doc, score)
+            for (doc, score, _) in self.similarity_search_with_score_id_by_vector(
+                embedding=embedding,
+                k=k,
+                filter=filter,
+            )
+        ]
+
+    def similarity_search_with_score_id_by_vector(
+        self,
+        embedding: list[float],
+        k: int = 4,
+        filter: dict[str, Any] | None = None,  # noqa: A002
+    ) -> list[tuple[Document, float, str]]:
+        """Return docs most similar to embedding vector with score and id.
+
+        Args:
+            embedding: Embedding to look up documents similar to.
+            k: Number of Documents to return. Defaults to 4.
+            filter: Filter on the metadata to apply.
+
+        Returns:
+            The list of (Document, score, id), the most similar to the query vector.
+        """
+        if self.document_encoder.server_side_embeddings:
+            msg = (
+                "Searching by vector on a Vector Store that uses server-side "
+                "embeddings is not allowed."
+            )
+            raise ValueError(msg)
+        sort = {"$vector": embedding}
+        return self._similarity_search_with_score_id_by_sort(
+            sort=sort,
+            k=k,
+            filter=filter,
+        )
+
+    def _similarity_search_with_score_id_by_sort(
+        self,
+        sort: dict[str, Any],
+        k: int = 4,
+        filter: dict[str, Any] | None = None,  # noqa: A002
+    ) -> list[tuple[Document, float, str]]:
+        """Run ANN search with a provided sort clause."""
+        self.astra_env.ensure_db_setup()
+        metadata_parameter = self._filter_to_metadata(filter)
+        hits_ite = self.astra_env.collection.find(
+            filter=metadata_parameter,
+            projection=self.document_encoder.base_projection,
+            limit=k,
+            include_similarity=True,
+            sort=sort,
+        )
+        return [
+            (
+                self.document_encoder.decode(hit),
+                hit["$similarity"],
+                hit["_id"],
+            )
+            for hit in hits_ite
+        ]
+
+    @override
+    async def asimilarity_search(
+        self,
+        query: str,
+        k: int = 4,
+        filter: dict[str, Any] | None = None,
+        **kwargs: Any,
+    ) -> list[Document]:
+        """Return docs most similar to query.
+
+        Args:
+            query: Query to look up documents similar to.
+            k: Number of Documents to return. Defaults to 4.
+            filter: Filter on the metadata to apply.
+
+        Returns:
+            The list of Documents most similar to the query.
+        """
+        return [
+            doc
+            for (doc, _, _) in await self.asimilarity_search_with_score_id(
+                query=query,
+                k=k,
+                filter=filter,
+            )
+        ]
+
+    @override
+    async def asimilarity_search_with_score(
+        self,
+        query: str,
+        k: int = 4,
+        filter: dict[str, Any] | None = None,
+    ) -> list[tuple[Document, float]]:
+        """Return docs most similar to query with score.
+
+        Args:
+            query: Query to look up documents similar to.
+            k: Number of Documents to return. Defaults to 4.
+            filter: Filter on the metadata to apply.
+
+        Returns:
+            The list of (Document, score), the most similar to the query vector.
+        """
+        return [
+            (doc, score)
+            for (doc, score, _) in await self.asimilarity_search_with_score_id(
+                query=query,
+                k=k,
+                filter=filter,
+            )
+        ]
+
+    async def asimilarity_search_with_score_id(
+        self,
+        query: str,
+        k: int = 4,
+        filter: dict[str, Any] | None = None,  # noqa: A002
+    ) -> list[tuple[Document, float, str]]:
+        """Return docs most similar to the query with score and id.
+
+        Args:
+            query: Query to look up documents similar to.
+            k: Number of Documents to return. Defaults to 4.
+            filter: Filter on the metadata to apply.
+
+        Returns:
+            The list of (Document, score, id), the most similar to the query.
+        """
+        if self.document_encoder.server_side_embeddings:
+            sort = {"$vectorize": query}
+            return await self._asimilarity_search_with_score_id_by_sort(
+                sort=sort,
+                k=k,
+                filter=filter,
+            )
+
+        embedding_vector = await self._get_safe_embedding().aembed_query(query)
+        return await self.asimilarity_search_with_score_id_by_vector(
+            embedding=embedding_vector,
+            k=k,
+            filter=filter,
+        )
 
     @override
     async def asimilarity_search_by_vector(
@@ -1292,88 +1225,90 @@ class AstraDBVectorStore(VectorStore):
         """
         return [
             doc
-            for doc, _ in await self.asimilarity_search_with_score_by_vector(
-                embedding,
-                k,
+            for (doc, _, _) in await self.asimilarity_search_with_score_id_by_vector(
+                embedding=embedding,
+                k=k,
                 filter=filter,
             )
         ]
 
-    @override
-    def similarity_search_with_score(
+    async def asimilarity_search_with_score_by_vector(
         self,
-        query: str,
+        embedding: list[float],
         k: int = 4,
-        filter: dict[str, Any] | None = None,
+        filter: dict[str, Any] | None = None,  # noqa: A002
     ) -> list[tuple[Document, float]]:
-        """Return docs most similar to query with score.
+        """Return docs most similar to embedding vector with score.
 
         Args:
-            query: Query to look up documents similar to.
+            embedding: Embedding to look up documents similar to.
             k: Number of Documents to return. Defaults to 4.
             filter: Filter on the metadata to apply.
 
         Returns:
             The list of (Document, score), the most similar to the query vector.
         """
-        if self.document_encoder.server_side_embeddings:
-            return [
-                (doc, score)
-                for (
-                    doc,
-                    score,
-                    doc_id,
-                ) in self._similarity_search_with_score_id_with_vectorize(
-                    query=query,
-                    k=k,
-                    filter=filter,
-                )
-            ]
+        return [
+            (doc, scr)
+            for (doc, scr, _) in await self.asimilarity_search_with_score_id_by_vector(
+                embedding=embedding,
+                k=k,
+                filter=filter,
+            )
+        ]
 
-        embedding_vector = self._get_safe_embedding().embed_query(query)
-        return self.similarity_search_with_score_by_vector(
-            embedding_vector,
-            k,
-            filter=filter,
-        )
-
-    @override
-    async def asimilarity_search_with_score(
+    async def asimilarity_search_with_score_id_by_vector(
         self,
-        query: str,
+        embedding: list[float],
         k: int = 4,
-        filter: dict[str, Any] | None = None,
-    ) -> list[tuple[Document, float]]:
-        """Return docs most similar to query with score.
+        filter: dict[str, Any] | None = None,  # noqa: A002
+    ) -> list[tuple[Document, float, str]]:
+        """Return docs most similar to embedding vector with score and id.
 
         Args:
-            query: Query to look up documents similar to.
+            embedding: Embedding to look up documents similar to.
             k: Number of Documents to return. Defaults to 4.
             filter: Filter on the metadata to apply.
 
         Returns:
-            The list of (Document, score), the most similar to the query vector.
+            The list of (Document, score, id), the most similar to the query vector.
         """
         if self.document_encoder.server_side_embeddings:
-            return [
-                (doc, score)
-                for (
-                    doc,
-                    score,
-                    doc_id,
-                ) in await self._asimilarity_search_with_score_id_with_vectorize(
-                    query=query,
-                    k=k,
-                    filter=filter,
-                )
-            ]
-
-        embedding_vector = await self._get_safe_embedding().aembed_query(query)
-        return await self.asimilarity_search_with_score_by_vector(
-            embedding_vector,
-            k,
+            msg = (
+                "Searching by vector on a Vector Store that uses server-side "
+                "embeddings is not allowed."
+            )
+            raise ValueError(msg)
+        sort = {"$vector": embedding}
+        return await self._asimilarity_search_with_score_id_by_sort(
+            sort=sort,
+            k=k,
             filter=filter,
         )
+
+    async def _asimilarity_search_with_score_id_by_sort(
+        self,
+        sort: dict[str, Any],
+        k: int = 4,
+        filter: dict[str, Any] | None = None,  # noqa: A002
+    ) -> list[tuple[Document, float, str]]:
+        """Run ANN search with a provided sort clause."""
+        await self.astra_env.aensure_db_setup()
+        metadata_parameter = self._filter_to_metadata(filter)
+        return [
+            (
+                self.document_encoder.decode(hit),
+                hit["$similarity"],
+                hit["_id"],
+            )
+            async for hit in self.astra_env.async_collection.find(
+                filter=metadata_parameter,
+                projection=self.document_encoder.base_projection,
+                limit=k,
+                include_similarity=True,
+                sort=sort,
+            )
+        ]
 
     def _run_mmr_query_by_sort(
         self,
