@@ -33,7 +33,7 @@ from langchain_astradb.utils.astradb import (
     _AstraDBCollectionEnvironment,
 )
 from langchain_astradb.utils.encoders import (
-    AstraDBVectorStoreDocumentEncoder,
+    _AstraDBVectorStoreDocumentEncoder,
     _DefaultVectorizeVSDocumentEncoder,
     _DefaultVSDocumentEncoder,
 )
@@ -400,7 +400,7 @@ class AstraDBVectorStore(VectorStore):
         self.environment = environment
         self.namespace = namespace
         self.collection_vector_service_options = collection_vector_service_options
-        self.document_encoder: AstraDBVectorStoreDocumentEncoder
+        self.document_encoder: _AstraDBVectorStoreDocumentEncoder
         if self.collection_vector_service_options is not None:
             self.document_encoder = _DefaultVectorizeVSDocumentEncoder()
         else:

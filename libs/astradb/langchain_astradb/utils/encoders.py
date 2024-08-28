@@ -28,7 +28,7 @@ def _default_encode_filter(filter_dict: dict[str, Any]) -> dict[str, Any]:
     return metadata_filter
 
 
-class AstraDBVectorStoreDocumentEncoder(ABC):
+class _AstraDBVectorStoreDocumentEncoder(ABC):
     """A document encoder for the Astra DB vector store.
 
     The document encoder contains the information for consistent interaction
@@ -98,7 +98,7 @@ class AstraDBVectorStoreDocumentEncoder(ABC):
         """
 
 
-class _DefaultVSDocumentEncoder(AstraDBVectorStoreDocumentEncoder):
+class _DefaultVSDocumentEncoder(_AstraDBVectorStoreDocumentEncoder):
     """Encoder for the default vector store usage with client-side embeddings.
 
     This encoder expresses how document are stored for collections created
@@ -148,7 +148,7 @@ class _DefaultVSDocumentEncoder(AstraDBVectorStoreDocumentEncoder):
         return _default_encode_filter(filter_dict)
 
 
-class _DefaultVectorizeVSDocumentEncoder(AstraDBVectorStoreDocumentEncoder):
+class _DefaultVectorizeVSDocumentEncoder(_AstraDBVectorStoreDocumentEncoder):
     """Encoder for the default vector store usage with server-side embeddings.
 
     This encoder expresses how document are stored for collections created
