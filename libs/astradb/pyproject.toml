@@ -76,14 +76,12 @@ ignore = [
     "ERA", # Do we want to activate (no commented code) ?
     "ISC001", # Messes with the formatter
     "PLR09", # TODO: do we enforce these ones (complexity) ?
-    "PTH", # Do we want to activate (use pathlib) ?
 
     "BLE001", # TODO
     "PT011", # TODO
     "PT012", # TODO
     "D101", # TODO
     "D417", # TODO
-    "PTH", # TODO
 
 ]
 
