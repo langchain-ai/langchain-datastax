@@ -247,6 +247,7 @@ class AstraDBStore(AstraDBBaseStore[Any]):
         Documents in the AstraDB collection will have the format
 
         .. code-block:: json
+
             {
               "_id": "<key>",
               "value": <value>

@@ -542,6 +542,7 @@ class AstraDBVectorStore(VectorStore):
             ids: List of ids to delete.
             concurrency: max number of threads issuing single-doc delete requests.
                 Defaults to vector-store overall setting.
+            **kwargs: Additional arguments are ignored.
 
         Returns:
             True if deletion is (entirely) successful, False otherwise.
@@ -581,6 +582,7 @@ class AstraDBVectorStore(VectorStore):
             ids: List of ids to delete.
             concurrency: max number of simultaneous coroutines for single-doc
                 delete requests. Defaults to vector-store overall setting.
+            **kwargs: Additional arguments are ignored.
 
         Returns:
             True if deletion is (entirely) successful, False otherwise.
@@ -716,6 +718,7 @@ class AstraDBVectorStore(VectorStore):
             overwrite_concurrency: number of threads to process
                 pre-existing documents in each batch. Defaults to the vector-store
                 overall setting if not provided.
+            **kwargs: Additional arguments are ignored.
 
         Note:
             There are constraints on the allowed field names
@@ -837,6 +840,7 @@ class AstraDBVectorStore(VectorStore):
             overwrite_concurrency: number of simultaneous coroutines to process
                 pre-existing documents in each batch. Defaults to the vector-store
                 overall setting if not provided.
+            **kwargs: Additional arguments are ignored.
 
         Note:
             There are constraints on the allowed field names
@@ -945,6 +949,7 @@ class AstraDBVectorStore(VectorStore):
             query: Query to look up documents similar to.
             k: Number of Documents to return. Defaults to 4.
             filter: Filter on the metadata to apply.
+            **kwargs: Additional arguments are ignored.
 
         Returns:
             The list of Documents most similar to the query.
@@ -1029,6 +1034,7 @@ class AstraDBVectorStore(VectorStore):
             embedding: Embedding to look up documents similar to.
             k: Number of Documents to return. Defaults to 4.
             filter: Filter on the metadata to apply.
+            **kwargs: Additional arguments are ignored.
 
         Returns:
             The list of Documents most similar to the query vector.
@@ -1135,6 +1141,7 @@ class AstraDBVectorStore(VectorStore):
             query: Query to look up documents similar to.
             k: Number of Documents to return. Defaults to 4.
             filter: Filter on the metadata to apply.
+            **kwargs: Additional arguments are ignored.
 
         Returns:
             The list of Documents most similar to the query.
@@ -1219,6 +1226,7 @@ class AstraDBVectorStore(VectorStore):
             embedding: Embedding to look up documents similar to.
             k: Number of Documents to return. Defaults to 4.
             filter: Filter on the metadata to apply.
+            **kwargs: Additional arguments are ignored.
 
         Returns:
             The list of Documents most similar to the query vector.
@@ -1403,6 +1411,7 @@ class AstraDBVectorStore(VectorStore):
                 of diversity among the results with 0 corresponding
                 to maximum diversity and 1 to minimum diversity.
             filter: Filter on the metadata to apply.
+            **kwargs: Additional arguments are ignored.
 
         Returns:
             The list of Documents selected by maximal marginal relevance.
@@ -1441,6 +1450,7 @@ class AstraDBVectorStore(VectorStore):
                 of diversity among the results with 0 corresponding
                 to maximum diversity and 1 to minimum diversity.
             filter: Filter on the metadata to apply.
+            **kwargs: Additional arguments are ignored.
 
         Returns:
             The list of Documents selected by maximal marginal relevance.
@@ -1479,6 +1489,7 @@ class AstraDBVectorStore(VectorStore):
                 of diversity among the results with 0 corresponding
                 to maximum diversity and 1 to minimum diversity.
             filter: Filter on the metadata to apply.
+            **kwargs: Additional arguments are ignored.
 
         Returns:
             The list of Documents selected by maximal marginal relevance.
@@ -1503,6 +1514,7 @@ class AstraDBVectorStore(VectorStore):
             fetch_k,
             lambda_mult=lambda_mult,
             filter=filter,
+            **kwargs,
         )
 
     @override
@@ -1528,6 +1540,7 @@ class AstraDBVectorStore(VectorStore):
                 of diversity among the results with 0 corresponding
                 to maximum diversity and 1 to minimum diversity.
             filter: Filter on the metadata to apply.
+            **kwargs: Additional arguments are ignored.
 
         Returns:
             The list of Documents selected by maximal marginal relevance.
@@ -1552,6 +1565,7 @@ class AstraDBVectorStore(VectorStore):
             fetch_k,
             lambda_mult=lambda_mult,
             filter=filter,
+            **kwargs,
         )
 
     @classmethod
