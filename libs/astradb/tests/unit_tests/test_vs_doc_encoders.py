@@ -36,7 +36,9 @@ ASTRA_DEFAULT_FILTER = {
 class TestVSDocEncoders:
     def test_default_novectorize_encoding(self) -> None:
         """Test encoding for default, no-vectorize."""
-        encoder = _DefaultVSDocumentEncoder(content_field="content_x")
+        encoder = _DefaultVSDocumentEncoder(
+            content_field="content_x", ignore_invalid_documents=False
+        )
         encoded_doc = encoder.encode(
             content=CONTENT,
             document_id=DOCUMENT_ID,
@@ -47,7 +49,9 @@ class TestVSDocEncoders:
 
     def test_default_novectorize_vector_required(self) -> None:
         """Test vector is required for default encoding, no-vectorize."""
-        encoder = _DefaultVSDocumentEncoder(content_field="content_x")
+        encoder = _DefaultVSDocumentEncoder(
+            content_field="content_x", ignore_invalid_documents=False
+        )
         with pytest.raises(
             ValueError,
             match=NO_NULL_VECTOR_MSG,
@@ -61,19 +65,33 @@ class TestVSDocEncoders:
 
     def test_default_novectorize_decoding(self) -> None:
         """Test decoding for default, no-vectorize."""
-        encoder = _DefaultVSDocumentEncoder(content_field="content_x")
+        encoder = _DefaultVSDocumentEncoder(
+            content_field="content_x", ignore_invalid_documents=False
+        )
         decoded_doc = encoder.decode(ASTRA_DEFAULT_DOCUMENT_NOVECTORIZE)
         assert decoded_doc == LC_DOCUMENT
 
+    def test_default_novectorize_decoding_ignore(self) -> None:
+        """Test decoding for default, no-vectorize."""
+        encoder = _DefaultVSDocumentEncoder(
+            content_field="content_x", ignore_invalid_documents=True
+        )
+        with pytest.warns(UserWarning) as rec_warnings:
+            decoded_doc = encoder.decode({"_id": 0})
+        assert len(rec_warnings) == 1
+        assert decoded_doc is None
+
     def test_default_novectorize_filtering(self) -> None:
         """Test filter-encoding for default, no-vectorize."""
-        encoder = _DefaultVSDocumentEncoder(content_field="content_x")
+        encoder = _DefaultVSDocumentEncoder(
+            content_field="content_x", ignore_invalid_documents=False
+        )
         encoded_flt = encoder.encode_filter(LC_FILTER)
         assert encoded_flt == ASTRA_DEFAULT_FILTER
 
     def test_default_vectorize_encoding(self) -> None:
         """Test encoding for default, vectorize."""
-        encoder = _DefaultVectorizeVSDocumentEncoder()
+        encoder = _DefaultVectorizeVSDocumentEncoder(ignore_invalid_documents=False)
         encoded_doc = encoder.encode(
             content=CONTENT,
             document_id=DOCUMENT_ID,
@@ -84,7 +102,7 @@ class TestVSDocEncoders:
 
     def test_default_vectorize_vector_forbidden(self) -> None:
         """Test vector is not allowed for default encoding, vectorize."""
-        encoder = _DefaultVectorizeVSDocumentEncoder()
+        encoder = _DefaultVectorizeVSDocumentEncoder(ignore_invalid_documents=False)
         with pytest.raises(
             ValueError,
             match=VECTOR_REQUIRED_PREAMBLE_MSG,
@@ -98,12 +116,20 @@ class TestVSDocEncoders:
 
     def test_default_vectorize_decoding(self) -> None:
         """Test decoding for default, vectorize."""
-        encoder = _DefaultVectorizeVSDocumentEncoder()
+        encoder = _DefaultVectorizeVSDocumentEncoder(ignore_invalid_documents=False)
         decoded_doc = encoder.decode(ASTRA_DEFAULT_DOCUMENT_VECTORIZE)
         assert decoded_doc == LC_DOCUMENT
 
+    def test_default_vectorize_decoding_ignore(self) -> None:
+        """Test decoding for default, no-vectorize."""
+        encoder = _DefaultVectorizeVSDocumentEncoder(ignore_invalid_documents=True)
+        with pytest.warns(UserWarning) as rec_warnings:
+            decoded_doc = encoder.decode({"_id": 0})
+        assert len(rec_warnings) == 1
+        assert decoded_doc is None
+
     def test_default_vectorize_filtering(self) -> None:
         """Test filter-encoding for default, vectorize."""
-        encoder = _DefaultVectorizeVSDocumentEncoder()
+        encoder = _DefaultVectorizeVSDocumentEncoder(ignore_invalid_documents=False)
         encoded_flt = encoder.encode_filter(LC_FILTER)
         assert encoded_flt == ASTRA_DEFAULT_FILTER

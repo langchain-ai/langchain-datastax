@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import warnings
 from abc import ABC, abstractmethod
 from typing import Any
 
@@ -52,6 +53,7 @@ class _AstraDBVectorStoreDocumentEncoder(ABC):
     content_field: str
     base_projection: dict[str, bool]
     full_projection: dict[str, bool]
+    ignore_invalid_documents: bool
 
     @abstractmethod
     def encode(
@@ -75,7 +77,7 @@ class _AstraDBVectorStoreDocumentEncoder(ABC):
         """
 
     @abstractmethod
-    def decode(self, astra_document: dict[str, Any]) -> Document:
+    def decode(self, astra_document: dict[str, Any]) -> Document | None:
         """Create a LangChain Document instance from a document retrieved from Astra DB.
 
         Args:
@@ -110,11 +112,13 @@ class _DefaultVSDocumentEncoder(_AstraDBVectorStoreDocumentEncoder):
 
     server_side_embeddings = False
 
-    def __init__(self, content_field: str) -> None:
+    def __init__(self, content_field: str, *, ignore_invalid_documents: bool) -> None:
         """Initialize a new DefaultVSDocumentEncoder.
 
         Args:
             content_field: name of the (top-level) field for textual content.
+            ignore_invalid_documents: if True, noncompliant inputs to `decode`
+                are logged and a None is returned (instead of raising an exception).
         """
         self.content_field = content_field
         self.base_projection = {"_id": True, self.content_field: True, "metadata": True}
@@ -124,6 +128,7 @@ class _DefaultVSDocumentEncoder(_AstraDBVectorStoreDocumentEncoder):
             "metadata": True,
             "$vector": True,
         }
+        self.ignore_invalid_documents = ignore_invalid_documents
 
     @override
     def encode(
@@ -143,7 +148,22 @@ class _DefaultVSDocumentEncoder(_AstraDBVectorStoreDocumentEncoder):
         }
 
     @override
-    def decode(self, astra_document: dict[str, Any]) -> Document:
+    def decode(self, astra_document: dict[str, Any]) -> Document | None:
+        if self.ignore_invalid_documents:
+            if (
+                "metadata" not in astra_document
+                or self.content_field not in astra_document
+            ):
+                invalid_doc_warning = (
+                    "Ignoring document with _id = "
+                    f"{astra_document.get('_id', '(no _id)')}. "
+                    "Reason: missing required fields."
+                )
+                warnings.warn(
+                    invalid_doc_warning,
+                    stacklevel=2,
+                )
+            return None
         return Document(
             page_content=astra_document[self.content_field],
             metadata=astra_document["metadata"],
@@ -165,8 +185,13 @@ class _DefaultVectorizeVSDocumentEncoder(_AstraDBVectorStoreDocumentEncoder):
     server_side_embeddings = True
     content_field = "$vectorize"
 
-    def __init__(self) -> None:
-        """Initialize a new DefaultVectorizeVSDocumentEncoder."""
+    def __init__(self, *, ignore_invalid_documents: bool) -> None:
+        """Initialize a new DefaultVectorizeVSDocumentEncoder.
+
+        Args:
+            ignore_invalid_documents: if True, noncompliant inputs to `decode`
+                are logged and a None is returned (instead of raising an exception).
+        """
         self.base_projection = {"_id": True, "$vectorize": True, "metadata": True}
         self.full_projection = {
             "_id": True,
@@ -174,6 +199,7 @@ class _DefaultVectorizeVSDocumentEncoder(_AstraDBVectorStoreDocumentEncoder):
             "metadata": True,
             "$vector": True,
         }
+        self.ignore_invalid_documents = ignore_invalid_documents
 
     @override
     def encode(
@@ -193,7 +219,19 @@ class _DefaultVectorizeVSDocumentEncoder(_AstraDBVectorStoreDocumentEncoder):
         }
 
     @override
-    def decode(self, astra_document: dict[str, Any]) -> Document:
+    def decode(self, astra_document: dict[str, Any]) -> Document | None:
+        if self.ignore_invalid_documents:
+            if "metadata" not in astra_document or "$vectorize" not in astra_document:
+                invalid_doc_warning = (
+                    "Ignoring document with _id = "
+                    f"{astra_document.get('_id', '(no _id)')}. "
+                    "Reason: missing required fields."
+                )
+                warnings.warn(
+                    invalid_doc_warning,
+                    stacklevel=2,
+                )
+            return None
         return Document(
             page_content=astra_document["$vectorize"],
             metadata=astra_document["metadata"],

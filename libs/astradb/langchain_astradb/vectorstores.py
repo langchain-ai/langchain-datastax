@@ -277,6 +277,7 @@ class AstraDBVectorStore(VectorStore):
         collection_vector_service_options: CollectionVectorServiceOptions | None = None,
         collection_embedding_api_key: str | EmbeddingHeadersProvider | None = None,
         content_field: str | None = _NOT_SET,  # type: ignore[assignment]
+        ignore_invalid_documents: bool = False,
     ) -> None:
         """Wrapper around DataStax Astra DB for vector-store workloads.
 
@@ -356,6 +357,12 @@ class AstraDBVectorStore(VectorStore):
                 in the documents when saved on Astra DB. For vectorize collections,
                 this cannot be specified; for non-vectorize collection, defaults
                 to "content".
+            ignore_invalid_documents: if False (default), exceptions are raised
+                when a document is found on the Astra DB collectin that does
+                not have the expected shape. If set to True, such results
+                from the database are ignored and a warning is issued. Note
+                that in this case a similarity search may end up returning fewer
+                results than the required `k`.
 
         Note:
             For concurrency in synchronous :meth:`~add_texts`:, as a rule of thumb, on a
@@ -407,7 +414,9 @@ class AstraDBVectorStore(VectorStore):
             if content_field is not _NOT_SET:
                 msg = "content_field is not configurable for vectorize collections."
                 raise ValueError(msg)
-            self.document_encoder = _DefaultVectorizeVSDocumentEncoder()
+            self.document_encoder = _DefaultVectorizeVSDocumentEncoder(
+                ignore_invalid_documents=ignore_invalid_documents,
+            )
         else:
             _content_field: str
             if content_field is _NOT_SET or content_field is None:
@@ -415,7 +424,8 @@ class AstraDBVectorStore(VectorStore):
             else:
                 _content_field = content_field
             self.document_encoder = _DefaultVSDocumentEncoder(
-                content_field=_content_field
+                content_field=_content_field,
+                ignore_invalid_documents=ignore_invalid_documents,
             )
         self.collection_embedding_api_key = collection_embedding_api_key
 
@@ -1142,12 +1152,16 @@ class AstraDBVectorStore(VectorStore):
             sort=sort,
         )
         return [
-            (
-                self.document_encoder.decode(hit),
-                hit["$similarity"],
-                hit["_id"],
+            (doc, sim, did)
+            for (doc, sim, did) in (
+                (
+                    self.document_encoder.decode(hit),
+                    hit["$similarity"],
+                    hit["_id"],
+                )
+                for hit in hits_ite
             )
-            for hit in hits_ite
+            if doc is not None
         ]
 
     @override
@@ -1327,18 +1341,22 @@ class AstraDBVectorStore(VectorStore):
         await self.astra_env.aensure_db_setup()
         metadata_parameter = self._filter_to_metadata(filter)
         return [
-            (
-                self.document_encoder.decode(hit),
-                hit["$similarity"],
-                hit["_id"],
+            (doc, sim, did)
+            async for (doc, sim, did) in (
+                (
+                    self.document_encoder.decode(hit),
+                    hit["$similarity"],
+                    hit["_id"],
+                )
+                async for hit in self.astra_env.async_collection.find(
+                    filter=metadata_parameter,
+                    projection=self.document_encoder.base_projection,
+                    limit=k,
+                    include_similarity=True,
+                    sort=sort,
+                )
             )
-            async for hit in self.astra_env.async_collection.find(
-                filter=metadata_parameter,
-                projection=self.document_encoder.base_projection,
-                limit=k,
-                include_similarity=True,
-                sort=sort,
-            )
+            if doc is not None
         ]
 
     def _run_mmr_query_by_sort(
@@ -1409,7 +1427,11 @@ class AstraDBVectorStore(VectorStore):
             for prefetch_index, prefetch_hit in enumerate(prefetch_hits)
             if prefetch_index in mmr_chosen_indices
         ]
-        return [self.document_encoder.decode(hit) for hit in mmr_hits]
+        return [
+            doc
+            for doc in (self.document_encoder.decode(hit) for hit in mmr_hits)
+            if doc is not None
+        ]
 
     @override
     def max_marginal_relevance_search_by_vector(
