@@ -71,15 +71,11 @@ flake8-annotations.allow-star-arg-any = true
 flake8-annotations.mypy-init-return = true
 select = ["ALL"]
 ignore = [
-    "C90", # Do we want to activate (complexity) ?
     "COM812", # Messes with the formatter
     "ERA", # Do we want to activate (no commented code) ?
     "ISC001", # Messes with the formatter
     "PLR09", # TODO: do we enforce these ones (complexity) ?
-
-    "D101", # TODO
-    "D417", # TODO
-
+    "D101", # We prefer using the __init__ docstring to document the class
 ]
 
 [tool.ruff.lint.per-file-ignores]
