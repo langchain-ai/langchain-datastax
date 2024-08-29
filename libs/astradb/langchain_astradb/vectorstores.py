@@ -59,6 +59,8 @@ DocDict = Dict[str, Any]  # dicts expressing entries to insert
 # indexing options when creating a collection
 DEFAULT_INDEXING_OPTIONS = {"allow": ["metadata"]}
 
+_NOT_SET = object()
+
 
 def _unique_list(lst: list[T], key: Callable[[T], U]) -> list[T]:
     visited_keys: set[U] = set()
@@ -267,13 +269,14 @@ class AstraDBVectorStore(VectorStore):
         bulk_insert_batch_concurrency: int | None = None,
         bulk_insert_overwrite_concurrency: int | None = None,
         bulk_delete_concurrency: int | None = None,
-        setup_mode: SetupMode = SetupMode.SYNC,
+        setup_mode: SetupMode = _NOT_SET,  # type: ignore[assignment]
         pre_delete_collection: bool = False,
         metadata_indexing_include: Iterable[str] | None = None,
         metadata_indexing_exclude: Iterable[str] | None = None,
         collection_indexing_policy: dict[str, Any] | None = None,
         collection_vector_service_options: CollectionVectorServiceOptions | None = None,
         collection_embedding_api_key: str | EmbeddingHeadersProvider | None = None,
+        content_field: str | None = _NOT_SET,  # type: ignore[assignment]
     ) -> None:
         """Wrapper around DataStax Astra DB for vector-store workloads.
 
@@ -322,7 +325,8 @@ class AstraDBVectorStore(VectorStore):
                 batch to insert pre-existing entries.
             bulk_delete_concurrency: Number of threads or coroutines for
                 multiple-entry deletes.
-            setup_mode: mode used to create the collection (SYNC, ASYNC or OFF).
+            setup_mode: mode used to create the collection. Allowed: SYNC, ASYNC, OFF,
+                members of `langchain_astradb.utils.astradb.SetupMode`.
             pre_delete_collection: whether to delete the collection before creating it.
                 If False and the collection already exists, the collection will be used
                 as is.
@@ -348,6 +352,10 @@ class AstraDBVectorStore(VectorStore):
                 Astra's key management system.
                 This parameter cannot be provided without
                 specifying `collection_vector_service_options`.
+            content_field: name of the field containing the textual content
+                in the documents when saved on Astra DB. For vectorize collections,
+                this cannot be specified; for non-vectorize collection, defaults
+                to "content".
 
         Note:
             For concurrency in synchronous :meth:`~add_texts`:, as a rule of thumb, on a
@@ -392,6 +400,28 @@ class AstraDBVectorStore(VectorStore):
             )
             raise ValueError(msg)
 
+        # determine vectorize/nonvectorize
+        self.collection_vector_service_options = collection_vector_service_options
+        self.document_encoder: _AstraDBVectorStoreDocumentEncoder
+        if self.collection_vector_service_options is not None:
+            if content_field is not _NOT_SET:
+                msg = "content_field is not configurable for vectorize collections."
+                raise ValueError(msg)
+            self.document_encoder = _DefaultVectorizeVSDocumentEncoder()
+        else:
+            _content_field: str
+            if content_field is _NOT_SET or content_field is None:
+                _content_field = "content"
+            else:
+                _content_field = content_field
+            self.document_encoder = _DefaultVSDocumentEncoder(
+                content_field=_content_field
+            )
+        self.collection_embedding_api_key = collection_embedding_api_key
+
+        _setup_mode: SetupMode = (
+            SetupMode.SYNC if setup_mode is _NOT_SET else setup_mode
+        )
         self.embedding_dimension: int | None = None
         self.embedding = embedding
         self.collection_name = collection_name
@@ -399,13 +429,6 @@ class AstraDBVectorStore(VectorStore):
         self.api_endpoint = api_endpoint
         self.environment = environment
         self.namespace = namespace
-        self.collection_vector_service_options = collection_vector_service_options
-        self.document_encoder: _AstraDBVectorStoreDocumentEncoder
-        if self.collection_vector_service_options is not None:
-            self.document_encoder = _DefaultVectorizeVSDocumentEncoder()
-        else:
-            self.document_encoder = _DefaultVSDocumentEncoder()
-        self.collection_embedding_api_key = collection_embedding_api_key
         # Concurrency settings
         self.batch_size: int | None = batch_size or DEFAULT_DOCUMENT_CHUNK_SIZE
         self.bulk_insert_batch_concurrency: int = (
@@ -421,9 +444,9 @@ class AstraDBVectorStore(VectorStore):
         self.metric = metric
         embedding_dimension_m: int | Awaitable[int] | None = None
         if self.embedding is not None:
-            if setup_mode == SetupMode.ASYNC:
+            if _setup_mode == SetupMode.ASYNC:
                 embedding_dimension_m = self._aget_embedding_dimension()
-            elif setup_mode in (SetupMode.SYNC, SetupMode.OFF):
+            elif _setup_mode in (SetupMode.SYNC, SetupMode.OFF):
                 embedding_dimension_m = self._get_embedding_dimension()
 
         # indexing policy setting
@@ -441,7 +464,7 @@ class AstraDBVectorStore(VectorStore):
             astra_db_client=astra_db_client,
             async_astra_db_client=async_astra_db_client,
             namespace=self.namespace,
-            setup_mode=setup_mode,
+            setup_mode=_setup_mode,
             pre_delete_collection=pre_delete_collection,
             embedding_dimension=embedding_dimension_m,
             metric=self.metric,

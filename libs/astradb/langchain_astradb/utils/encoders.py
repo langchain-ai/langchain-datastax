@@ -109,14 +109,18 @@ class _DefaultVSDocumentEncoder(_AstraDBVectorStoreDocumentEncoder):
     """
 
     server_side_embeddings = False
-    content_field = "content"
 
-    def __init__(self) -> None:
-        """Initialize a new DefaultVSDocumentEncoder."""
-        self.base_projection = {"_id": True, "content": True, "metadata": True}
+    def __init__(self, content_field: str) -> None:
+        """Initialize a new DefaultVSDocumentEncoder.
+
+        Args:
+            content_field: name of the (top-level) field for textual content.
+        """
+        self.content_field = content_field
+        self.base_projection = {"_id": True, self.content_field: True, "metadata": True}
         self.full_projection = {
             "_id": True,
-            "content": True,
+            self.content_field: True,
             "metadata": True,
             "$vector": True,
         }
@@ -132,7 +136,7 @@ class _DefaultVSDocumentEncoder(_AstraDBVectorStoreDocumentEncoder):
         if vector is None:
             raise ValueError(NO_NULL_VECTOR_MSG)
         return {
-            "content": content,
+            self.content_field: content,
             "_id": document_id,
             "$vector": vector,
             "metadata": metadata,
@@ -141,7 +145,7 @@ class _DefaultVSDocumentEncoder(_AstraDBVectorStoreDocumentEncoder):
     @override
     def decode(self, astra_document: dict[str, Any]) -> Document:
         return Document(
-            page_content=astra_document["content"],
+            page_content=astra_document[self.content_field],
             metadata=astra_document["metadata"],
         )
 

@@ -17,7 +17,7 @@ DOCUMENT_ID = "the_id"
 LC_DOCUMENT = Document(page_content=CONTENT, metadata=METADATA)
 ASTRA_DEFAULT_DOCUMENT_NOVECTORIZE = {
     "_id": DOCUMENT_ID,
-    "content": CONTENT,
+    "content_x": CONTENT,
     "metadata": METADATA,
     "$vector": VECTOR,
 }
@@ -36,7 +36,7 @@ ASTRA_DEFAULT_FILTER = {
 class TestVSDocEncoders:
     def test_default_novectorize_encoding(self) -> None:
         """Test encoding for default, no-vectorize."""
-        encoder = _DefaultVSDocumentEncoder()
+        encoder = _DefaultVSDocumentEncoder(content_field="content_x")
         encoded_doc = encoder.encode(
             content=CONTENT,
             document_id=DOCUMENT_ID,
@@ -47,7 +47,7 @@ class TestVSDocEncoders:
 
     def test_default_novectorize_vector_required(self) -> None:
         """Test vector is required for default encoding, no-vectorize."""
-        encoder = _DefaultVSDocumentEncoder()
+        encoder = _DefaultVSDocumentEncoder(content_field="content_x")
         with pytest.raises(
             ValueError,
             match=NO_NULL_VECTOR_MSG,
@@ -61,13 +61,13 @@ class TestVSDocEncoders:
 
     def test_default_novectorize_decoding(self) -> None:
         """Test decoding for default, no-vectorize."""
-        encoder = _DefaultVSDocumentEncoder()
+        encoder = _DefaultVSDocumentEncoder(content_field="content_x")
         decoded_doc = encoder.decode(ASTRA_DEFAULT_DOCUMENT_NOVECTORIZE)
         assert decoded_doc == LC_DOCUMENT
 
     def test_default_novectorize_filtering(self) -> None:
         """Test filter-encoding for default, no-vectorize."""
-        encoder = _DefaultVSDocumentEncoder()
+        encoder = _DefaultVSDocumentEncoder(content_field="content_x")
         encoded_flt = encoder.encode_filter(LC_FILTER)
         assert encoded_flt == ASTRA_DEFAULT_FILTER
 
