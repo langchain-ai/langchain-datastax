@@ -39,6 +39,8 @@ from langchain_astradb.utils.encoders import (
     _AstraDBVectorStoreDocumentEncoder,
     _DefaultVectorizeVSDocumentEncoder,
     _DefaultVSDocumentEncoder,
+    _FlatVectorizeVSDocumentEncoder,
+    _FlatVSDocumentEncoder,
 )
 from langchain_astradb.utils.mmr import maximal_marginal_relevance
 
@@ -175,7 +177,7 @@ def _detect_document_encoder(
 
     final_content_field: str
     if _content_field == "*":
-        # guess content_field itself by docs inspection
+        # guess content_field by docs inspection
         content_fields = [_detect_content_field(document) for document in documents]
         cf_stats = Counter([cf for cf in content_fields if cf is not None])
         if not cf_stats:
@@ -187,15 +189,19 @@ def _detect_document_encoder(
 
     if has_vectorize:
         if is_flat:
-            raise NotImplementedError
+            return _FlatVectorizeVSDocumentEncoder(
+                ignore_invalid_documents=ignore_invalid_documents,
+            )
 
         return _DefaultVectorizeVSDocumentEncoder(
             ignore_invalid_documents=ignore_invalid_documents,
         )
     # no vectorize:
     if is_flat:
-        raise NotImplementedError
-
+        return _FlatVSDocumentEncoder(
+            content_field=final_content_field,
+            ignore_invalid_documents=ignore_invalid_documents,
+        )
     return _DefaultVSDocumentEncoder(
         content_field=final_content_field,
         ignore_invalid_documents=ignore_invalid_documents,

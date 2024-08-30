@@ -9,8 +9,9 @@ from typing import Any
 from langchain_core.documents import Document
 from typing_extensions import override
 
-NO_NULL_VECTOR_MSG = "Default encoder cannot receive null vector"
-VECTOR_REQUIRED_PREAMBLE_MSG = "DefaultVectorize encoder got a non-null vector"
+NO_NULL_VECTOR_MSG = "Default encoder cannot receive null vector."
+VECTOR_REQUIRED_PREAMBLE_MSG = "DefaultVectorize encoder got a non-null vector."
+FLATTEN_CONFLICT_MSG = "Cannot flatten metadata: field name overlap for '{field}'."
 
 
 def _default_encode_filter(filter_dict: dict[str, Any]) -> dict[str, Any]:
@@ -144,7 +145,7 @@ class _DefaultVSDocumentEncoder(_AstraDBVectorStoreDocumentEncoder):
             self.content_field: content,
             "_id": document_id,
             "$vector": vector,
-            "metadata": metadata,
+            "metadata": metadata or {},
         }
 
     @override
@@ -215,7 +216,7 @@ class _DefaultVectorizeVSDocumentEncoder(_AstraDBVectorStoreDocumentEncoder):
         return {
             "$vectorize": content,
             "_id": document_id,
-            "metadata": metadata,
+            "metadata": metadata or {},
         }
 
     @override
@@ -240,3 +241,141 @@ class _DefaultVectorizeVSDocumentEncoder(_AstraDBVectorStoreDocumentEncoder):
     @override
     def encode_filter(self, filter_dict: dict[str, Any]) -> dict[str, Any]:
         return _default_encode_filter(filter_dict)
+
+
+class _FlatVSDocumentEncoder(_AstraDBVectorStoreDocumentEncoder):
+    """Encoder for collections populated externally, with client-side embeddings.
+
+    This encoder manages document structured as a flat key-value map, with one
+    field being the textual content and the other implicitly forming the "metadata".
+    """
+
+    server_side_embeddings = False
+
+    def __init__(self, content_field: str, *, ignore_invalid_documents: bool) -> None:
+        """Initialize a new DefaultVSDocumentEncoder.
+
+        Args:
+            content_field: name of the (top-level) field for textual content.
+            ignore_invalid_documents: if True, noncompliant inputs to `decode`
+                are logged and a None is returned (instead of raising an exception).
+        """
+        self.content_field = content_field
+        self.base_projection = {"_id": True, "$vector": False}
+        self.full_projection = {"*": True}
+        self.ignore_invalid_documents = ignore_invalid_documents
+        self._non_md_fields = {"_id", "$vector", "$vectorize", self.content_field}
+
+    @override
+    def encode(
+        self,
+        content: str,
+        document_id: str,
+        vector: list[float] | None,
+        metadata: dict | None,
+    ) -> dict[str, Any]:
+        if vector is None:
+            raise ValueError(NO_NULL_VECTOR_MSG)
+        if self.content_field in (metadata or {}):
+            msg = FLATTEN_CONFLICT_MSG.format(field=self.content_field)
+            raise ValueError(msg)
+        return {
+            self.content_field: content,
+            "_id": document_id,
+            "$vector": vector,
+        } | (metadata or {})
+
+    @override
+    def decode(self, astra_document: dict[str, Any]) -> Document | None:
+        if self.ignore_invalid_documents:
+            if self.content_field not in astra_document:
+                invalid_doc_warning = (
+                    "Ignoring document with _id = "
+                    f"{astra_document.get('_id', '(no _id)')}. "
+                    "Reason: missing required fields."
+                )
+                warnings.warn(
+                    invalid_doc_warning,
+                    stacklevel=2,
+                )
+            return None
+        _metadata = {
+            k: v for k, v in astra_document.items() if k not in self._non_md_fields
+        }
+        return Document(
+            page_content=astra_document[self.content_field],
+            metadata=_metadata,
+        )
+
+    @override
+    def encode_filter(self, filter_dict: dict[str, Any]) -> dict[str, Any]:
+        return filter_dict
+
+
+class _FlatVectorizeVSDocumentEncoder(_AstraDBVectorStoreDocumentEncoder):
+    """Encoder for collections populated externally, with server-side embeddings.
+
+    This encoder manages document structured as a flat key-value map, with one
+    field being the textual content and the other implicitly forming the "metadata".
+    """
+
+    server_side_embeddings = True
+    content_field = "$vectorize"
+
+    def __init__(self, *, ignore_invalid_documents: bool) -> None:
+        """Initialize a new DefaultVectorizeVSDocumentEncoder.
+
+        Args:
+            ignore_invalid_documents: if True, noncompliant inputs to `decode`
+                are logged and a None is returned (instead of raising an exception).
+        """
+        self.base_projection = {"_id": True, "$vector": False}
+        self.full_projection = {"*": True}
+        self.ignore_invalid_documents = ignore_invalid_documents
+        self._non_md_fields = {"_id", "$vector", "$vectorize"}
+
+    @override
+    def encode(
+        self,
+        content: str,
+        document_id: str,
+        vector: list[float] | None,
+        metadata: dict | None,
+    ) -> dict[str, Any]:
+        if vector is not None:
+            msg = f"{VECTOR_REQUIRED_PREAMBLE_MSG}: {vector}"
+            raise ValueError(msg)
+        if "$vectorize" in (metadata or {}):
+            msg = FLATTEN_CONFLICT_MSG.format(field="$vectorize")
+            raise ValueError(msg)
+        return {
+            "$vectorize": content,
+            "_id": document_id,
+            "$vector": vector,
+        } | (metadata or {})
+
+    @override
+    def decode(self, astra_document: dict[str, Any]) -> Document | None:
+        if self.ignore_invalid_documents:
+            if "$vectorize" not in astra_document:
+                invalid_doc_warning = (
+                    "Ignoring document with _id = "
+                    f"{astra_document.get('_id', '(no _id)')}. "
+                    "Reason: missing required fields."
+                )
+                warnings.warn(
+                    invalid_doc_warning,
+                    stacklevel=2,
+                )
+            return None
+        _metadata = {
+            k: v for k, v in astra_document.items() if k not in self._non_md_fields
+        }
+        return Document(
+            page_content=astra_document["$vectorize"],
+            metadata=_metadata,
+        )
+
+    @override
+    def encode_filter(self, filter_dict: dict[str, Any]) -> dict[str, Any]:
+        return filter_dict
