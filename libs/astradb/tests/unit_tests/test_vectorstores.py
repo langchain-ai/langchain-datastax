@@ -60,8 +60,7 @@ class TestAstraDB:
         # embedding and vectorize => error
         with pytest.raises(
             ValueError,
-            match="Only one of `embedding` or `collection_vector_service_options` can "
-            "be provided.",
+            match="Embedding cannot be provided for vectorize collections",
         ):
             AstraDBVectorStore(
                 embedding=embedding,
@@ -76,8 +75,7 @@ class TestAstraDB:
         # no embedding and no vectorize => error
         with pytest.raises(
             ValueError,
-            match="Either an `embedding` or a `collection_vector_service_options` "
-            "must be provided.",
+            match="Embedding is required for non-vectorize collections",
         ):
             AstraDBVectorStore(
                 collection_name="mock_coll_name",

@@ -6,7 +6,9 @@ import asyncio
 import inspect
 import uuid
 import warnings
+from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
+from operator import itemgetter
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -31,6 +33,7 @@ from langchain_astradb.utils.astradb import (
     MAX_CONCURRENT_DOCUMENT_REPLACEMENTS,
     SetupMode,
     _AstraDBCollectionEnvironment,
+    _survey_collection,
 )
 from langchain_astradb.utils.encoders import (
     _AstraDBVectorStoreDocumentEncoder,
@@ -71,6 +74,156 @@ def _unique_list(lst: list[T], key: Callable[[T], U]) -> list[T]:
             visited_keys.add(item_key)
             new_lst.append(item)
     return new_lst
+
+
+def _validate_autodetect_init_params(
+    *,
+    metric: str | None = None,
+    setup_mode: SetupMode,
+    pre_delete_collection: bool,
+    metadata_indexing_include: Iterable[str] | None,
+    metadata_indexing_exclude: Iterable[str] | None,
+    collection_indexing_policy: dict[str, Any] | None,
+    collection_vector_service_options: CollectionVectorServiceOptions | None,
+) -> None:
+    """Check that the passed parameters do not violate the autodetect constraints."""
+    forbidden_parameters = [
+        p_name
+        for p_name, p_value in (
+            ("metric", metric),
+            ("metadata_indexing_include", metadata_indexing_include),
+            ("metadata_indexing_exclude", metadata_indexing_exclude),
+            ("collection_indexing_policy", collection_indexing_policy),
+            ("collection_vector_service_options", collection_vector_service_options),
+        )
+        if p_value is not None
+    ]
+    fp_error: str | None = None
+    if forbidden_parameters:
+        fp_error = (
+            f"Parameter(s) {', '.join(forbidden_parameters)}. were provided "
+            "but cannot be passed."
+        )
+    pd_error: str | None = None
+    if pre_delete_collection:
+        pd_error = "Parameter `pre_delete_collection` cannot be True."
+    sm_error: str | None = None
+    if setup_mode is not _NOT_SET:
+        sm_error = "Parameter `setup_mode` not allowed."
+    am_errors = [err_s for err_s in (fp_error, pd_error, sm_error) if err_s is not None]
+    if am_errors:
+        msg = f"Invalid parameters for autodetect mode: {'; '.join(am_errors)}"
+        raise ValueError(msg)
+
+
+def _is_flat_document(document: dict[str, Any]) -> bool | None:
+    """Try to guess, when possible, if this document has metadata-as-a-dict or not."""
+    _metadata = document.get("metadata")
+    _vector = document.get("$vector")
+    _regularfields = set(document.keys()) - {"_id", "$vector"}
+    _regularfields_m = _regularfields - {"metadata"}
+    # cannot determine if ...
+    if _vector is None:
+        return None
+    # now a determination
+    if isinstance(_metadata, dict) and _regularfields_m:
+        return False
+    if isinstance(_metadata, dict) and not _regularfields_m:
+        # this document should not contribute to the survey
+        return None
+    str_regularfields = {
+        k for k, v in document.items() if isinstance(v, str) if k in _regularfields
+    }
+    if str_regularfields:
+        return True
+    return None
+
+
+def _detect_content_field(document: dict[str, Any]) -> str | None:
+    """Try to guess the content field by inspecting the passed document."""
+    strlen_map = {
+        k: len(v) for k, v in document.items() if k != "_id" if isinstance(v, str)
+    }
+    if not strlen_map:
+        return None
+    return sorted(strlen_map.items(), key=itemgetter(1), reverse=True)[0][0]
+
+
+def _detect_document_encoder(
+    documents: list[dict[str, Any]],
+    *,
+    has_vectorize: bool,
+    ignore_invalid_documents: bool,
+    content_field: str,
+) -> _AstraDBVectorStoreDocumentEncoder:
+    _content_field = _normalize_content_field(
+        content_field,
+        is_autodetect=True,
+        has_vectorize=has_vectorize,
+    )
+    # survey and determine flatness
+    flatness_survey = [_is_flat_document(document) for document in documents]
+    flatness_stats = Counter(flatness_survey)
+    n_flats = flatness_stats.get(True, 0)
+    n_deeps = flatness_stats.get(False, 0)
+    if n_flats > 0 and n_deeps > 0:
+        msg = "Mixed document shapes detected on collection during autodetect."
+        raise ValueError(msg)
+
+    # in absence of clues, 0 < 0 is False and default is NON FLAT (i.e. native)
+    is_flat = n_deeps < n_flats
+
+    final_content_field: str
+    if _content_field == "*":
+        # guess content_field itself by docs inspection
+        content_fields = [_detect_content_field(document) for document in documents]
+        cf_stats = Counter([cf for cf in content_fields if cf is not None])
+        if not cf_stats:
+            msg = "Could not infer content_field name from sampled documents."
+            raise ValueError(msg)
+        final_content_field = cf_stats.most_common(1)[0][0]
+    else:
+        final_content_field = _content_field
+
+    if has_vectorize:
+        if is_flat:
+            raise NotImplementedError
+
+        return _DefaultVectorizeVSDocumentEncoder(
+            ignore_invalid_documents=ignore_invalid_documents,
+        )
+    # no vectorize:
+    if is_flat:
+        raise NotImplementedError
+
+    return _DefaultVSDocumentEncoder(
+        content_field=final_content_field,
+        ignore_invalid_documents=ignore_invalid_documents,
+    )
+
+
+def _normalize_content_field(
+    content_field: str,
+    *,
+    is_autodetect: bool,
+    has_vectorize: bool,
+) -> str:
+    if has_vectorize:
+        if content_field is not _NOT_SET:
+            msg = "content_field is not configurable for vectorize collections."
+            raise ValueError(msg)
+        return "$vectorize"
+
+    if content_field is _NOT_SET or content_field is None:
+        return "content"
+
+    if content_field == "*":
+        if not is_autodetect:
+            msg = "content_field='*' illegal if autodetect_collection is False."
+            raise ValueError(msg)
+        return content_field
+
+    return content_field
 
 
 class AstraDBVectorStore(VectorStore):
@@ -276,8 +429,9 @@ class AstraDBVectorStore(VectorStore):
         collection_indexing_policy: dict[str, Any] | None = None,
         collection_vector_service_options: CollectionVectorServiceOptions | None = None,
         collection_embedding_api_key: str | EmbeddingHeadersProvider | None = None,
-        content_field: str | None = _NOT_SET,  # type: ignore[assignment]
+        content_field: str = _NOT_SET,  # type: ignore[assignment]
         ignore_invalid_documents: bool = False,
+        autodetect_collection: bool = False,
     ) -> None:
         """Wrapper around DataStax Astra DB for vector-store workloads.
 
@@ -357,12 +511,26 @@ class AstraDBVectorStore(VectorStore):
                 in the documents when saved on Astra DB. For vectorize collections,
                 this cannot be specified; for non-vectorize collection, defaults
                 to "content".
+                The special value "*" can be passed only if autodetect_collection=True.
             ignore_invalid_documents: if False (default), exceptions are raised
                 when a document is found on the Astra DB collectin that does
                 not have the expected shape. If set to True, such results
                 from the database are ignored and a warning is issued. Note
                 that in this case a similarity search may end up returning fewer
                 results than the required `k`.
+            autodetect_collection: if True, turns on autodetect behavior.
+                The store will look for an existing collection of the provided name
+                and infer the store settings from it. Default is False.
+                In autodetect mode, `content_field` can be given as "*", meaning
+                that an attempt will be made to determine it by inspection
+                (unless vectorize is enabled, in which case `content_field` is ignored).
+                Note that the following parameters cannot be used if this is True:
+                    `metric`
+                    `setup_mode`
+                    `metadata_indexing_include`
+                    `metadata_indexing_exclude`
+                    `collection_indexing_policy`
+                    `collection_vector_service_options`
 
         Note:
             For concurrency in synchronous :meth:`~add_texts`:, as a rule of thumb, on a
@@ -381,65 +549,23 @@ class AstraDBVectorStore(VectorStore):
             Remember you can pass concurrency settings to individual calls to
             :meth:`~add_texts` and :meth:`~add_documents` as well.
         """
-        # Embedding and the server-side embeddings are mutually exclusive,
-        # as both specify how to produce embeddings
-        if embedding is None and collection_vector_service_options is None:
-            msg = (
-                "Either an `embedding` or a `collection_vector_service_options` "
-                "must be provided."
-            )
-            raise ValueError(msg)
-
-        if embedding is not None and collection_vector_service_options is not None:
-            msg = (
-                "Only one of `embedding` or `collection_vector_service_options` "
-                "can be provided."
-            )
-            raise ValueError(msg)
-
-        if (
-            collection_vector_service_options is None
-            and collection_embedding_api_key is not None
-        ):
-            msg = (
-                "`collection_embedding_api_key` cannot be provided unless"
-                " `collection_vector_service_options` is also passed."
-            )
-            raise ValueError(msg)
-
-        # determine vectorize/nonvectorize
-        self.collection_vector_service_options = collection_vector_service_options
-        self.document_encoder: _AstraDBVectorStoreDocumentEncoder
-        if self.collection_vector_service_options is not None:
-            if content_field is not _NOT_SET:
-                msg = "content_field is not configurable for vectorize collections."
-                raise ValueError(msg)
-            self.document_encoder = _DefaultVectorizeVSDocumentEncoder(
-                ignore_invalid_documents=ignore_invalid_documents,
-            )
-        else:
-            _content_field: str
-            if content_field is _NOT_SET or content_field is None:
-                _content_field = "content"
-            else:
-                _content_field = content_field
-            self.document_encoder = _DefaultVSDocumentEncoder(
-                content_field=_content_field,
-                ignore_invalid_documents=ignore_invalid_documents,
-            )
-        self.collection_embedding_api_key = collection_embedding_api_key
-
-        _setup_mode: SetupMode = (
-            SetupMode.SYNC if setup_mode is _NOT_SET else setup_mode
-        )
-        self.embedding_dimension: int | None = None
-        self.embedding = embedding
+        # general collection settings
         self.collection_name = collection_name
         self.token = token
         self.api_endpoint = api_endpoint
         self.environment = environment
         self.namespace = namespace
-        # Concurrency settings
+        self.indexing_policy: dict[str, Any]
+        self.autodetect_collection = autodetect_collection
+        # vector-related settings
+        self.embedding_dimension: int | None = None
+        self.embedding = embedding
+        self.metric = metric
+        self.collection_embedding_api_key = collection_embedding_api_key
+        self.collection_vector_service_options = collection_vector_service_options
+        # DB-encoding settings:
+        self.document_encoder: _AstraDBVectorStoreDocumentEncoder
+        # concurrency settings
         self.batch_size: int | None = batch_size or DEFAULT_DOCUMENT_CHUNK_SIZE
         self.bulk_insert_batch_concurrency: int = (
             bulk_insert_batch_concurrency or MAX_CONCURRENT_DOCUMENT_INSERTIONS
@@ -450,21 +576,99 @@ class AstraDBVectorStore(VectorStore):
         self.bulk_delete_concurrency: int = (
             bulk_delete_concurrency or MAX_CONCURRENT_DOCUMENT_DELETIONS
         )
-        # "vector-related" settings
-        self.metric = metric
-        embedding_dimension_m: int | Awaitable[int] | None = None
-        if self.embedding is not None:
-            if _setup_mode == SetupMode.ASYNC:
-                embedding_dimension_m = self._aget_embedding_dimension()
-            elif _setup_mode in (SetupMode.SYNC, SetupMode.OFF):
-                embedding_dimension_m = self._get_embedding_dimension()
 
-        # indexing policy setting
-        self.indexing_policy: dict[str, Any] = self._normalize_metadata_indexing_policy(
-            metadata_indexing_include=metadata_indexing_include,
-            metadata_indexing_exclude=metadata_indexing_exclude,
-            collection_indexing_policy=collection_indexing_policy,
-        )
+        _setup_mode: SetupMode
+        _embedding_dimension: int | Awaitable[int] | None
+
+        if not self.autodetect_collection:
+            _setup_mode = SetupMode.SYNC if setup_mode is _NOT_SET else setup_mode
+            _embedding_dimension = self._prepare_embedding_dimension(_setup_mode)
+            # determine vectorize/nonvectorize
+            has_vectorize = self.collection_vector_service_options is not None
+            _content_field = _normalize_content_field(
+                content_field,
+                is_autodetect=False,
+                has_vectorize=has_vectorize,
+            )
+
+            if self.collection_vector_service_options is not None:
+                self.document_encoder = _DefaultVectorizeVSDocumentEncoder(
+                    ignore_invalid_documents=ignore_invalid_documents,
+                )
+            else:
+                self.document_encoder = _DefaultVSDocumentEncoder(
+                    content_field=_content_field,
+                    ignore_invalid_documents=ignore_invalid_documents,
+                )
+            # indexing policy setting
+            self.indexing_policy = self._normalize_metadata_indexing_policy(
+                metadata_indexing_include=metadata_indexing_include,
+                metadata_indexing_exclude=metadata_indexing_exclude,
+                collection_indexing_policy=collection_indexing_policy,
+            )
+        else:
+            # specific checks for autodetect logic
+            _validate_autodetect_init_params(
+                metric=self.metric,
+                setup_mode=setup_mode,
+                pre_delete_collection=pre_delete_collection,
+                metadata_indexing_include=metadata_indexing_include,
+                metadata_indexing_exclude=metadata_indexing_exclude,
+                collection_indexing_policy=collection_indexing_policy,
+                collection_vector_service_options=self.collection_vector_service_options,
+            )
+            _setup_mode = SetupMode.OFF
+
+            # fetch collection intelligence
+            c_descriptor, c_documents = _survey_collection(
+                collection_name=self.collection_name,
+                token=self.token,
+                api_endpoint=self.api_endpoint,
+                environment=self.environment,
+                astra_db_client=astra_db_client,
+                async_astra_db_client=async_astra_db_client,
+                namespace=self.namespace,
+            )
+            if c_descriptor is None:
+                msg = f"Collection '{self.collection_name}' not found."
+                raise ValueError(msg)
+            # use the collection info to set the store properties
+            self.indexing_policy = self._normalize_metadata_indexing_policy(
+                metadata_indexing_include=None,
+                metadata_indexing_exclude=None,
+                collection_indexing_policy=c_descriptor.options.indexing,
+            )
+            if c_descriptor.options.vector is None:
+                msg = "Non-vector collection detected."
+                raise ValueError(msg)
+            _embedding_dimension = c_descriptor.options.vector.dimension
+            self.collection_vector_service_options = c_descriptor.options.vector.service
+            has_vectorize = self.collection_vector_service_options is not None
+            self.document_encoder = _detect_document_encoder(
+                c_documents,
+                has_vectorize=has_vectorize,
+                ignore_invalid_documents=ignore_invalid_documents,
+                content_field=content_field,
+            )
+
+        # validate embedding/vectorize compatibility and such.
+        # Embedding and the server-side embeddings are mutually exclusive,
+        # as both specify how to produce embeddings.
+        # Also API key makes no sense unless vectorize.
+        if self.embedding is None and not self.document_encoder.server_side_embeddings:
+            msg = "Embedding is required for non-vectorize collections."
+            raise ValueError(msg)
+
+        if self.embedding is not None and self.document_encoder.server_side_embeddings:
+            msg = "Embedding cannot be provided for vectorize collections."
+            raise ValueError(msg)
+
+        if (
+            not self.document_encoder.server_side_embeddings
+            and self.collection_embedding_api_key is not None
+        ):
+            msg = "Embedding API Key cannot be provided for non-vectorize collections."
+            raise ValueError(msg)
 
         self.astra_env = _AstraDBCollectionEnvironment(
             collection_name=collection_name,
@@ -476,7 +680,7 @@ class AstraDBVectorStore(VectorStore):
             namespace=self.namespace,
             setup_mode=_setup_mode,
             pre_delete_collection=pre_delete_collection,
-            embedding_dimension=embedding_dimension_m,
+            embedding_dimension=_embedding_dimension,
             metric=self.metric,
             requested_indexing_policy=self.indexing_policy,
             default_indexing_policy=DEFAULT_INDEXING_OPTIONS,
@@ -490,19 +694,28 @@ class AstraDBVectorStore(VectorStore):
             raise ValueError(msg)
         return self.embedding
 
-    def _get_embedding_dimension(self) -> int:
+    def _prepare_embedding_dimension(
+        self, setup_mode: SetupMode
+    ) -> int | Awaitable[int] | None:
+        """Return the right kind of object for the astra_env to use."""
+        if self.embedding is None:
+            return None
+        if setup_mode == SetupMode.ASYNC:
+            # in this case, we wrap the computation as an awaitable
+            async def _aget_embedding_dimension() -> int:
+                if self.embedding_dimension is None:
+                    self.embedding_dimension = len(
+                        await self._get_safe_embedding().aembed_query(
+                            text="This is a sample sentence."
+                        )
+                    )
+                return self.embedding_dimension
+
+            return _aget_embedding_dimension()
+        # case of setup_mode = SetupMode.SYNC, SetupMode.OFF
         if self.embedding_dimension is None:
             self.embedding_dimension = len(
                 self._get_safe_embedding().embed_query(
-                    text="This is a sample sentence."
-                )
-            )
-        return self.embedding_dimension
-
-    async def _aget_embedding_dimension(self) -> int:
-        if self.embedding_dimension is None:
-            self.embedding_dimension = len(
-                await self._get_safe_embedding().aembed_query(
                     text="This is a sample sentence."
                 )
             )
