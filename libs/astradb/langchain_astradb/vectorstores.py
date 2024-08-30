@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+import logging
 import uuid
 import warnings
 from collections import Counter
@@ -63,6 +64,8 @@ DocDict = Dict[str, Any]  # dicts expressing entries to insert
 
 # indexing options when creating a collection
 DEFAULT_INDEXING_OPTIONS = {"allow": ["metadata"]}
+
+logger = logging.getLogger(__name__)
 
 _NOT_SET = object()
 
@@ -163,6 +166,7 @@ def _detect_document_encoder(
         is_autodetect=True,
         has_vectorize=has_vectorize,
     )
+    logger.info("vector store autodetect: inspecting %i documents", len(documents))
     # survey and determine flatness
     flatness_survey = [_is_flat_document(document) for document in documents]
     flatness_stats = Counter(flatness_survey)
@@ -174,18 +178,27 @@ def _detect_document_encoder(
 
     # in absence of clues, 0 < 0 is False and default is NON FLAT (i.e. native)
     is_flat = n_deeps < n_flats
+    logger.info("vector store autodetect: is_flat = %s", is_flat)
 
     final_content_field: str
     if _content_field == "*":
         # guess content_field by docs inspection
         content_fields = [_detect_content_field(document) for document in documents]
-        cf_stats = Counter([cf for cf in content_fields if cf is not None])
+        valid_content_fields = [cf for cf in content_fields if cf is not None]
+        logger.info(
+            "vector store autodetect: inferring content_field from %i documents",
+            len(valid_content_fields),
+        )
+        cf_stats = Counter(valid_content_fields)
         if not cf_stats:
             msg = "Could not infer content_field name from sampled documents."
             raise ValueError(msg)
         final_content_field = cf_stats.most_common(1)[0][0]
     else:
         final_content_field = _content_field
+    logger.info(
+        "vector store autodetect: final_content_field = %s", final_content_field
+    )
 
     if has_vectorize:
         if is_flat:
@@ -221,7 +234,7 @@ def _normalize_content_field(
         return "$vectorize"
 
     if content_field is _NOT_SET or content_field is None:
-        return "content"
+        return "*" if is_autodetect else "content"
 
     if content_field == "*":
         if not is_autodetect:
@@ -587,6 +600,9 @@ class AstraDBVectorStore(VectorStore):
         _embedding_dimension: int | Awaitable[int] | None
 
         if not self.autodetect_collection:
+            logger.info(
+                "vector store default init, collection '%s'", self.collection_name
+            )
             _setup_mode = SetupMode.SYNC if setup_mode is _NOT_SET else setup_mode
             _embedding_dimension = self._prepare_embedding_dimension(_setup_mode)
             # determine vectorize/nonvectorize
@@ -613,6 +629,9 @@ class AstraDBVectorStore(VectorStore):
                 collection_indexing_policy=collection_indexing_policy,
             )
         else:
+            logger.info(
+                "vector store autodetect init, collection '%s'", self.collection_name
+            )
             # specific checks for autodetect logic
             _validate_autodetect_init_params(
                 metric=self.metric,
@@ -650,6 +669,7 @@ class AstraDBVectorStore(VectorStore):
             _embedding_dimension = c_descriptor.options.vector.dimension
             self.collection_vector_service_options = c_descriptor.options.vector.service
             has_vectorize = self.collection_vector_service_options is not None
+            logger.info("vector store autodetect: has_vectorize = %s", has_vectorize)
             self.document_encoder = _detect_document_encoder(
                 c_documents,
                 has_vectorize=has_vectorize,

@@ -264,7 +264,13 @@ class _FlatVSDocumentEncoder(_AstraDBVectorStoreDocumentEncoder):
         self.base_projection = {"_id": True, "$vector": False}
         self.full_projection = {"*": True}
         self.ignore_invalid_documents = ignore_invalid_documents
-        self._non_md_fields = {"_id", "$vector", "$vectorize", self.content_field}
+        self._non_md_fields = {
+            "_id",
+            "$vector",
+            "$vectorize",
+            self.content_field,
+            "$similarity",
+        }
 
     @override
     def encode(
@@ -329,10 +335,10 @@ class _FlatVectorizeVSDocumentEncoder(_AstraDBVectorStoreDocumentEncoder):
             ignore_invalid_documents: if True, noncompliant inputs to `decode`
                 are logged and a None is returned (instead of raising an exception).
         """
-        self.base_projection = {"_id": True, "$vector": False}
+        self.base_projection = {"_id": True, "$vector": False, "$vectorize": True}
         self.full_projection = {"*": True}
         self.ignore_invalid_documents = ignore_invalid_documents
-        self._non_md_fields = {"_id", "$vector", "$vectorize"}
+        self._non_md_fields = {"_id", "$vector", "$vectorize", "$similarity"}
 
     @override
     def encode(
@@ -351,7 +357,6 @@ class _FlatVectorizeVSDocumentEncoder(_AstraDBVectorStoreDocumentEncoder):
         return {
             "$vectorize": content,
             "_id": document_id,
-            "$vector": vector,
         } | (metadata or {})
 
     @override
