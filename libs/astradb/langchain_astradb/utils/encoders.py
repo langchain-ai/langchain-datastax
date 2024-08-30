@@ -150,20 +150,19 @@ class _DefaultVSDocumentEncoder(_AstraDBVectorStoreDocumentEncoder):
 
     @override
     def decode(self, astra_document: dict[str, Any]) -> Document | None:
-        if self.ignore_invalid_documents:
-            if (
-                "metadata" not in astra_document
-                or self.content_field not in astra_document
-            ):
-                invalid_doc_warning = (
-                    "Ignoring document with _id = "
-                    f"{astra_document.get('_id', '(no _id)')}. "
-                    "Reason: missing required fields."
-                )
-                warnings.warn(
-                    invalid_doc_warning,
-                    stacklevel=2,
-                )
+        _invalid_doc = (
+            "metadata" not in astra_document or self.content_field not in astra_document
+        )
+        if _invalid_doc and self.ignore_invalid_documents:
+            invalid_doc_warning = (
+                "Ignoring document with _id = "
+                f"{astra_document.get('_id', '(no _id)')}. "
+                "Reason: missing required fields."
+            )
+            warnings.warn(
+                invalid_doc_warning,
+                stacklevel=2,
+            )
             return None
         return Document(
             page_content=astra_document[self.content_field],
@@ -221,17 +220,19 @@ class _DefaultVectorizeVSDocumentEncoder(_AstraDBVectorStoreDocumentEncoder):
 
     @override
     def decode(self, astra_document: dict[str, Any]) -> Document | None:
-        if self.ignore_invalid_documents:
-            if "metadata" not in astra_document or "$vectorize" not in astra_document:
-                invalid_doc_warning = (
-                    "Ignoring document with _id = "
-                    f"{astra_document.get('_id', '(no _id)')}. "
-                    "Reason: missing required fields."
-                )
-                warnings.warn(
-                    invalid_doc_warning,
-                    stacklevel=2,
-                )
+        _invalid_doc = (
+            "metadata" not in astra_document or "$vectorize" not in astra_document
+        )
+        if _invalid_doc and self.ignore_invalid_documents:
+            invalid_doc_warning = (
+                "Ignoring document with _id = "
+                f"{astra_document.get('_id', '(no _id)')}. "
+                "Reason: missing required fields."
+            )
+            warnings.warn(
+                invalid_doc_warning,
+                stacklevel=2,
+            )
             return None
         return Document(
             page_content=astra_document["$vectorize"],
@@ -293,17 +294,16 @@ class _FlatVSDocumentEncoder(_AstraDBVectorStoreDocumentEncoder):
 
     @override
     def decode(self, astra_document: dict[str, Any]) -> Document | None:
-        if self.ignore_invalid_documents:
-            if self.content_field not in astra_document:
-                invalid_doc_warning = (
-                    "Ignoring document with _id = "
-                    f"{astra_document.get('_id', '(no _id)')}. "
-                    "Reason: missing required fields."
-                )
-                warnings.warn(
-                    invalid_doc_warning,
-                    stacklevel=2,
-                )
+        if self.content_field not in astra_document and self.ignore_invalid_documents:
+            invalid_doc_warning = (
+                "Ignoring document with _id = "
+                f"{astra_document.get('_id', '(no _id)')}. "
+                "Reason: missing required fields."
+            )
+            warnings.warn(
+                invalid_doc_warning,
+                stacklevel=2,
+            )
             return None
         _metadata = {
             k: v for k, v in astra_document.items() if k not in self._non_md_fields
@@ -361,17 +361,16 @@ class _FlatVectorizeVSDocumentEncoder(_AstraDBVectorStoreDocumentEncoder):
 
     @override
     def decode(self, astra_document: dict[str, Any]) -> Document | None:
-        if self.ignore_invalid_documents:
-            if "$vectorize" not in astra_document:
-                invalid_doc_warning = (
-                    "Ignoring document with _id = "
-                    f"{astra_document.get('_id', '(no _id)')}. "
-                    "Reason: missing required fields."
-                )
-                warnings.warn(
-                    invalid_doc_warning,
-                    stacklevel=2,
-                )
+        if "$vectorize" not in astra_document and self.ignore_invalid_documents:
+            invalid_doc_warning = (
+                "Ignoring document with _id = "
+                f"{astra_document.get('_id', '(no _id)')}. "
+                "Reason: missing required fields."
+            )
+            warnings.warn(
+                invalid_doc_warning,
+                stacklevel=2,
+            )
             return None
         _metadata = {
             k: v for k, v in astra_document.items() if k not in self._non_md_fields

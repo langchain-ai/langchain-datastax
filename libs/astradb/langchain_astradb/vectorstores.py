@@ -7,9 +7,7 @@ import inspect
 import logging
 import uuid
 import warnings
-from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
-from operator import itemgetter
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -40,10 +38,11 @@ from langchain_astradb.utils.encoders import (
     _AstraDBVectorStoreDocumentEncoder,
     _DefaultVectorizeVSDocumentEncoder,
     _DefaultVSDocumentEncoder,
-    _FlatVectorizeVSDocumentEncoder,
-    _FlatVSDocumentEncoder,
 )
 from langchain_astradb.utils.mmr import maximal_marginal_relevance
+from langchain_astradb.utils.vector_store_autodetect import (
+    _detect_document_encoder,
+)
 
 if TYPE_CHECKING:
     from astrapy.authentication import EmbeddingHeadersProvider, TokenProvider
@@ -79,6 +78,30 @@ def _unique_list(lst: list[T], key: Callable[[T], U]) -> list[T]:
             visited_keys.add(item_key)
             new_lst.append(item)
     return new_lst
+
+
+def _normalize_content_field(
+    content_field: str,
+    *,
+    is_autodetect: bool,
+    has_vectorize: bool,
+) -> str:
+    if has_vectorize:
+        if content_field is not _NOT_SET:
+            msg = "content_field is not configurable for vectorize collections."
+            raise ValueError(msg)
+        return "$vectorize"
+
+    if content_field is _NOT_SET or content_field is None:
+        return "*" if is_autodetect else "content"
+
+    if content_field == "*":
+        if not is_autodetect:
+            msg = "content_field='*' illegal if autodetect_collection is False."
+            raise ValueError(msg)
+        return content_field
+
+    return content_field
 
 
 def _validate_autodetect_init_params(
@@ -119,130 +142,6 @@ def _validate_autodetect_init_params(
     if am_errors:
         msg = f"Invalid parameters for autodetect mode: {'; '.join(am_errors)}"
         raise ValueError(msg)
-
-
-def _is_flat_document(document: dict[str, Any]) -> bool | None:
-    """Try to guess, when possible, if this document has metadata-as-a-dict or not."""
-    _metadata = document.get("metadata")
-    _vector = document.get("$vector")
-    _regularfields = set(document.keys()) - {"_id", "$vector"}
-    _regularfields_m = _regularfields - {"metadata"}
-    # cannot determine if ...
-    if _vector is None:
-        return None
-    # now a determination
-    if isinstance(_metadata, dict) and _regularfields_m:
-        return False
-    if isinstance(_metadata, dict) and not _regularfields_m:
-        # this document should not contribute to the survey
-        return None
-    str_regularfields = {
-        k for k, v in document.items() if isinstance(v, str) if k in _regularfields
-    }
-    if str_regularfields:
-        return True
-    return None
-
-
-def _detect_content_field(document: dict[str, Any]) -> str | None:
-    """Try to guess the content field by inspecting the passed document."""
-    strlen_map = {
-        k: len(v) for k, v in document.items() if k != "_id" if isinstance(v, str)
-    }
-    if not strlen_map:
-        return None
-    return sorted(strlen_map.items(), key=itemgetter(1), reverse=True)[0][0]
-
-
-def _detect_document_encoder(
-    documents: list[dict[str, Any]],
-    *,
-    has_vectorize: bool,
-    ignore_invalid_documents: bool,
-    content_field: str,
-) -> _AstraDBVectorStoreDocumentEncoder:
-    _content_field = _normalize_content_field(
-        content_field,
-        is_autodetect=True,
-        has_vectorize=has_vectorize,
-    )
-    logger.info("vector store autodetect: inspecting %i documents", len(documents))
-    # survey and determine flatness
-    flatness_survey = [_is_flat_document(document) for document in documents]
-    flatness_stats = Counter(flatness_survey)
-    n_flats = flatness_stats.get(True, 0)
-    n_deeps = flatness_stats.get(False, 0)
-    if n_flats > 0 and n_deeps > 0:
-        msg = "Mixed document shapes detected on collection during autodetect."
-        raise ValueError(msg)
-
-    # in absence of clues, 0 < 0 is False and default is NON FLAT (i.e. native)
-    is_flat = n_deeps < n_flats
-    logger.info("vector store autodetect: is_flat = %s", is_flat)
-
-    final_content_field: str
-    if _content_field == "*":
-        # guess content_field by docs inspection
-        content_fields = [_detect_content_field(document) for document in documents]
-        valid_content_fields = [cf for cf in content_fields if cf is not None]
-        logger.info(
-            "vector store autodetect: inferring content_field from %i documents",
-            len(valid_content_fields),
-        )
-        cf_stats = Counter(valid_content_fields)
-        if not cf_stats:
-            msg = "Could not infer content_field name from sampled documents."
-            raise ValueError(msg)
-        final_content_field = cf_stats.most_common(1)[0][0]
-    else:
-        final_content_field = _content_field
-    logger.info(
-        "vector store autodetect: final_content_field = %s", final_content_field
-    )
-
-    if has_vectorize:
-        if is_flat:
-            return _FlatVectorizeVSDocumentEncoder(
-                ignore_invalid_documents=ignore_invalid_documents,
-            )
-
-        return _DefaultVectorizeVSDocumentEncoder(
-            ignore_invalid_documents=ignore_invalid_documents,
-        )
-    # no vectorize:
-    if is_flat:
-        return _FlatVSDocumentEncoder(
-            content_field=final_content_field,
-            ignore_invalid_documents=ignore_invalid_documents,
-        )
-    return _DefaultVSDocumentEncoder(
-        content_field=final_content_field,
-        ignore_invalid_documents=ignore_invalid_documents,
-    )
-
-
-def _normalize_content_field(
-    content_field: str,
-    *,
-    is_autodetect: bool,
-    has_vectorize: bool,
-) -> str:
-    if has_vectorize:
-        if content_field is not _NOT_SET:
-            msg = "content_field is not configurable for vectorize collections."
-            raise ValueError(msg)
-        return "$vectorize"
-
-    if content_field is _NOT_SET or content_field is None:
-        return "*" if is_autodetect else "content"
-
-    if content_field == "*":
-        if not is_autodetect:
-            msg = "content_field='*' illegal if autodetect_collection is False."
-            raise ValueError(msg)
-        return content_field
-
-    return content_field
 
 
 class AstraDBVectorStore(VectorStore):
@@ -670,11 +569,16 @@ class AstraDBVectorStore(VectorStore):
             self.collection_vector_service_options = c_descriptor.options.vector.service
             has_vectorize = self.collection_vector_service_options is not None
             logger.info("vector store autodetect: has_vectorize = %s", has_vectorize)
+            norm_content_field = _normalize_content_field(
+                content_field,
+                is_autodetect=True,
+                has_vectorize=has_vectorize,
+            )
             self.document_encoder = _detect_document_encoder(
                 c_documents,
                 has_vectorize=has_vectorize,
                 ignore_invalid_documents=ignore_invalid_documents,
-                content_field=content_field,
+                norm_content_field=norm_content_field,
             )
 
         # validate embedding/vectorize compatibility and such.

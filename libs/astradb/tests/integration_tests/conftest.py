@@ -7,6 +7,7 @@ from typing import TypedDict
 import pytest
 from astrapy import Database
 from astrapy.db import AstraDB
+from astrapy.info import CollectionVectorServiceOptions
 
 # Getting the absolute path of the current file's directory
 ABS_PATH = (Path(__file__)).parent
@@ -70,3 +71,24 @@ def core_astra_db(astra_db_credentials: AstraDBCredentials) -> AstraDB:
 
 
 _load_env()
+
+
+OPENAI_VECTORIZE_OPTIONS = CollectionVectorServiceOptions(
+    provider="openai",
+    model_name="text-embedding-3-small",
+    authentication={
+        "providerKey": f"{os.environ.get('SHARED_SECRET_NAME_OPENAI', '')}",
+    },
+)
+
+
+OPENAI_VECTORIZE_OPTIONS_HEADER = CollectionVectorServiceOptions(
+    provider="openai",
+    model_name="text-embedding-3-small",
+)
+
+
+NVIDIA_VECTORIZE_OPTIONS = CollectionVectorServiceOptions(
+    provider="nvidia",
+    model_name="NV-Embed-QA",
+)

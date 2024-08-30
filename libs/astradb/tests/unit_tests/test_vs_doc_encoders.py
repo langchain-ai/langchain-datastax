@@ -100,6 +100,8 @@ class TestVSDocEncoders:
         )
         with pytest.warns(UserWarning) as rec_warnings:
             decoded_doc = encoder_w.decode({"_id": 0})
+        encoder_w.decode({"_id": 0, "content_x": "a", "metadata": {"k": "v"}})
+        encoder_e.decode({"_id": 0, "content_x": "a", "metadata": {"k": "v"}})
         assert len(rec_warnings) == 1
         assert decoded_doc is None
 
@@ -150,6 +152,8 @@ class TestVSDocEncoders:
         encoder_w = _DefaultVectorizeVSDocumentEncoder(ignore_invalid_documents=True)
         with pytest.warns(UserWarning) as rec_warnings:
             decoded_doc = encoder_w.decode({"_id": 0})
+        encoder_w.decode({"_id": 0, "$vectorize": "a", "metadata": {"k": "v"}})
+        encoder_e.decode({"_id": 0, "$vectorize": "a", "metadata": {"k": "v"}})
         assert len(rec_warnings) == 1
         assert decoded_doc is None
 
@@ -208,6 +212,8 @@ class TestVSDocEncoders:
         )
         with pytest.warns(UserWarning) as rec_warnings:
             decoded_doc = encoder_w.decode({"_id": 0})
+        encoder_w.decode({"_id": 0, "content_x": "a", "m": "v"})
+        encoder_e.decode({"_id": 0, "content_x": "a", "m": "v"})
         assert len(rec_warnings) == 1
         assert decoded_doc is None
 
@@ -258,6 +264,8 @@ class TestVSDocEncoders:
         encoder_w = _FlatVectorizeVSDocumentEncoder(ignore_invalid_documents=True)
         with pytest.warns(UserWarning) as rec_warnings:
             decoded_doc = encoder_w.decode({"_id": 0})
+        encoder_w.decode({"_id": 0, "$vectorize": "a", "m": "v"})
+        encoder_e.decode({"_id": 0, "$vectorize": "a", "m": "v"})
         assert len(rec_warnings) == 1
         assert decoded_doc is None
 

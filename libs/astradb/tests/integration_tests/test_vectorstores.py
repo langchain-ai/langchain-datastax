@@ -28,14 +28,19 @@ from typing import TYPE_CHECKING, Iterable
 
 import pytest
 from astrapy.authentication import EmbeddingAPIKeyHeaderProvider, StaticTokenProvider
-from astrapy.info import CollectionVectorServiceOptions
 from langchain_core.documents import Document
 
 from langchain_astradb.utils.astradb import SetupMode
 from langchain_astradb.vectorstores import AstraDBVectorStore
 from tests.conftest import ParserEmbeddings, SomeEmbeddings
 
-from .conftest import AstraDBCredentials, _has_env_vars
+from .conftest import (
+    NVIDIA_VECTORIZE_OPTIONS,
+    OPENAI_VECTORIZE_OPTIONS,
+    OPENAI_VECTORIZE_OPTIONS_HEADER,
+    AstraDBCredentials,
+    _has_env_vars,
+)
 
 if TYPE_CHECKING:
     from astrapy import Database
@@ -53,23 +58,6 @@ COLLECTION_NAME_VECTORIZE_OPENAI_HEADER = "lc_test_vec_openai_h"
 COLLECTION_NAME_VECTORIZE_NVIDIA = "lc_test_nvidia"
 
 MATCH_EPSILON = 0.0001
-
-
-openai_vectorize_options = CollectionVectorServiceOptions(
-    provider="openai",
-    model_name="text-embedding-3-small",
-    authentication={
-        "providerKey": f"{os.environ.get('SHARED_SECRET_NAME_OPENAI', '')}",
-    },
-)
-openai_vectorize_options_header = CollectionVectorServiceOptions(
-    provider="openai",
-    model_name="text-embedding-3-small",
-)
-nvidia_vectorize_options = CollectionVectorServiceOptions(
-    provider="nvidia",
-    model_name="NV-Embed-QA",
-)
 
 INCOMPATIBLE_INDEXING_MSG = "is detected as having the following indexing policy"
 
@@ -166,7 +154,7 @@ def vectorize_store(
         pytest.skip("OpenAI SHARED_SECRET key not set for KMS vectorize")
 
     v_store = AstraDBVectorStore(
-        collection_vector_service_options=openai_vectorize_options,
+        collection_vector_service_options=OPENAI_VECTORIZE_OPTIONS,
         collection_name=COLLECTION_NAME_VECTORIZE_OPENAI,
         token=astra_db_credentials["token"],
         api_endpoint=astra_db_credentials["api_endpoint"],
@@ -190,7 +178,7 @@ def vectorize_store_w_header(
         pytest.skip("OpenAI key not available")
 
     v_store = AstraDBVectorStore(
-        collection_vector_service_options=openai_vectorize_options_header,
+        collection_vector_service_options=OPENAI_VECTORIZE_OPTIONS_HEADER,
         collection_name=COLLECTION_NAME_VECTORIZE_OPENAI_HEADER,
         collection_embedding_api_key=os.environ["OPENAI_API_KEY"],
         token=astra_db_credentials["token"],
@@ -217,7 +205,7 @@ def vectorize_store_w_header_and_provider(
         pytest.skip("OpenAI key not available")
 
     v_store = AstraDBVectorStore(
-        collection_vector_service_options=openai_vectorize_options_header,
+        collection_vector_service_options=OPENAI_VECTORIZE_OPTIONS_HEADER,
         collection_name=COLLECTION_NAME_VECTORIZE_OPENAI_HEADER,
         collection_embedding_api_key=EmbeddingAPIKeyHeaderProvider(
             os.environ["OPENAI_API_KEY"],
@@ -244,7 +232,7 @@ def vectorize_store_nvidia(
         pytest.skip("vectorize/nvidia unavailable")
 
     v_store = AstraDBVectorStore(
-        collection_vector_service_options=nvidia_vectorize_options,
+        collection_vector_service_options=NVIDIA_VECTORIZE_OPTIONS,
         collection_name=COLLECTION_NAME_VECTORIZE_NVIDIA,
         token=astra_db_credentials["token"],
         api_endpoint=astra_db_credentials["api_endpoint"],
@@ -286,7 +274,7 @@ class TestAstraDBVectorStore:
     ) -> None:
         """Create and delete with vectorize option."""
         v_store = AstraDBVectorStore(
-            collection_vector_service_options=openai_vectorize_options_header,
+            collection_vector_service_options=OPENAI_VECTORIZE_OPTIONS_HEADER,
             collection_name=COLLECTION_NAME_VECTORIZE_OPENAI_HEADER,
             token=astra_db_credentials["token"],
             api_endpoint=astra_db_credentials["api_endpoint"],
@@ -315,7 +303,7 @@ class TestAstraDBVectorStore:
     ) -> None:
         """Create and delete with vectorize option."""
         v_store = AstraDBVectorStore(
-            collection_vector_service_options=openai_vectorize_options,
+            collection_vector_service_options=OPENAI_VECTORIZE_OPTIONS,
             collection_name=COLLECTION_NAME_VECTORIZE_OPENAI,
             token=astra_db_credentials["token"],
             api_endpoint=astra_db_credentials["api_endpoint"],
@@ -510,7 +498,7 @@ class TestAstraDBVectorStore:
     ) -> None:
         """from_texts and from_documents methods with vectorize."""
         AstraDBVectorStore(
-            collection_vector_service_options=openai_vectorize_options_header,
+            collection_vector_service_options=OPENAI_VECTORIZE_OPTIONS_HEADER,
             collection_embedding_api_key=os.environ["OPENAI_API_KEY"],
             collection_name=COLLECTION_NAME_VECTORIZE_OPENAI_HEADER,
             token=astra_db_credentials["token"],
@@ -522,7 +510,7 @@ class TestAstraDBVectorStore:
         # from_texts
         v_store = AstraDBVectorStore.from_texts(
             texts=["Hi", "Ho"],
-            collection_vector_service_options=openai_vectorize_options_header,
+            collection_vector_service_options=OPENAI_VECTORIZE_OPTIONS_HEADER,
             collection_embedding_api_key=os.environ["OPENAI_API_KEY"],
             collection_name=COLLECTION_NAME_VECTORIZE_OPENAI_HEADER,
             token=astra_db_credentials["token"],
@@ -541,7 +529,7 @@ class TestAstraDBVectorStore:
                 Document(page_content="Hee"),
                 Document(page_content="Hoi"),
             ],
-            collection_vector_service_options=openai_vectorize_options_header,
+            collection_vector_service_options=OPENAI_VECTORIZE_OPTIONS_HEADER,
             collection_embedding_api_key=os.environ["OPENAI_API_KEY"],
             collection_name=COLLECTION_NAME_VECTORIZE_OPENAI_HEADER,
             token=astra_db_credentials["token"],
@@ -662,7 +650,7 @@ class TestAstraDBVectorStore:
         # from_text with vectorize
         v_store = await AstraDBVectorStore.afrom_texts(
             texts=["Haa", "Huu"],
-            collection_vector_service_options=openai_vectorize_options_header,
+            collection_vector_service_options=OPENAI_VECTORIZE_OPTIONS_HEADER,
             collection_embedding_api_key=os.environ["OPENAI_API_KEY"],
             collection_name=COLLECTION_NAME_VECTORIZE_OPENAI_HEADER,
             token=astra_db_credentials["token"],
@@ -683,7 +671,7 @@ class TestAstraDBVectorStore:
                 Document(page_content="HeeH"),
                 Document(page_content="HooH"),
             ],
-            collection_vector_service_options=openai_vectorize_options_header,
+            collection_vector_service_options=OPENAI_VECTORIZE_OPTIONS_HEADER,
             collection_embedding_api_key=os.environ["OPENAI_API_KEY"],
             collection_name=COLLECTION_NAME_VECTORIZE_OPENAI_HEADER,
             token=astra_db_credentials["token"],
