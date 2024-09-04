@@ -1,15 +1,15 @@
+# ruff: noqa: EM101 TRY003
+
 from __future__ import annotations
 
 import dataclasses
 from typing import TYPE_CHECKING, Iterable
 
 import numpy as np
-
-from langchain_core.documents import Document
-
 from _math import cosine_similarity
 
 if TYPE_CHECKING:
+    from langchain_core.documents import Document
     from numpy.typing import NDArray
 
 
@@ -200,7 +200,9 @@ class MmrHelper:
 
         return selected_id
 
-    def add_candidates(self, candidates: dict[str, (Document, list[float])]) -> None:
+    def add_candidates(
+        self, candidates: dict[str, tuple[Document, list[float]]]
+    ) -> None:
         """Add candidates to the consideration set."""
         # Determine the keys to actually include.
         # These are the candidates that aren't already selected

@@ -3,6 +3,8 @@
 See https://github.com/langchain-ai/langchain/blob/langchain-community%3D%3D0.0.38/libs/community/langchain_community/utils/math.py .
 """  # noqa: E501
 
+# ruff: noqa: EM102 TRY003
+
 import logging
 from typing import List, Union
 
