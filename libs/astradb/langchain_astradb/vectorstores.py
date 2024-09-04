@@ -75,7 +75,9 @@ class AstraDBVectorStore(VectorStore):
     """AstraDB vector store integration.
 
     Setup:
-        Install ``langchain-astradb`` and head to the [AstraDB website](https://astra.datastax.com), create an account, create a new database and [create an application token](https://docs.datastax.com/en/astra-db-serverless/administration/manage-application-tokens.html#generate-application-token).
+        Install the ``langchain-astradb`` package and head to the
+        `AstraDB website <https://astra.datastax.com>`, create an account, create a
+        new database and `create an application token <https://docs.datastax.com/en/astra-db-serverless/administration/manage-application-tokens.html#generate-application-token>`.
 
         .. code-block:: bash
 
@@ -95,7 +97,6 @@ class AstraDBVectorStore(VectorStore):
         namespace: Optional[str]
             Namespace (aka keyspace) where the collection is created
 
-    # TODO: Replace with relevant init params.
     Instantiate:
 
         Get your API endpoint and application token from the dashboard of your database.
@@ -117,6 +118,7 @@ class AstraDBVectorStore(VectorStore):
             )
 
     Add Documents:
+
         .. code-block:: python
 
             from langchain_core.documents import Document
@@ -130,65 +132,71 @@ class AstraDBVectorStore(VectorStore):
             vector_store.add_documents(documents=documents, ids=ids)
 
     Delete Documents:
+
         .. code-block:: python
 
             vector_store.delete(ids=["3"])
 
     Search:
+
         .. code-block:: python
 
             results = vector_store.similarity_search(query="thud",k=1)
             for doc in results:
                 print(f"* {doc.page_content} [{doc.metadata}]")
 
-        .. code-block:: python
+        .. code-block:: none
 
-            * thud [{'bar': 'baz'}]
+            thud [{'bar': 'baz'}]
 
     Search with filter:
+
         .. code-block:: python
 
             results = vector_store.similarity_search(query="thud",k=1,filter={"bar": "baz"})
             for doc in results:
                 print(f"* {doc.page_content} [{doc.metadata}]")
 
-        .. code-block:: python
+        .. code-block:: none
 
-            * thud [{'bar': 'baz'}]
+            thud [{'bar': 'baz'}]
 
     Search with score:
+
         .. code-block:: python
 
             results = vector_store.similarity_search_with_score(query="qux",k=1)
             for doc, score in results:
                 print(f"* [SIM={score:3f}] {doc.page_content} [{doc.metadata}]")
 
-        .. code-block:: python
+        .. code-block:: none
 
-            * [SIM=0.916135] foo [{'baz': 'bar'}]
+            [SIM=0.916135] foo [{'baz': 'bar'}]
 
     Async:
+
         .. code-block:: python
 
             # add documents
-            # await vector_store.aadd_documents(documents=documents, ids=ids)
+            await vector_store.aadd_documents(documents=documents, ids=ids)
 
             # delete documents
-            # await vector_store.adelete(ids=["3"])
+            await vector_store.adelete(ids=["3"])
 
             # search
-            # results = vector_store.asimilarity_search(query="thud",k=1)
+            results = vector_store.asimilarity_search(query="thud",k=1)
 
             # search with score
             results = await vector_store.asimilarity_search_with_score(query="qux",k=1)
             for doc,score in results:
                 print(f"* [SIM={score:3f}] {doc.page_content} [{doc.metadata}]")
 
-        .. code-block:: python
+        .. code-block:: none
 
-            * [SIM=0.916135] foo [{'baz': 'bar'}]
+            [SIM=0.916135] foo [{'baz': 'bar'}]
 
     Use as Retriever:
+
         .. code-block:: python
 
             retriever = vector_store.as_retriever(
@@ -197,7 +205,7 @@ class AstraDBVectorStore(VectorStore):
             )
             retriever.invoke("thud")
 
-        .. code-block:: python
+        .. code-block:: none
 
             [Document(metadata={'bar': 'baz'}, page_content='thud')]
 
