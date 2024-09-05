@@ -107,7 +107,7 @@ def _normalize_content_field(
 def _validate_autodetect_init_params(
     *,
     metric: str | None = None,
-    setup_mode: SetupMode,
+    setup_mode: SetupMode | None,
     pre_delete_collection: bool,
     metadata_indexing_include: Iterable[str] | None,
     metadata_indexing_exclude: Iterable[str] | None,
@@ -136,7 +136,7 @@ def _validate_autodetect_init_params(
     if pre_delete_collection:
         pd_error = "Parameter `pre_delete_collection` cannot be True."
     sm_error: str | None = None
-    if setup_mode is not _NOT_SET:
+    if setup_mode is not None:
         sm_error = "Parameter `setup_mode` not allowed."
     am_errors = [err_s for err_s in (fp_error, pd_error, sm_error) if err_s is not None]
     if am_errors:
@@ -348,7 +348,7 @@ class AstraDBVectorStore(VectorStore):
         bulk_insert_batch_concurrency: int | None = None,
         bulk_insert_overwrite_concurrency: int | None = None,
         bulk_delete_concurrency: int | None = None,
-        setup_mode: SetupMode = _NOT_SET,  # type: ignore[assignment]
+        setup_mode: SetupMode | None = None,
         pre_delete_collection: bool = False,
         metadata_indexing_include: Iterable[str] | None = None,
         metadata_indexing_exclude: Iterable[str] | None = None,
@@ -509,7 +509,7 @@ class AstraDBVectorStore(VectorStore):
             logger.info(
                 "vector store default init, collection '%s'", self.collection_name
             )
-            _setup_mode = SetupMode.SYNC if setup_mode is _NOT_SET else setup_mode
+            _setup_mode = SetupMode.SYNC if setup_mode is None else setup_mode
             _embedding_dimension = self._prepare_embedding_dimension(_setup_mode)
             # determine vectorize/nonvectorize
             has_vectorize = self.collection_vector_service_options is not None
