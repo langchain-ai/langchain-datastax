@@ -145,7 +145,7 @@ class TestVectorStoreAutodetect:
         astra_db_credentials: AstraDBCredentials,
         embedding: Embeddings,
     ) -> None:
-        """Test autodetect on a populated flat collection, checking all encoders."""
+        """Test autodetect on a populated flat collection, checking all codecs."""
         novectorize_collection.insert_many(
             [
                 {
@@ -208,7 +208,7 @@ class TestVectorStoreAutodetect:
         embedding: Embeddings,
         novectorize_store: AstraDBVectorStore,
     ) -> None:
-        """Test autodetect on a VS-made collection, checking all encoders."""
+        """Test autodetect on a VS-made collection, checking all codecs."""
         novectorize_store.add_texts(
             texts=[
                 "Cont1",
@@ -262,7 +262,7 @@ class TestVectorStoreAutodetect:
         vectorize_collection: Collection,
         astra_db_credentials: AstraDBCredentials,
     ) -> None:
-        """Test autodetect on a populated flat collection, checking all encoders."""
+        """Test autodetect on a populated flat collection, checking all codecs."""
         vectorize_collection.insert_many(
             [
                 {
@@ -320,7 +320,7 @@ class TestVectorStoreAutodetect:
         astra_db_credentials: AstraDBCredentials,
         vectorize_store: AstraDBVectorStore,
     ) -> None:
-        """Test autodetect on a VS-made collection, checking all encoders."""
+        """Test autodetect on a VS-made collection, checking all codecs."""
         vectorize_store.add_texts(
             texts=[
                 "Cont1",

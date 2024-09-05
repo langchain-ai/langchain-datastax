@@ -9,12 +9,12 @@ from typing import (
     Any,
 )
 
-from langchain_astradb.utils.encoders import (
-    _AstraDBVectorStoreDocumentEncoder,
-    _DefaultVectorizeVSDocumentEncoder,
-    _DefaultVSDocumentEncoder,
-    _FlatVectorizeVSDocumentEncoder,
-    _FlatVSDocumentEncoder,
+from langchain_astradb.utils.vector_store_codecs import (
+    _AstraDBVectorStoreDocumentCodec,
+    _DefaultVectorizeVSDocumentCodec,
+    _DefaultVSDocumentCodec,
+    _FlatVectorizeVSDocumentCodec,
+    _FlatVSDocumentCodec,
 )
 
 logger = logging.getLogger(__name__)
@@ -90,13 +90,13 @@ def _detect_documents_content_field(
     return requested_content_field
 
 
-def _detect_document_encoder(
+def _detect_document_codec(
     documents: list[dict[str, Any]],
     *,
     has_vectorize: bool,
     ignore_invalid_documents: bool,
     norm_content_field: str,
-) -> _AstraDBVectorStoreDocumentEncoder:
+) -> _AstraDBVectorStoreDocumentCodec:
     logger.info("vector store autodetect: inspecting %i documents", len(documents))
     # survey and determine flatness
     is_flat = _detect_documents_flatness(documents)
@@ -112,20 +112,20 @@ def _detect_document_encoder(
 
     if has_vectorize:
         if is_flat:
-            return _FlatVectorizeVSDocumentEncoder(
+            return _FlatVectorizeVSDocumentCodec(
                 ignore_invalid_documents=ignore_invalid_documents,
             )
 
-        return _DefaultVectorizeVSDocumentEncoder(
+        return _DefaultVectorizeVSDocumentCodec(
             ignore_invalid_documents=ignore_invalid_documents,
         )
     # no vectorize:
     if is_flat:
-        return _FlatVSDocumentEncoder(
+        return _FlatVSDocumentCodec(
             content_field=final_content_field,
             ignore_invalid_documents=ignore_invalid_documents,
         )
-    return _DefaultVSDocumentEncoder(
+    return _DefaultVSDocumentCodec(
         content_field=final_content_field,
         ignore_invalid_documents=ignore_invalid_documents,
     )

@@ -34,14 +34,14 @@ from langchain_astradb.utils.astradb import (
     _AstraDBCollectionEnvironment,
     _survey_collection,
 )
-from langchain_astradb.utils.encoders import (
-    _AstraDBVectorStoreDocumentEncoder,
-    _DefaultVectorizeVSDocumentEncoder,
-    _DefaultVSDocumentEncoder,
-)
 from langchain_astradb.utils.mmr import maximal_marginal_relevance
 from langchain_astradb.utils.vector_store_autodetect import (
-    _detect_document_encoder,
+    _detect_document_codec,
+)
+from langchain_astradb.utils.vector_store_codecs import (
+    _AstraDBVectorStoreDocumentCodec,
+    _DefaultVectorizeVSDocumentCodec,
+    _DefaultVSDocumentCodec,
 )
 
 if TYPE_CHECKING:
@@ -288,7 +288,7 @@ class AstraDBVectorStore(VectorStore):
         if filter_dict is None:
             return {}
 
-        return self.document_encoder.encode_filter(filter_dict)
+        return self.document_codec.encode_filter(filter_dict)
 
     @staticmethod
     def _normalize_metadata_indexing_policy(
@@ -490,7 +490,7 @@ class AstraDBVectorStore(VectorStore):
         self.collection_embedding_api_key = collection_embedding_api_key
         self.collection_vector_service_options = collection_vector_service_options
         # DB-encoding settings:
-        self.document_encoder: _AstraDBVectorStoreDocumentEncoder
+        self.document_codec: _AstraDBVectorStoreDocumentCodec
         # concurrency settings
         self.batch_size: int | None = batch_size or DEFAULT_DOCUMENT_CHUNK_SIZE
         self.bulk_insert_batch_concurrency: int = (
@@ -521,11 +521,11 @@ class AstraDBVectorStore(VectorStore):
             )
 
             if self.collection_vector_service_options is not None:
-                self.document_encoder = _DefaultVectorizeVSDocumentEncoder(
+                self.document_codec = _DefaultVectorizeVSDocumentCodec(
                     ignore_invalid_documents=ignore_invalid_documents,
                 )
             else:
-                self.document_encoder = _DefaultVSDocumentEncoder(
+                self.document_codec = _DefaultVSDocumentCodec(
                     content_field=_content_field,
                     ignore_invalid_documents=ignore_invalid_documents,
                 )
@@ -582,7 +582,7 @@ class AstraDBVectorStore(VectorStore):
                 is_autodetect=True,
                 has_vectorize=has_vectorize,
             )
-            self.document_encoder = _detect_document_encoder(
+            self.document_codec = _detect_document_codec(
                 c_documents,
                 has_vectorize=has_vectorize,
                 ignore_invalid_documents=ignore_invalid_documents,
@@ -593,16 +593,16 @@ class AstraDBVectorStore(VectorStore):
         # Embedding and the server-side embeddings are mutually exclusive,
         # as both specify how to produce embeddings.
         # Also API key makes no sense unless vectorize.
-        if self.embedding is None and not self.document_encoder.server_side_embeddings:
+        if self.embedding is None and not self.document_codec.server_side_embeddings:
             msg = "Embedding is required for non-vectorize collections."
             raise ValueError(msg)
 
-        if self.embedding is not None and self.document_encoder.server_side_embeddings:
+        if self.embedding is not None and self.document_codec.server_side_embeddings:
             msg = "Embedding cannot be provided for vectorize collections."
             raise ValueError(msg)
 
         if (
-            not self.document_encoder.server_side_embeddings
+            not self.document_codec.server_side_embeddings
             and self.collection_embedding_api_key is not None
         ):
             msg = "Embedding API Key cannot be provided for non-vectorize collections."
@@ -824,7 +824,7 @@ class AstraDBVectorStore(VectorStore):
         if metadatas is None:
             metadatas = [{} for _ in texts]
         documents_to_insert = [
-            self.document_encoder.encode(
+            self.document_codec.encode(
                 content=b_txt,
                 document_id=b_id,
                 vector=b_emb,
@@ -924,7 +924,7 @@ class AstraDBVectorStore(VectorStore):
         self.astra_env.ensure_db_setup()
 
         embedding_vectors: Sequence[list[float] | None]
-        if self.document_encoder.server_side_embeddings:
+        if self.document_codec.server_side_embeddings:
             embedding_vectors = [None for _ in list(texts)]
         else:
             embedding_vectors = self._get_safe_embedding().embed_documents(list(texts))
@@ -1046,7 +1046,7 @@ class AstraDBVectorStore(VectorStore):
         await self.astra_env.aensure_db_setup()
 
         embedding_vectors: Sequence[list[float] | None]
-        if self.document_encoder.server_side_embeddings:
+        if self.document_codec.server_side_embeddings:
             embedding_vectors = [None for _ in list(texts)]
         else:
             embedding_vectors = await self._get_safe_embedding().aembed_documents(
@@ -1189,7 +1189,7 @@ class AstraDBVectorStore(VectorStore):
         Returns:
             The list of (Document, score, id), the most similar to the query.
         """
-        if self.document_encoder.server_side_embeddings:
+        if self.document_codec.server_side_embeddings:
             sort = {"$vectorize": query}
             return self._similarity_search_with_score_id_by_sort(
                 sort=sort,
@@ -1273,7 +1273,7 @@ class AstraDBVectorStore(VectorStore):
         Returns:
             The list of (Document, score, id), the most similar to the query vector.
         """
-        if self.document_encoder.server_side_embeddings:
+        if self.document_codec.server_side_embeddings:
             msg = (
                 "Searching by vector on a Vector Store that uses server-side "
                 "embeddings is not allowed."
@@ -1297,7 +1297,7 @@ class AstraDBVectorStore(VectorStore):
         metadata_parameter = self._filter_to_metadata(filter)
         hits_ite = self.astra_env.collection.find(
             filter=metadata_parameter,
-            projection=self.document_encoder.base_projection,
+            projection=self.document_codec.base_projection,
             limit=k,
             include_similarity=True,
             sort=sort,
@@ -1306,7 +1306,7 @@ class AstraDBVectorStore(VectorStore):
             (doc, sim, did)
             for (doc, sim, did) in (
                 (
-                    self.document_encoder.decode(hit),
+                    self.document_codec.decode(hit),
                     hit["$similarity"],
                     hit["_id"],
                 )
@@ -1385,7 +1385,7 @@ class AstraDBVectorStore(VectorStore):
         Returns:
             The list of (Document, score, id), the most similar to the query.
         """
-        if self.document_encoder.server_side_embeddings:
+        if self.document_codec.server_side_embeddings:
             sort = {"$vectorize": query}
             return await self._asimilarity_search_with_score_id_by_sort(
                 sort=sort,
@@ -1469,7 +1469,7 @@ class AstraDBVectorStore(VectorStore):
         Returns:
             The list of (Document, score, id), the most similar to the query vector.
         """
-        if self.document_encoder.server_side_embeddings:
+        if self.document_codec.server_side_embeddings:
             msg = (
                 "Searching by vector on a Vector Store that uses server-side "
                 "embeddings is not allowed."
@@ -1495,13 +1495,13 @@ class AstraDBVectorStore(VectorStore):
             (doc, sim, did)
             async for (doc, sim, did) in (
                 (
-                    self.document_encoder.decode(hit),
+                    self.document_codec.decode(hit),
                     hit["$similarity"],
                     hit["_id"],
                 )
                 async for hit in self.astra_env.async_collection.find(
                     filter=metadata_parameter,
-                    projection=self.document_encoder.base_projection,
+                    projection=self.document_codec.base_projection,
                     limit=k,
                     include_similarity=True,
                     sort=sort,
@@ -1520,7 +1520,7 @@ class AstraDBVectorStore(VectorStore):
     ) -> list[Document]:
         prefetch_cursor = self.astra_env.collection.find(
             filter=metadata_parameter,
-            projection=self.document_encoder.full_projection,
+            projection=self.document_codec.full_projection,
             limit=fetch_k,
             include_similarity=True,
             include_sort_vector=True,
@@ -1545,7 +1545,7 @@ class AstraDBVectorStore(VectorStore):
     ) -> list[Document]:
         prefetch_cursor = self.astra_env.async_collection.find(
             filter=metadata_parameter,
-            projection=self.document_encoder.full_projection,
+            projection=self.document_codec.full_projection,
             limit=fetch_k,
             include_similarity=True,
             include_sort_vector=True,
@@ -1580,7 +1580,7 @@ class AstraDBVectorStore(VectorStore):
         ]
         return [
             doc
-            for doc in (self.document_encoder.decode(hit) for hit in mmr_hits)
+            for doc in (self.document_codec.decode(hit) for hit in mmr_hits)
             if doc is not None
         ]
 
@@ -1690,7 +1690,7 @@ class AstraDBVectorStore(VectorStore):
         Returns:
             The list of Documents selected by maximal marginal relevance.
         """
-        if self.document_encoder.server_side_embeddings:
+        if self.document_codec.server_side_embeddings:
             # this case goes directly to the "_by_sort" method
             # (and does its own filter normalization, as it cannot
             #  use the path for the with-embedding mmr querying)
@@ -1741,7 +1741,7 @@ class AstraDBVectorStore(VectorStore):
         Returns:
             The list of Documents selected by maximal marginal relevance.
         """
-        if self.document_encoder.server_side_embeddings:
+        if self.document_codec.server_side_embeddings:
             # this case goes directly to the "_by_sort" method
             # (and does its own filter normalization, as it cannot
             #  use the path for the with-embedding mmr querying)

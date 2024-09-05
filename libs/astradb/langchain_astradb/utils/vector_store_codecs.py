@@ -9,8 +9,10 @@ from typing import Any
 from langchain_core.documents import Document
 from typing_extensions import override
 
-NO_NULL_VECTOR_MSG = "Default encoder cannot receive null vector."
-VECTOR_REQUIRED_PREAMBLE_MSG = "DefaultVectorize encoder got a non-null vector."
+NO_NULL_VECTOR_MSG = "Default (non-vectorize) codec cannot encode null vector."
+VECTOR_REQUIRED_PREAMBLE_MSG = (
+    "Default vectorize codec got a non-null vector to encode."
+)
 FLATTEN_CONFLICT_MSG = "Cannot flatten metadata: field name overlap for '{field}'."
 
 
@@ -33,10 +35,10 @@ def _default_encode_filter(filter_dict: dict[str, Any]) -> dict[str, Any]:
     return metadata_filter
 
 
-class _AstraDBVectorStoreDocumentEncoder(ABC):
-    """A document encoder for the Astra DB vector store.
+class _AstraDBVectorStoreDocumentCodec(ABC):
+    """A document codec for the Astra DB vector store.
 
-    The document encoder contains the information for consistent interaction
+    The document codec contains the information for consistent interaction
     with documents as stored on the Astra DB collection.
 
     Implementations of this class must:
@@ -104,17 +106,17 @@ class _AstraDBVectorStoreDocumentEncoder(ABC):
         """
 
 
-class _DefaultVSDocumentEncoder(_AstraDBVectorStoreDocumentEncoder):
-    """Encoder for the default vector store usage with client-side embeddings.
+class _DefaultVSDocumentCodec(_AstraDBVectorStoreDocumentCodec):
+    """Codec for the default vector store usage with client-side embeddings.
 
-    This encoder expresses how document are stored for collections created
+    This codec expresses how document are stored for collections created
     and entirely managed by the AstraDBVectorStore class.
     """
 
     server_side_embeddings = False
 
     def __init__(self, content_field: str, *, ignore_invalid_documents: bool) -> None:
-        """Initialize a new DefaultVSDocumentEncoder.
+        """Initialize a new DefaultVSDocumentCodec.
 
         Args:
             content_field: name of the (top-level) field for textual content.
@@ -174,10 +176,10 @@ class _DefaultVSDocumentEncoder(_AstraDBVectorStoreDocumentEncoder):
         return _default_encode_filter(filter_dict)
 
 
-class _DefaultVectorizeVSDocumentEncoder(_AstraDBVectorStoreDocumentEncoder):
-    """Encoder for the default vector store usage with server-side embeddings.
+class _DefaultVectorizeVSDocumentCodec(_AstraDBVectorStoreDocumentCodec):
+    """Codec for the default vector store usage with server-side embeddings.
 
-    This encoder expresses how document are stored for collections created
+    This codec expresses how document are stored for collections created
     and entirely managed by the AstraDBVectorStore class, for the case of
     server-side embeddings (aka $vectorize).
     """
@@ -186,7 +188,7 @@ class _DefaultVectorizeVSDocumentEncoder(_AstraDBVectorStoreDocumentEncoder):
     content_field = "$vectorize"
 
     def __init__(self, *, ignore_invalid_documents: bool) -> None:
-        """Initialize a new DefaultVectorizeVSDocumentEncoder.
+        """Initialize a new DefaultVectorizeVSDocumentCodec.
 
         Args:
             ignore_invalid_documents: if True, noncompliant inputs to `decode`
@@ -244,17 +246,17 @@ class _DefaultVectorizeVSDocumentEncoder(_AstraDBVectorStoreDocumentEncoder):
         return _default_encode_filter(filter_dict)
 
 
-class _FlatVSDocumentEncoder(_AstraDBVectorStoreDocumentEncoder):
-    """Encoder for collections populated externally, with client-side embeddings.
+class _FlatVSDocumentCodec(_AstraDBVectorStoreDocumentCodec):
+    """Codec for collections populated externally, with client-side embeddings.
 
-    This encoder manages document structured as a flat key-value map, with one
+    This codec manages document structured as a flat key-value map, with one
     field being the textual content and the other implicitly forming the "metadata".
     """
 
     server_side_embeddings = False
 
     def __init__(self, content_field: str, *, ignore_invalid_documents: bool) -> None:
-        """Initialize a new DefaultVSDocumentEncoder.
+        """Initialize a new DefaultVSDocumentCodec.
 
         Args:
             content_field: name of the (top-level) field for textual content.
@@ -290,7 +292,8 @@ class _FlatVSDocumentEncoder(_AstraDBVectorStoreDocumentEncoder):
             self.content_field: content,
             "_id": document_id,
             "$vector": vector,
-        } | (metadata or {})
+            **(metadata or {}),
+        }
 
     @override
     def decode(self, astra_document: dict[str, Any]) -> Document | None:
@@ -318,10 +321,10 @@ class _FlatVSDocumentEncoder(_AstraDBVectorStoreDocumentEncoder):
         return filter_dict
 
 
-class _FlatVectorizeVSDocumentEncoder(_AstraDBVectorStoreDocumentEncoder):
-    """Encoder for collections populated externally, with server-side embeddings.
+class _FlatVectorizeVSDocumentCodec(_AstraDBVectorStoreDocumentCodec):
+    """Codec for collections populated externally, with server-side embeddings.
 
-    This encoder manages document structured as a flat key-value map, with one
+    This codec manages document structured as a flat key-value map, with one
     field being the textual content and the other implicitly forming the "metadata".
     """
 
@@ -329,7 +332,7 @@ class _FlatVectorizeVSDocumentEncoder(_AstraDBVectorStoreDocumentEncoder):
     content_field = "$vectorize"
 
     def __init__(self, *, ignore_invalid_documents: bool) -> None:
-        """Initialize a new DefaultVectorizeVSDocumentEncoder.
+        """Initialize a new DefaultVectorizeVSDocumentCodec.
 
         Args:
             ignore_invalid_documents: if True, noncompliant inputs to `decode`
@@ -357,7 +360,8 @@ class _FlatVectorizeVSDocumentEncoder(_AstraDBVectorStoreDocumentEncoder):
         return {
             "$vectorize": content,
             "_id": document_id,
-        } | (metadata or {})
+            **(metadata or {}),
+        }
 
     @override
     def decode(self, astra_document: dict[str, Any]) -> Document | None:
