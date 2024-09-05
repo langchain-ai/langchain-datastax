@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import json
+from typing import Any
+
 import pytest
 
 from langchain_astradb.utils.vector_store_autodetect import (
@@ -16,170 +19,207 @@ DOCUMENT_WITH_CF_X = {"x": "LL", "y": "s", "_id": "a"}
 DOCUMENT_WITH_CF_Y = {"x": 1234, "y": "s", "_id": "a"}
 DOCUMENT_WITH_UNKNOWN_CF = {"x": 1234, "y": 987, "_id": "a"}
 
-
-class TestVSAutodetectInferences:
-    def test_detect_document_flatness(self) -> None:
-        """Test expected results for flatness detection."""
-        doc_00 = UNKNOWN_FLATNESS_DOCUMENT
-        assert _detect_document_flatness(doc_00) is None
-        doc_01 = {"$vector": [0], "metadata": {}, "_id": "a"}
-        assert _detect_document_flatness(doc_01) is None
-        doc_02 = {
+# Test-case assets:
+DOC_FLATNESS_PAIRS = [
+    (UNKNOWN_FLATNESS_DOCUMENT, None),
+    ({"$vector": [0], "metadata": {}, "_id": "a"}, None),
+    (
+        {
             "$vector": [0],
             "metadata": {},
             "_id": "a",
             "$vectorize": "a",
             "x": "x",
-        }
-        assert _detect_document_flatness(doc_02) is False
-        doc_03 = DEEP_DOCUMENT
-        assert _detect_document_flatness(doc_03) is False
-        # note: as soon as `metadata` is a string, it is just a field name like any:
-        doc_04 = {"$vector": [0], "metadata": "m", "_id": "a"}
-        assert _detect_document_flatness(doc_04) is True
-        doc_05 = FLAT_DOCUMENT
-        assert _detect_document_flatness(doc_05) is True
-        doc_06 = {"$vector": [0], "metadata": "m", "_id": "a", "x": 9}
-        assert _detect_document_flatness(doc_06) is True
-        doc_07 = {
+        },
+        False,
+    ),
+    (DEEP_DOCUMENT, False),
+    ({"$vector": [0], "metadata": "m", "_id": "a"}, True),
+    (FLAT_DOCUMENT, True),
+    ({"$vector": [0], "metadata": "m", "_id": "a", "x": 9}, True),
+    (
+        {
             "$vector": [0],
             "metadata": "m",
             "_id": "a",
             "$vectorize": "a",
             "x": "x",
-        }
-        assert _detect_document_flatness(doc_07) is True
-        doc_08 = {
+        },
+        True,
+    ),
+    (
+        {
             "$vector": [0],
             "metadata": "m",
             "_id": "a",
             "$vectorize": "a",
             "x": 9,
-        }
-        assert _detect_document_flatness(doc_08) is True
-        doc_09 = {"$vector": [0], "metadata": 9, "_id": "a"}
-        assert _detect_document_flatness(doc_09) is None
-        doc_10 = {"$vector": [0], "metadata": 9, "_id": "a", "x": "x"}
-        assert _detect_document_flatness(doc_10) is True
-        doc_11 = {"$vector": [0], "metadata": 9, "_id": "a", "x": 9}
-        assert _detect_document_flatness(doc_11) is None
-        doc_12 = {
+        },
+        True,
+    ),
+    ({"$vector": [0], "metadata": 9, "_id": "a"}, None),
+    ({"$vector": [0], "metadata": 9, "_id": "a", "x": "x"}, True),
+    ({"$vector": [0], "metadata": 9, "_id": "a", "x": 9}, None),
+    (
+        {
             "$vector": [0],
             "metadata": 9,
             "_id": "a",
             "$vectorize": "a",
             "x": "x",
-        }
-        assert _detect_document_flatness(doc_12) is True
-        doc_13 = {"$vector": [0], "metadata": 9, "_id": "a", "$vectorize": "a", "x": 9}
-        assert _detect_document_flatness(doc_13) is True
-        doc_14 = {"$vector": [0], "_id": "a"}
-        assert _detect_document_flatness(doc_14) is None
-        doc_15 = {"$vector": [0], "_id": "a", "x": "x"}
-        assert _detect_document_flatness(doc_15) is True
-        doc_16 = {"$vector": [0], "_id": "a", "x": 9}
-        assert _detect_document_flatness(doc_16) is None
-        doc_17 = {"$vector": [0], "_id": "a", "$vectorize": "a", "x": "x"}
-        assert _detect_document_flatness(doc_17) is True
-        doc_18 = {"$vector": [0], "_id": "a", "$vectorize": "a", "x": 9}
-        assert _detect_document_flatness(doc_18) is True
+        },
+        True,
+    ),
+    ({"$vector": [0], "metadata": 9, "_id": "a", "$vectorize": "a", "x": 9}, True),
+    ({"$vector": [0], "_id": "a"}, None),
+    ({"$vector": [0], "_id": "a", "x": "x"}, True),
+    ({"$vector": [0], "_id": "a", "x": 9}, None),
+    ({"$vector": [0], "_id": "a", "$vectorize": "a", "x": "x"}, True),
+    ({"$vector": [0], "_id": "a", "$vectorize": "a", "x": 9}, True),
+]
+DOC_FLATNESS_TEST_IDS = [f"DOC=<{json.dumps(doc)}>" for doc, _ in DOC_FLATNESS_PAIRS]
+ff = FLAT_DOCUMENT
+df = DEEP_DOCUMENT  # noqa: PD901
+uf = UNKNOWN_FLATNESS_DOCUMENT
+DOCS_FLATNESS_PAIRS = [
+    ([], False),
+    ([uf], False),
+    ([uf, uf], False),
+    ([df], False),
+    ([df, df], False),
+    ([df, uf], False),
+    ([ff], True),
+    ([ff, ff], True),
+    ([ff, uf], True),
+    ([ff, df], ValueError()),
+]
+DOCS_FLATNESS_TEST_IDS = [
+    " docs=[] ",
+    " docs=[u] ",
+    " docs=[u, u] ",
+    " docs=[d] ",
+    " docs=[d, d] ",
+    " docs=[d, u] ",
+    " docs=[f] ",
+    " docs=[f, f] ",
+    " docs=[f, u] ",
+    " docs=[f, d] ",
+]
+DOC_CF_PAIRS = [
+    (DOCUMENT_WITH_CF_X, "x"),
+    (DOCUMENT_WITH_CF_Y, "y"),
+    (DOCUMENT_WITH_UNKNOWN_CF, None),
+    ({"x": "LL", "_id": "a"}, "x"),
+    ({"x": 1234, "_id": "a"}, None),
+    ({"_id": "a"}, None),
+]
+DOC_CF_TEST_IDS = [
+    "cf=x",
+    "cf=y",
+    "unknown-cf",
+    "only-x",
+    "x-is-number",
+    "no-fields",
+]
+xc = DOCUMENT_WITH_CF_X
+yc = DOCUMENT_WITH_CF_Y
+uc = DOCUMENT_WITH_UNKNOWN_CF
+DOCS_CF_TRIPLES = [
+    ([], "q", "q"),
+    ([xc], "q", "q"),
+    ([xc, xc, yc], "q", "q"),
+    ([uc, uc], "q", "q"),
+    ([xc, uc, uc], "q", "q"),
+    ([xc, xc, yc, uc, uc, uc], "q", "q"),
+    ([], "*", ValueError),
+    ([xc], "*", "x"),
+    ([xc, xc, yc], "*", "x"),
+    ([uc, uc], "*", ValueError),
+    ([xc, uc, uc], "*", "x"),
+    ([xc, xc, yc, uc, uc, uc], "*", "x"),
+]
+DOCS_CF_TEST_IDS = [
+    "[]",
+    "[x]",
+    "[x, x, y]",
+    "[u, u]",
+    "[x, u, u]",
+    "[x, x, y, u, u, u]",
+    "[]",
+    "[x]",
+    "[x, x, y]",
+    "[u, u]",
+    "[x, u, u]",
+    "[x, x, y, u, u, u]",
+]
 
-    def test_detect_documents_flatness(self) -> None:
+
+class TestVSAutodetectInferences:
+    @pytest.mark.parametrize(
+        ("document", "expected_flatness"), DOC_FLATNESS_PAIRS, ids=DOC_FLATNESS_TEST_IDS
+    )
+    def test_detect_document_flatness(
+        self,
+        document: dict[str, Any],
+        expected_flatness: bool | None,
+    ) -> None:
+        """Test expected results for flatness detection."""
+        assert _detect_document_flatness(document) is expected_flatness
+
+    @pytest.mark.parametrize(
+        ("documents", "expected_flatness"),
+        DOCS_FLATNESS_PAIRS,
+        ids=DOCS_FLATNESS_TEST_IDS,
+    )
+    def test_detect_documents_flatness(
+        self,
+        documents: list[dict[str, Any]],
+        expected_flatness: bool | Exception,
+    ) -> None:
         """Test flatness detection from a list of documents."""
-        f = FLAT_DOCUMENT
-        d = DEEP_DOCUMENT
-        u = UNKNOWN_FLATNESS_DOCUMENT
-        assert _detect_documents_flatness([]) is False
-        assert _detect_documents_flatness([u]) is False
-        assert _detect_documents_flatness([u, u]) is False
-        assert _detect_documents_flatness([d]) is False
-        assert _detect_documents_flatness([d, d]) is False
-        assert _detect_documents_flatness([d, u]) is False
-        assert _detect_documents_flatness([f]) is True
-        assert _detect_documents_flatness([f, f]) is True
-        assert _detect_documents_flatness([f, u]) is True
-        with pytest.raises(ValueError, match="Mixed"):
-            assert _detect_documents_flatness([f, d]) is True
+        if isinstance(expected_flatness, bool):
+            assert _detect_documents_flatness(documents) is expected_flatness
+        else:
+            with pytest.raises(ValueError, match="Mixed"):
+                _detect_documents_flatness(documents)
 
-    def test_detect_document_content_field(self) -> None:
+    @pytest.mark.parametrize(
+        ("document", "expected_content_field"), DOC_CF_PAIRS, ids=DOC_CF_TEST_IDS
+    )
+    def test_detect_document_content_field(
+        self,
+        document: dict[str, Any],
+        expected_content_field: str | None,
+    ) -> None:
         """Test content-field detection on a document."""
-        doc_2ss = DOCUMENT_WITH_CF_X
-        assert _detect_document_content_field(doc_2ss) == "x"
-        doc_2sn = DOCUMENT_WITH_CF_Y
-        assert _detect_document_content_field(doc_2sn) == "y"
-        doc_2nn = DOCUMENT_WITH_UNKNOWN_CF
-        assert _detect_document_content_field(doc_2nn) is None
-        doc_1s = {"x": "LL", "_id": "a"}
-        assert _detect_document_content_field(doc_1s) == "x"
-        doc_1n = {"x": 1234, "_id": "a"}
-        assert _detect_document_content_field(doc_1n) is None
-        doc_0 = {"_id": "a"}
-        assert _detect_document_content_field(doc_0) is None
+        if isinstance(expected_content_field, str):
+            assert _detect_document_content_field(document) == expected_content_field
+        elif expected_content_field is None:
+            assert _detect_document_content_field(document) is None
+        else:
+            raise NotImplementedError
 
-    def test_detect_documents_content_field(self) -> None:
+    @pytest.mark.parametrize(
+        ("documents", "requested_content_field", "expected_content_field"),
+        DOCS_CF_TRIPLES,
+        ids=DOCS_CF_TEST_IDS,
+    )
+    def test_detect_documents_content_field(
+        self,
+        documents: list[dict[str, Any]],
+        requested_content_field: str,
+        expected_content_field: str | Exception,
+    ) -> None:
         """Test content-field detection on a list of document."""
-        x = DOCUMENT_WITH_CF_X
-        y = DOCUMENT_WITH_CF_Y
-        u = DOCUMENT_WITH_UNKNOWN_CF
-
-        assert (
-            _detect_documents_content_field(documents=[], requested_content_field="q")
-            == "q"
-        )
-        assert (
-            _detect_documents_content_field(documents=[x], requested_content_field="q")
-            == "q"
-        )
-        assert (
-            _detect_documents_content_field(
-                documents=[x, x, y], requested_content_field="q"
+        if isinstance(expected_content_field, str):
+            detected_cf = _detect_documents_content_field(
+                documents=documents,
+                requested_content_field=requested_content_field,
             )
-            == "q"
-        )
-        assert (
-            _detect_documents_content_field(
-                documents=[u, u], requested_content_field="q"
-            )
-            == "q"
-        )
-        assert (
-            _detect_documents_content_field(
-                documents=[x, u, u], requested_content_field="q"
-            )
-            == "q"
-        )
-        assert (
-            _detect_documents_content_field(
-                documents=[x, x, y, u, u, u], requested_content_field="q"
-            )
-            == "q"
-        )
-
-        with pytest.raises(ValueError, match="not infer"):
-            _detect_documents_content_field(documents=[], requested_content_field="*")
-        assert (
-            _detect_documents_content_field(documents=[x], requested_content_field="*")
-            == "x"
-        )
-        assert (
-            _detect_documents_content_field(
-                documents=[x, x, y], requested_content_field="*"
-            )
-            == "x"
-        )
-        with pytest.raises(ValueError, match="not infer"):
-            _detect_documents_content_field(
-                documents=[u, u], requested_content_field="*"
-            )
-        assert (
-            _detect_documents_content_field(
-                documents=[x, u, u], requested_content_field="*"
-            )
-            == "x"
-        )
-        assert (
-            _detect_documents_content_field(
-                documents=[x, x, y, u, u, u], requested_content_field="*"
-            )
-            == "x"
-        )
+            assert detected_cf == expected_content_field
+        else:
+            with pytest.raises(ValueError, match="not infer"):
+                _detect_documents_content_field(
+                    documents=documents,
+                    requested_content_field=requested_content_field,
+                )
