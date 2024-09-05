@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import warnings
 from abc import ABC, abstractmethod
 from typing import Any
@@ -14,6 +15,8 @@ VECTOR_REQUIRED_PREAMBLE_MSG = (
     "Default vectorize codec got a non-null vector to encode."
 )
 FLATTEN_CONFLICT_MSG = "Cannot flatten metadata: field name overlap for '{field}'."
+
+logger = logging.getLogger(__name__)
 
 
 def _default_encode_filter(filter_dict: dict[str, Any]) -> dict[str, Any]:
@@ -161,10 +164,7 @@ class _DefaultVSDocumentCodec(_AstraDBVectorStoreDocumentCodec):
                 f"{astra_document.get('_id', '(no _id)')}. "
                 "Reason: missing required fields."
             )
-            warnings.warn(
-                invalid_doc_warning,
-                stacklevel=2,
-            )
+            logger.warning(invalid_doc_warning)
             return None
         return Document(
             page_content=astra_document[self.content_field],

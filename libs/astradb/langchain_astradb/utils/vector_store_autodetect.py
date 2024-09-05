@@ -46,9 +46,8 @@ def _detect_document_flatness(document: dict[str, Any]) -> bool | None:
 
 def _detect_documents_flatness(documents: list[dict[str, Any]]) -> bool:
     flatness_survey = [_detect_document_flatness(document) for document in documents]
-    flatness_stats = Counter(flatness_survey)
-    n_flats = flatness_stats.get(True, 0)
-    n_deeps = flatness_stats.get(False, 0)
+    n_flats = flatness_survey.count(True)
+    n_deeps = flatness_survey.count(False)
     if n_flats > 0 and n_deeps > 0:
         msg = "Mixed document shapes detected on collection during autodetect."
         raise ValueError(msg)

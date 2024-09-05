@@ -406,8 +406,7 @@ class AstraDBVectorStore(VectorStore):
                 batch to insert pre-existing entries.
             bulk_delete_concurrency: Number of threads or coroutines for
                 multiple-entry deletes.
-            setup_mode: mode used to create the collection. Allowed: SYNC, ASYNC, OFF,
-                members of `langchain_astradb.utils.astradb.SetupMode`.
+            setup_mode: mode used to create the collection (SYNC, ASYNC or OFF).
             pre_delete_collection: whether to delete the collection before creating it.
                 If False and the collection already exists, the collection will be used
                 as is.
