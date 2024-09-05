@@ -66,8 +66,6 @@ DEFAULT_INDEXING_OPTIONS = {"allow": ["metadata"]}
 
 logger = logging.getLogger(__name__)
 
-_NOT_SET = object()
-
 
 def _unique_list(lst: list[T], key: Callable[[T], U]) -> list[T]:
     visited_keys: set[U] = set()
@@ -81,18 +79,18 @@ def _unique_list(lst: list[T], key: Callable[[T], U]) -> list[T]:
 
 
 def _normalize_content_field(
-    content_field: str,
+    content_field: str | None,
     *,
     is_autodetect: bool,
     has_vectorize: bool,
 ) -> str:
     if has_vectorize:
-        if content_field is not _NOT_SET:
+        if content_field is not None:
             msg = "content_field is not configurable for vectorize collections."
             raise ValueError(msg)
         return "$vectorize"
 
-    if content_field is _NOT_SET or content_field is None:
+    if content_field is None:
         return "*" if is_autodetect else "content"
 
     if content_field == "*":
@@ -355,7 +353,7 @@ class AstraDBVectorStore(VectorStore):
         collection_indexing_policy: dict[str, Any] | None = None,
         collection_vector_service_options: CollectionVectorServiceOptions | None = None,
         collection_embedding_api_key: str | EmbeddingHeadersProvider | None = None,
-        content_field: str = _NOT_SET,  # type: ignore[assignment]
+        content_field: str | None = None,
         ignore_invalid_documents: bool = False,
         autodetect_collection: bool = False,
     ) -> None:

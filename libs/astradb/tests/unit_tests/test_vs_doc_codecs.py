@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import Any
 
 import pytest
@@ -76,7 +77,7 @@ class TestVSDocCodecs:
         )
         with pytest.raises(
             ValueError,
-            match=NO_NULL_VECTOR_MSG,
+            match=re.escape(NO_NULL_VECTOR_MSG),
         ):
             codec.encode(
                 content=CONTENT,
@@ -93,7 +94,10 @@ class TestVSDocCodecs:
         decoded_doc = codec.decode(ASTRA_DEFAULT_DOCUMENT_NOVECTORIZE)
         assert decoded_doc == LC_DOCUMENT
 
-    def test_default_novectorize_decoding_invalid(self) -> None:
+    def test_default_novectorize_decoding_invalid(
+        self,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
         """Test decoding for invalid documents, no-vectorize."""
         codec_e = _DefaultVSDocumentCodec(
             content_field="content_x", ignore_invalid_documents=False
@@ -103,12 +107,12 @@ class TestVSDocCodecs:
         codec_w = _DefaultVSDocumentCodec(
             content_field="content_x", ignore_invalid_documents=True
         )
-        with pytest.warns(UserWarning) as rec_warnings:
-            decoded_doc = codec_w.decode({"_id": 0})
+        decoded_doc = codec_w.decode({"_id": 0})
+        assert decoded_doc is None
+        assert "Ignoring document with _id = " in caplog.text
+
         codec_w.decode({"_id": 0, "content_x": "a", "metadata": {"k": "v"}})
         codec_e.decode({"_id": 0, "content_x": "a", "metadata": {"k": "v"}})
-        assert len(rec_warnings) == 1
-        assert decoded_doc is None
 
     def test_default_novectorize_filtering(self) -> None:
         """Test filter-encoding for default, no-vectorize."""
@@ -188,7 +192,7 @@ class TestVSDocCodecs:
         )
         with pytest.raises(
             ValueError,
-            match=NO_NULL_VECTOR_MSG,
+            match=re.escape(NO_NULL_VECTOR_MSG),
         ):
             codec.encode(
                 content=CONTENT,
