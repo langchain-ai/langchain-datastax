@@ -20,7 +20,6 @@ from langchain_core.embeddings import Embeddings
 from langchain_core.globals import get_llm_cache, set_llm_cache
 from langchain_core.language_models import LLM
 from langchain_core.outputs import Generation, LLMResult
-from langchain_core.pydantic_v1 import validator
 from typing_extensions import override
 
 from langchain_astradb import AstraDBCache, AstraDBSemanticCache
@@ -68,15 +67,6 @@ class FakeLLM(LLM):
     queries: Optional[Mapping] = None  # noqa: UP007
     sequential_responses: Optional[bool] = False  # noqa: UP007
     response_index: int = 0
-
-    @validator("queries", always=True)
-    def check_queries_required(
-        cls, queries: Mapping | None, values: Mapping[str, Any]
-    ) -> Mapping | None:
-        if values.get("sequential_response") and not queries:
-            msg = "queries is required when sequential_response is set to True"
-            raise ValueError(msg)
-        return queries
 
     @override
     def get_num_tokens(self, text: str) -> int:
