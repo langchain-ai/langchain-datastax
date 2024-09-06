@@ -6,7 +6,8 @@ import dataclasses
 from typing import TYPE_CHECKING, Iterable
 
 import numpy as np
-from _math import cosine_similarity
+
+from langchain_astradb._math import cosine_similarity
 
 if TYPE_CHECKING:
     from langchain_core.documents import Document
