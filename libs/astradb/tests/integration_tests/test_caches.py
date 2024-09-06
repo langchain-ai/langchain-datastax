@@ -260,7 +260,12 @@ class TestAstraDBCaches:
                     collection_name=collection_name,
                     astra_db_client=core_astra_db,
                 )
-            assert len(rec_warnings) == 1
+            f_rec_warnings = [
+                wrn
+                for wrn in rec_warnings
+                if not issubclass(wrn.category, ResourceWarning)
+            ]
+            assert len(f_rec_warnings) == 1
             assert cache_init_core.lookup("pr", "llms") == test_gens
         finally:
             cache_init_ok.astra_env.database.drop_collection(collection_name)
