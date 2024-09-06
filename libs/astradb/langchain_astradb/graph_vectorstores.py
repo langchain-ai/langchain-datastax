@@ -9,7 +9,6 @@ from dataclasses import dataclass
 from typing import (
     TYPE_CHECKING,
     Any,
-    Awaitable,
     Iterable,
     Sequence,
     dict_values,
@@ -24,19 +23,8 @@ from langchain_core.graph_vectorstores.base import (
 from typing_extensions import override
 
 from langchain_astradb import AstraDBVectorStore
-from langchain_astradb.utils.astradb import (
-    SetupMode,
-    _AstraDBCollectionEnvironment,
-)
 
 if TYPE_CHECKING:
-    from astrapy.authentication import TokenProvider
-    from astrapy.db import (
-        AstraDB as AstraDBClient,
-    )
-    from astrapy.db import (
-        AsyncAstraDB as AsyncAstraDBClient,
-    )
     from langchain_core.embeddings import Embeddings
 
 DEFAULT_INDEXING_OPTIONS = {"allow": ["metadata"]}
@@ -64,14 +52,6 @@ class AstraDBGraphVectorStore(GraphVectorStore):
         link_to_metadata_key: str = "links_to",
         link_from_metadata_key: str = "links_from",
         content_id_key: str = "content_id",
-        token: str | TokenProvider | None = None,
-        api_endpoint: str | None = None,
-        astra_db_client: AstraDBClient | None = None,
-        async_astra_db_client: AsyncAstraDBClient | None = None,
-        namespace: str | None = None,
-        setup_mode: SetupMode = SetupMode.SYNC,
-        pre_delete_collection: bool = False,  # noqa: FBT001 FBT002
-        metric: str | None = None,
         metadata_indexing_include: Iterable[str] | None = None,
         metadata_indexing_exclude: Iterable[str] | None = None,
         collection_indexing_policy: dict[str, Any] | None = None,
@@ -91,56 +71,7 @@ class AstraDBGraphVectorStore(GraphVectorStore):
             collection_indexing_policy=collection_indexing_policy,
         )
 
-        self.embedding_dimension: int | None = None
-        embedding_dimension: int | Awaitable[int] | None = None
-        if setup_mode == SetupMode.ASYNC:
-            embedding_dimension = self._aget_embedding_dimension()
-        elif setup_mode == SetupMode.SYNC or setup_mode == SetupMode.OFF:  # noqa: PLR1714
-            embedding_dimension = self._get_embedding_dimension()
-
-        # indexing policy setting
-        indexing_policy: dict[str, Any] = (
-            AstraDBVectorStore._normalize_metadata_indexing_policy(
-                metadata_indexing_include=metadata_indexing_include,
-                metadata_indexing_exclude=metadata_indexing_exclude,
-                collection_indexing_policy=collection_indexing_policy,
-            )
-        )
-
-        self.astra_env = _AstraDBCollectionEnvironment(
-            collection_name=collection_name,
-            token=token,
-            api_endpoint=api_endpoint,
-            astra_db_client=astra_db_client,
-            async_astra_db_client=async_astra_db_client,
-            namespace=namespace,
-            setup_mode=setup_mode,
-            pre_delete_collection=pre_delete_collection,
-            embedding_dimension=embedding_dimension,
-            metric=metric,
-            requested_indexing_policy=indexing_policy,
-            default_indexing_policy=DEFAULT_INDEXING_OPTIONS,
-            collection_vector_service_options=None,
-            collection_embedding_api_key=None,
-        )
-
-    def _get_embedding_dimension(self) -> int:
-        if self.embedding_dimension is None:
-            self.embedding_dimension = len(
-                self.embedding.embed_query(
-                    text="This is a sample sentence."
-                )
-            )
-        return self.embedding_dimension
-
-    async def _aget_embedding_dimension(self) -> int:
-        if self.embedding_dimension is None:
-            self.embedding_dimension = len(
-                await self.embedding.aembed_query(
-                    text="This is a sample sentence."
-                )
-            )
-        return self.embedding_dimension
+        self.astra_env = self.vectorstore.astra_env
 
     @property
     @override
