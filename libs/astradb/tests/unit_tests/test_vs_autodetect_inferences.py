@@ -78,79 +78,48 @@ DOC_FLATNESS_PAIRS = [
     ({"$vector": [0], "_id": "a", "$vectorize": "a", "x": 9}, True),
 ]
 DOC_FLATNESS_TEST_IDS = [f"DOC=<{json.dumps(doc)}>" for doc, _ in DOC_FLATNESS_PAIRS]
+
 ff = FLAT_DOCUMENT
 df = DEEP_DOCUMENT  # noqa: PD901
 uf = UNKNOWN_FLATNESS_DOCUMENT
-DOCS_FLATNESS_PAIRS = [
-    ([], False),
-    ([uf], False),
-    ([uf, uf], False),
-    ([df], False),
-    ([df, df], False),
-    ([df, uf], False),
-    ([ff], True),
-    ([ff, ff], True),
-    ([ff, uf], True),
-    ([ff, df], ValueError()),
+DOCS_FLATNESS_TEST_PARAMS = [
+    pytest.param([], False, id=" docs=[] "),
+    pytest.param([uf], False, id=" docs=[u] "),
+    pytest.param([uf, uf], False, id=" docs=[u, u] "),
+    pytest.param([df], False, id=" docs=[d] "),
+    pytest.param([df, df], False, id=" docs=[d, d] "),
+    pytest.param([df, uf], False, id=" docs=[d, u] "),
+    pytest.param([ff], True, id=" docs=[f] "),
+    pytest.param([ff, ff], True, id=" docs=[f, f] "),
+    pytest.param([ff, uf], True, id=" docs=[f, u] "),
+    pytest.param([ff, df], ValueError(), id=" docs=[f, d] "),
 ]
-DOCS_FLATNESS_TEST_IDS = [
-    " docs=[] ",
-    " docs=[u] ",
-    " docs=[u, u] ",
-    " docs=[d] ",
-    " docs=[d, d] ",
-    " docs=[d, u] ",
-    " docs=[f] ",
-    " docs=[f, f] ",
-    " docs=[f, u] ",
-    " docs=[f, d] ",
+
+DOC_CF_TEST_PARAMS = [
+    pytest.param(DOCUMENT_WITH_CF_X, "x", id="cf=x"),
+    pytest.param(DOCUMENT_WITH_CF_Y, "y", id="cf=y"),
+    pytest.param(DOCUMENT_WITH_UNKNOWN_CF, None, id="unknown-cf"),
+    pytest.param({"x": "LL", "_id": "a"}, "x", id="only-x"),
+    pytest.param({"x": 1234, "_id": "a"}, None, id="x-is-number"),
+    pytest.param({"_id": "a"}, None, id="no-fields"),
 ]
-DOC_CF_PAIRS = [
-    (DOCUMENT_WITH_CF_X, "x"),
-    (DOCUMENT_WITH_CF_Y, "y"),
-    (DOCUMENT_WITH_UNKNOWN_CF, None),
-    ({"x": "LL", "_id": "a"}, "x"),
-    ({"x": 1234, "_id": "a"}, None),
-    ({"_id": "a"}, None),
-]
-DOC_CF_TEST_IDS = [
-    "cf=x",
-    "cf=y",
-    "unknown-cf",
-    "only-x",
-    "x-is-number",
-    "no-fields",
-]
+
 xc = DOCUMENT_WITH_CF_X
 yc = DOCUMENT_WITH_CF_Y
 uc = DOCUMENT_WITH_UNKNOWN_CF
-DOCS_CF_TRIPLES = [
-    ([], "q", "q"),
-    ([xc], "q", "q"),
-    ([xc, xc, yc], "q", "q"),
-    ([uc, uc], "q", "q"),
-    ([xc, uc, uc], "q", "q"),
-    ([xc, xc, yc, uc, uc, uc], "q", "q"),
-    ([], "*", ValueError),
-    ([xc], "*", "x"),
-    ([xc, xc, yc], "*", "x"),
-    ([uc, uc], "*", ValueError),
-    ([xc, uc, uc], "*", "x"),
-    ([xc, xc, yc, uc, uc, uc], "*", "x"),
-]
-DOCS_CF_TEST_IDS = [
-    "[]",
-    "[x]",
-    "[x, x, y]",
-    "[u, u]",
-    "[x, u, u]",
-    "[x, x, y, u, u, u]",
-    "[]",
-    "[x]",
-    "[x, x, y]",
-    "[u, u]",
-    "[x, u, u]",
-    "[x, x, y, u, u, u]",
+DOCS_CF_TEST_PARAMS = [
+    pytest.param([], "q", "q", id=" [],req='q' "),
+    pytest.param([xc], "q", "q", id=" [x],req='q' "),
+    pytest.param([xc, xc, yc], "q", "q", id=" [x, x, y],req='q' "),
+    pytest.param([uc, uc], "q", "q", id=" [u, u],req='q' "),
+    pytest.param([xc, uc, uc], "q", "q", id=" [x, u, u],req='q' "),
+    pytest.param([xc, xc, yc, uc, uc, uc], "q", "q", id=" [x, x, y, u, u, u],req='q' "),
+    pytest.param([], "*", ValueError, id=" [],req='*' "),
+    pytest.param([xc], "*", "x", id=" [x],req='*' "),
+    pytest.param([xc, xc, yc], "*", "x", id=" [x, x, y],req='*' "),
+    pytest.param([uc, uc], "*", ValueError, id=" [u, u],req='*' "),
+    pytest.param([xc, uc, uc], "*", "x", id=" [x, u, u],req='*' "),
+    pytest.param([xc, xc, yc, uc, uc, uc], "*", "x", id=" [x, x, y, u, u, u],req='*' "),
 ]
 
 
@@ -168,8 +137,7 @@ class TestVSAutodetectInferences:
 
     @pytest.mark.parametrize(
         ("documents", "expected_flatness"),
-        DOCS_FLATNESS_PAIRS,
-        ids=DOCS_FLATNESS_TEST_IDS,
+        DOCS_FLATNESS_TEST_PARAMS,
     )
     def test_detect_documents_flatness(
         self,
@@ -184,7 +152,8 @@ class TestVSAutodetectInferences:
                 _detect_documents_flatness(documents)
 
     @pytest.mark.parametrize(
-        ("document", "expected_content_field"), DOC_CF_PAIRS, ids=DOC_CF_TEST_IDS
+        ("document", "expected_content_field"),
+        DOC_CF_TEST_PARAMS,
     )
     def test_detect_document_content_field(
         self,
@@ -201,8 +170,7 @@ class TestVSAutodetectInferences:
 
     @pytest.mark.parametrize(
         ("documents", "requested_content_field", "expected_content_field"),
-        DOCS_CF_TRIPLES,
-        ids=DOCS_CF_TEST_IDS,
+        DOCS_CF_TEST_PARAMS,
     )
     def test_detect_documents_content_field(
         self,
