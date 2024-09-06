@@ -11,10 +11,8 @@ from typing import (
     Any,
     Iterable,
     Sequence,
-    dict_values,
 )
 
-from _mmr_helper import MmrHelper
 from langchain_core.documents import Document
 from langchain_core.graph_vectorstores.base import (
     GraphVectorStore,
@@ -23,6 +21,7 @@ from langchain_core.graph_vectorstores.base import (
 from typing_extensions import override
 
 from langchain_astradb import AstraDBVectorStore
+from langchain_astradb._mmr_helper import MmrHelper
 
 if TYPE_CHECKING:
     from langchain_core.embeddings import Embeddings
@@ -183,7 +182,7 @@ class AstraDBGraphVectorStore(GraphVectorStore):
         # for tags that we've already traversed.
         visited_tags: dict[str, int] = {}
 
-        def visit_documents(d: int, docs: dict_values[Any, Document]) -> None:
+        def visit_documents(d: int, docs: Iterable[Any]) -> None:
             nonlocal visited_ids
             nonlocal visited_docs
             nonlocal visited_tags
@@ -286,23 +285,21 @@ class AstraDBGraphVectorStore(GraphVectorStore):
                     metadata_filter
                 )
                 metadata_parameter[f"metadata.{self.link_from_metadata_key}"] = tag
-                hits = list(
-                    self.astra_env.collection.paginated_find(
-                        filter=metadata_parameter,
-                        sort={"$vector": query_embedding},
-                        options={
-                            "limit": adjacent_k,
-                            "includeSimilarity": True,
-                            "includeSortVector": True,
-                        },
-                        projection={
-                            "_id": True,
-                            "content": True,
-                            "metadata": True,
-                            "$vector": True,
-                        },
-                    )
-                )
+
+
+                hits = list(self.astra_env.collection.find(
+                    filter=metadata_parameter,
+                    projection={
+                        "_id": True,
+                        "content": True,
+                        "metadata": True,
+                        "$vector": True,
+                    },
+                    limit=adjacent_k,
+                    include_similarity=True,
+                    include_sort_vector=True,
+                    sort={"$vector": query_embedding},
+                ))
 
                 for hit in hits:
                     vector = hit["$vector"]
@@ -351,20 +348,18 @@ class AstraDBGraphVectorStore(GraphVectorStore):
         def fetch_initial_candidates() -> None:
             metadata_parameter = self.vectorstore._filter_to_metadata(metadata_filter)
             hits = list(
-                self.astra_env.collection.paginated_find(
+                self.astra_env.collection.find(
                     filter=metadata_parameter,
-                    sort={"$vector": query_embedding},
-                    options={
-                        "limit": fetch_k,
-                        "includeSimilarity": True,
-                        "includeSortVector": True,
-                    },
                     projection={
                         "_id": True,
                         "content": True,
                         "metadata": True,
                         "$vector": True,
                     },
+                    limit=fetch_k,
+                    include_similarity=True,
+                    include_sort_vector=True,
+                    sort={"$vector": query_embedding},
                 )
             )
 
