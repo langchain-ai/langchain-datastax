@@ -3,8 +3,6 @@
 See https://github.com/langchain-ai/langchain/blob/langchain-community%3D%3D0.0.38/libs/community/langchain_community/utils/math.py .
 """  # noqa: E501
 
-# ruff: noqa: EM102 TRY003
-
 import logging
 from typing import List, Union
 
@@ -24,9 +22,12 @@ def cosine_similarity(x: Matrix, y: Matrix) -> NDArray[np.float32]:
     x = np.array(x)
     y = np.array(y)
     if x.shape[1] != y.shape[1]:
-        raise ValueError(
+        msg = (
             f"Number of columns in X and Y must be the same. X has shape {x.shape} "
             f"and Y has shape {y.shape}."
+        )
+        raise ValueError(
+            msg
         )
     try:
         import simsimd as simd

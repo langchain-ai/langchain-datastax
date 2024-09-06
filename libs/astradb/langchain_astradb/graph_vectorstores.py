@@ -1,6 +1,6 @@
 """Astra DB graph vector store integration."""
 
-# ruff: noqa: FIX002 TD002 TD003 C901 D102 EM101 TRY003 SLF001 ANN003 UP007 ARG002
+# ruff: noqa: SLF001 C901
 
 from __future__ import annotations
 
@@ -30,14 +30,13 @@ from langchain_astradb.utils.astradb import (
 )
 
 if TYPE_CHECKING:
-    from astrapy.authentication import EmbeddingHeadersProvider, TokenProvider
+    from astrapy.authentication import TokenProvider
     from astrapy.db import (
         AstraDB as AstraDBClient,
     )
     from astrapy.db import (
         AsyncAstraDB as AsyncAstraDBClient,
     )
-    from astrapy.info import CollectionVectorServiceOptions
     from langchain_core.embeddings import Embeddings
 
 DEFAULT_INDEXING_OPTIONS = {"allow": ["metadata"]}
@@ -76,8 +75,6 @@ class AstraDBGraphVectorStore(GraphVectorStore):
         metadata_indexing_include: Iterable[str] | None = None,
         metadata_indexing_exclude: Iterable[str] | None = None,
         collection_indexing_policy: dict[str, Any] | None = None,
-        collection_vector_service_options: CollectionVectorServiceOptions | None = None,
-        collection_embedding_api_key: str | EmbeddingHeadersProvider | None = None,
     ):
         """Create a new Graph Vector Store backed by AstraDB."""
         self.link_to_metadata_key = link_to_metadata_key
@@ -86,8 +83,6 @@ class AstraDBGraphVectorStore(GraphVectorStore):
         self.session = None
         self.embedding = embedding
 
-        # TODO: Use the _AstraDBCollectionEnvironment everywhere
-        # or nowhere - this can cause incompatibilities
         self.vectorstore = AstraDBVectorStore(
             collection_name=collection_name,
             embedding=embedding,
@@ -98,11 +93,10 @@ class AstraDBGraphVectorStore(GraphVectorStore):
 
         self.embedding_dimension: int | None = None
         embedding_dimension: int | Awaitable[int] | None = None
-        if self.embedding is not None:
-            if setup_mode == SetupMode.ASYNC:
-                embedding_dimension = self._aget_embedding_dimension()
-            elif setup_mode == SetupMode.SYNC or setup_mode == SetupMode.OFF:  # noqa: PLR1714
-                embedding_dimension = self._get_embedding_dimension()
+        if setup_mode == SetupMode.ASYNC:
+            embedding_dimension = self._aget_embedding_dimension()
+        elif setup_mode == SetupMode.SYNC or setup_mode == SetupMode.OFF:  # noqa: PLR1714
+            embedding_dimension = self._get_embedding_dimension()
 
         # indexing policy setting
         indexing_policy: dict[str, Any] = (
@@ -126,20 +120,14 @@ class AstraDBGraphVectorStore(GraphVectorStore):
             metric=metric,
             requested_indexing_policy=indexing_policy,
             default_indexing_policy=DEFAULT_INDEXING_OPTIONS,
-            collection_vector_service_options=collection_vector_service_options,
-            collection_embedding_api_key=collection_embedding_api_key,
+            collection_vector_service_options=None,
+            collection_embedding_api_key=None,
         )
-
-    def _get_safe_embedding(self) -> Embeddings:
-        if not self.embedding:
-            msg = "Missing embedding"
-            raise ValueError(msg)
-        return self.embedding
 
     def _get_embedding_dimension(self) -> int:
         if self.embedding_dimension is None:
             self.embedding_dimension = len(
-                self._get_safe_embedding().embed_query(
+                self.embedding.embed_query(
                     text="This is a sample sentence."
                 )
             )
@@ -148,7 +136,7 @@ class AstraDBGraphVectorStore(GraphVectorStore):
     async def _aget_embedding_dimension(self) -> int:
         if self.embedding_dimension is None:
             self.embedding_dimension = len(
-                await self._get_safe_embedding().aembed_query(
+                await self.embedding.aembed_query(
                     text="This is a sample sentence."
                 )
             )
@@ -162,7 +150,7 @@ class AstraDBGraphVectorStore(GraphVectorStore):
     def add_nodes(
         self,
         nodes: Iterable[Node],
-        **kwargs,
+        **kwargs: Any, # noqa: ARG002
     ) -> Iterable[str]:
         """Add nodes to the graph store."""
         docs = []
@@ -205,6 +193,7 @@ class AstraDBGraphVectorStore(GraphVectorStore):
         ids: Iterable[str] | None = None,
         **kwargs: Any,
     ) -> AstraDBGraphVectorStore:
+        """Return GraphVectorStore initialized from texts and embeddings."""
         store = cls(embedding, **kwargs)
         store.add_texts(texts, metadatas, ids=ids)
         return store
@@ -217,6 +206,7 @@ class AstraDBGraphVectorStore(GraphVectorStore):
         ids: Iterable[str] | None = None,
         **kwargs: Any,
     ) -> AstraDBGraphVectorStore:
+        """Return GraphVectorStore initialized from documents and embeddings."""
         store = cls(embedding, **kwargs)
         store.add_documents(documents, ids=ids)
         return store
@@ -228,6 +218,7 @@ class AstraDBGraphVectorStore(GraphVectorStore):
         metadata_filter: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> list[Document]:
+        """Return docs most similar to query."""
         return self.vectorstore.similarity_search(query, k, metadata_filter, **kwargs)
 
     def similarity_search_by_vector(
@@ -237,6 +228,7 @@ class AstraDBGraphVectorStore(GraphVectorStore):
         metadata_filter: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> list[Document]:
+        """Return docs most similar to embedding vector."""
         return self.vectorstore.similarity_search_by_vector(
             embedding, k, metadata_filter, **kwargs
         )
@@ -251,6 +243,7 @@ class AstraDBGraphVectorStore(GraphVectorStore):
         metadata_filter: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> Iterable[Document]:
+        """Retrieve documents from traversing this graph store."""
         # Map from visited ID to depth
         visited_ids: dict[str, int] = {}
         visited_docs: list[Document] = []
@@ -339,6 +332,7 @@ class AstraDBGraphVectorStore(GraphVectorStore):
         score_threshold: float = float("-inf"),
         metadata_filter: dict[str, Any] | None = None,
     ) -> Iterable[Document]:
+        """Retrieve documents from this graph store using MMR-traversal."""
         query_embedding = self.embedding.embed_query(query)
         helper = MmrHelper(
             k=k,
@@ -355,7 +349,7 @@ class AstraDBGraphVectorStore(GraphVectorStore):
         def get_adjacent(tags: set[str]) -> Iterable[_Edge]:
             targets: dict[str, _Edge] = {}
 
-            # TODO: Parralelize
+            # NOTE: Would be better parralelized
             for tag in tags:
                 metadata_parameter = self.vectorstore._filter_to_metadata(
                     metadata_filter
@@ -396,8 +390,6 @@ class AstraDBGraphVectorStore(GraphVectorStore):
                             ),
                         )
 
-            # TODO: Consider a combined limit based on the similarity and/or
-            # predicated MMR score?
             return targets.values()
 
         def fetch_neighborhood(neighborhood: Sequence[str]) -> None:
@@ -477,7 +469,7 @@ class AstraDBGraphVectorStore(GraphVectorStore):
                 # If the next nodes would not exceed the depth limit, find the
                 # adjacent nodes.
                 #
-                # TODO: For a big performance win, we should track which tags we've
+                # NOTE: For a big performance win, we should track which tags we've
                 # already incorporated. We don't need to issue adjacent queries for
                 # those.
 
