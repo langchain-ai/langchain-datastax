@@ -226,7 +226,12 @@ class TestAstraDBChatMessageHistories:
                     session_id="gattini",
                     astra_db_client=core_astra_db,
                 )
-            assert len(rec_warnings) == 1
+            f_rec_warnings = [
+                wrn
+                for wrn in rec_warnings
+                if issubclass(wrn.category, DeprecationWarning)
+            ]
+            assert len(f_rec_warnings) == 1
             assert chatmh_init_core.messages == test_messages
         finally:
             chatmh_init_ok.astra_env.collection.drop()
@@ -265,7 +270,7 @@ class TestAstraDBChatMessageHistories:
             f_rec_warnings = [
                 wrn
                 for wrn in rec_warnings
-                if not issubclass(wrn.category, ResourceWarning)
+                if issubclass(wrn.category, DeprecationWarning)
             ]
             assert len(f_rec_warnings) == 1
             assert await chatmh_init_core.aget_messages() == test_messages

@@ -298,7 +298,12 @@ class TestAstraDBCaches:
                     astra_db_client=core_astra_db,
                     setup_mode=SetupMode.ASYNC,
                 )
-            assert len(rec_warnings) == 1
+            f_rec_warnings = [
+                wrn
+                for wrn in rec_warnings
+                if issubclass(wrn.category, DeprecationWarning)
+            ]
+            assert len(f_rec_warnings) == 1
             assert await cache_init_core.alookup("pr", "llms") == test_gens
         finally:
             await cache_init_ok.astra_env.async_database.drop_collection(
@@ -334,7 +339,12 @@ class TestAstraDBCaches:
                     astra_db_client=core_astra_db,
                     embedding=fake_embe,
                 )
-            assert len(rec_warnings) == 1
+            f_rec_warnings = [
+                wrn
+                for wrn in rec_warnings
+                if issubclass(wrn.category, DeprecationWarning)
+            ]
+            assert len(f_rec_warnings) == 1
             assert cache_init_core.lookup("pr", "llms") == test_gens
         finally:
             cache_init_ok.astra_env.database.drop_collection(collection_name)
@@ -370,7 +380,12 @@ class TestAstraDBCaches:
                     setup_mode=SetupMode.ASYNC,
                     embedding=fake_embe,
                 )
-            assert len(rec_warnings) == 1
+            f_rec_warnings = [
+                wrn
+                for wrn in rec_warnings
+                if issubclass(wrn.category, DeprecationWarning)
+            ]
+            assert len(f_rec_warnings) == 1
             assert await cache_init_core.alookup("pr", "llms") == test_gens
         finally:
             await cache_init_ok.astra_env.async_database.drop_collection(

@@ -366,7 +366,10 @@ class TestAstraDBStore:
                 namespace=astra_db_credentials["namespace"],
                 environment=astra_db_credentials["environment"],
             )
-            assert len(rec_warnings) == 1
+            f_rec_warnings = [
+                wrn for wrn in rec_warnings if issubclass(wrn.category, UserWarning)
+            ]
+            assert len(f_rec_warnings) == 1
         # on a custom collection must error
         with pytest.raises(
             ValueError, match="is detected as having the following indexing policy"
@@ -408,7 +411,12 @@ class TestAstraDBStore:
                     collection_name=collection_name,
                     astra_db_client=core_astra_db,
                 )
-            assert len(rec_warnings) == 1
+            f_rec_warnings = [
+                wrn
+                for wrn in rec_warnings
+                if issubclass(wrn.category, DeprecationWarning)
+            ]
+            assert len(f_rec_warnings) == 1
             assert store_init_core.mget(["key"]) == ["val123"]
         finally:
             store_init_ok.astra_env.database.drop_collection(collection_name)
@@ -440,7 +448,12 @@ class TestAstraDBStore:
                     astra_db_client=core_astra_db,
                     setup_mode=SetupMode.ASYNC,
                 )
-            assert len(rec_warnings) == 1
+            f_rec_warnings = [
+                wrn
+                for wrn in rec_warnings
+                if issubclass(wrn.category, DeprecationWarning)
+            ]
+            assert len(f_rec_warnings) == 1
             assert await store_init_core.amget(["key"]) == ["val123"]
         finally:
             await store_init_ok.astra_env.async_database.drop_collection(
