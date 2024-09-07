@@ -263,7 +263,7 @@ class TestAstraDBCaches:
             f_rec_warnings = [
                 wrn
                 for wrn in rec_warnings
-                if not issubclass(wrn.category, ResourceWarning)
+                if issubclass(wrn.category, DeprecationWarning)
             ]
             assert len(f_rec_warnings) == 1
             assert cache_init_core.lookup("pr", "llms") == test_gens
