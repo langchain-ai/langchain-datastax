@@ -1492,7 +1492,10 @@ class TestAstraDBVectorStore:
                 namespace=astra_db_credentials["namespace"],
                 environment=astra_db_credentials["environment"],
             )
-            assert len(rec_warnings) == 1
+            f_rec_warnings = [
+                wrn for wrn in rec_warnings if issubclass(wrn.category, UserWarning)
+            ]
+            assert len(f_rec_warnings) == 1
 
         # cleanup
         database.drop_collection("lc_legacy_coll")
@@ -1626,9 +1629,7 @@ class TestAstraDBVectorStore:
             await leg_store.aadd_texts(["Triggering warning."])
             # cleaning out 'spurious' "unclosed socket/transport..." warnings
             f_rec_warnings = [
-                wrn
-                for wrn in rec_warnings
-                if not issubclass(wrn.category, ResourceWarning)
+                wrn for wrn in rec_warnings if issubclass(wrn.category, UserWarning)
             ]
             assert len(f_rec_warnings) == 1
 
@@ -1671,7 +1672,7 @@ class TestAstraDBVectorStore:
             f_rec_warnings = [
                 wrn
                 for wrn in rec_warnings
-                if not issubclass(wrn.category, ResourceWarning)
+                if issubclass(wrn.category, DeprecationWarning)
             ]
             assert len(f_rec_warnings) == 1
             assert len(results) == 1
@@ -1715,7 +1716,12 @@ class TestAstraDBVectorStore:
                 )
 
             results = await v_store_init_core.asimilarity_search("another", k=1)
-            assert len(rec_warnings) == 1
+            f_rec_warnings = [
+                wrn
+                for wrn in rec_warnings
+                if issubclass(wrn.category, DeprecationWarning)
+            ]
+            assert len(f_rec_warnings) == 1
             assert len(results) == 1
             assert results[0].page_content == "One text"
         finally:
