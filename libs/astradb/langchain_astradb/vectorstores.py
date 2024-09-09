@@ -188,6 +188,24 @@ class AstraDBVectorStore(VectorStore):
                 token=ASTRA_DB_APPLICATION_TOKEN,
             )
 
+        Have the vector store figure out its configuration (documents scheme on DB)
+        from an existing collection, in the case of `server-side-embeddings <https://docs.datastax.com/en/astra-db-serverless/databases/embedding-generation.html>`:
+
+        .. code-block:: python
+
+            import getpass
+            from langchain_astradb import AstraDBVectorStore
+
+            ASTRA_DB_API_ENDPOINT = getpass.getpass("ASTRA_DB_API_ENDPOINT = ")
+            ASTRA_DB_APPLICATION_TOKEN = getpass.getpass("ASTRA_DB_APPLICATION_TOKEN = ")
+
+            vector_store = AstraDBVectorStore(
+                collection_name="astra_vector_langchain",
+                api_endpoint=ASTRA_DB_API_ENDPOINT,
+                token=ASTRA_DB_APPLICATION_TOKEN,
+                autodetect_collection=True,
+            )
+
     Add Documents:
 
         .. code-block:: python
@@ -435,6 +453,11 @@ class AstraDBVectorStore(VectorStore):
                 this cannot be specified; for non-vectorize collection, defaults
                 to "content".
                 The special value "*" can be passed only if autodetect_collection=True.
+                In this case, the actual name of the key for the textual content is
+                guessed by inspection of a few documents from the collection, under the
+                assumption that the longer strings are the most likely candidates.
+                Please understand the limitations of this method and get some
+                understanding of your data before passing `"*"` for this parameter.
             ignore_invalid_documents: if False (default), exceptions are raised
                 when a document is found on the Astra DB collectin that does
                 not have the expected shape. If set to True, such results
@@ -447,13 +470,19 @@ class AstraDBVectorStore(VectorStore):
                 In autodetect mode, `content_field` can be given as "*", meaning
                 that an attempt will be made to determine it by inspection
                 (unless vectorize is enabled, in which case `content_field` is ignored).
+                In autodetect mode, the store not only determines whether embeddings
+                are client- or server-side, but - most importantly - switches
+                automatically between "nested" and "flat" representations of documents
+                on DB (i.e. having the metadata key-value pairs grouped in a `metadata`
+                field or spread at the documents' top-level). The former scheme
+                is the native mode of the AstraDBVectorStore; the store resorts
+                to the latter in case of vector collections populated with external
+                means (such as a third-party data import tool) before applying
+                an AstraDBVectorStore to them.
                 Note that the following parameters cannot be used if this is True:
-                    `metric`
-                    `setup_mode`
-                    `metadata_indexing_include`
-                    `metadata_indexing_exclude`
-                    `collection_indexing_policy`
-                    `collection_vector_service_options`
+                `metric`, `setup_mode`, `metadata_indexing_include`,
+                `metadata_indexing_exclude`, `collection_indexing_policy`,
+                `collection_vector_service_options`.
 
         Note:
             For concurrency in synchronous :meth:`~add_texts`:, as a rule of thumb, on a
