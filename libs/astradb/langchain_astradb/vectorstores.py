@@ -148,7 +148,7 @@ class AstraDBVectorStore(VectorStore):
     Setup:
         Install the ``langchain-astradb`` package and head to the
         `AstraDB website <https://astra.datastax.com>`, create an account, create a
-        new database and `create an application token <https://docs.datastax.com/en/astra-db-serverless/administration/manage-application-tokens.html#generate-application-token>`.
+        new database and `create an application token <https://docs.datastax.com/en/astra-db-serverless/administration/manage-application-tokens.html>`.
 
         .. code-block:: bash
 
@@ -378,7 +378,7 @@ class AstraDBVectorStore(VectorStore):
         """Wrapper around DataStax Astra DB for vector-store workloads.
 
         For quickstart and details, visit
-        https://docs.datastax.com/en/astra/astra-db-vector/
+        https://docs.datastax.com/en/astra-db-serverless/index.html
 
         Args:
             embedding: the embeddings function or service to use.
@@ -433,8 +433,7 @@ class AstraDBVectorStore(VectorStore):
             collection_indexing_policy: a full "indexing" specification for
                 what fields should be indexed for later filtering in searches.
                 This dict must conform to to the API specifications
-                (see docs.datastax.com/en/astra/astra-db-vector/api-reference/
-                data-api-commands.html#advanced-feature-indexing-clause-on-createcollection)
+                (see https://docs.datastax.com/en/astra-db-serverless/api-reference/collections.html#the-indexing-option)
             collection_vector_service_options: specifies the use of server-side
                 embeddings within Astra DB. If passing this parameter, ``embedding``
                 cannot be provided.
@@ -485,7 +484,7 @@ class AstraDBVectorStore(VectorStore):
                 ``collection_vector_service_options``.
 
         Note:
-            For concurrency in synchronous :meth:``~add_texts``:, as a rule of thumb,
+            For concurrency in synchronous :meth:`~add_texts`:, as a rule of thumb,
             on a typical client machine it is suggested to keep the quantity
             bulk_insert_batch_concurrency * bulk_insert_overwrite_concurrency
             much below 1000 to avoid exhausting the client multithreading/networking
@@ -499,7 +498,7 @@ class AstraDBVectorStore(VectorStore):
             depending on both the machine/network specs and the expected workload
             (specifically, how often a write is an update of an existing id).
             Remember you can pass concurrency settings to individual calls to
-            :meth:``~add_texts`` and :meth:``~add_documents`` as well.
+            :meth:`~add_texts` and :meth:`~add_documents` as well.
         """
         # general collection settings
         self.collection_name = collection_name
@@ -820,7 +819,7 @@ class AstraDBVectorStore(VectorStore):
         """Completely delete the collection from the database.
 
         Completely delete the collection from the database (as opposed
-        to :meth:``~clear``, which empties it only).
+        to :meth:`~clear`, which empties it only).
         Stored data is lost and unrecoverable, resources are freed.
         Use with caution.
         """
@@ -831,7 +830,7 @@ class AstraDBVectorStore(VectorStore):
         """Completely delete the collection from the database.
 
         Completely delete the collection from the database (as opposed
-        to :meth:``~aclear``, which empties it only).
+        to :meth:`~aclear`, which empties it only).
         Stored data is lost and unrecoverable, resources are freed.
         Use with caution.
         """
@@ -935,7 +934,7 @@ class AstraDBVectorStore(VectorStore):
             in the metadata dictionaries, coming from the underlying Astra DB API.
             For instance, the ``$`` (dollar sign) cannot be used in the dict keys.
             See this document for details:
-            https://docs.datastax.com/en/astra/astra-db-vector/api-reference/data-api.html
+            https://docs.datastax.com/en/astra-db-serverless/api-reference/overview.html#limits
 
         Returns:
             The list of ids of the added texts.
@@ -1057,7 +1056,7 @@ class AstraDBVectorStore(VectorStore):
             in the metadata dictionaries, coming from the underlying Astra DB API.
             For instance, the ``$`` (dollar sign) cannot be used in the dict keys.
             See this document for details:
-            https://docs.datastax.com/en/astra/astra-db-vector/api-reference/data-api.html
+            https://docs.datastax.com/en/astra-db-serverless/api-reference/overview.html#limits
 
         Returns:
             The list of ids of the added texts.
@@ -1833,7 +1832,7 @@ class AstraDBVectorStore(VectorStore):
             metadatas: metadata dicts for the texts.
             ids: ids to associate to the texts.
             **kwargs: you can pass any argument that you would
-                to :meth:``~add_texts`` and/or to the
+                to :meth:`~add_texts` and/or to the
                 ``AstraDBVectorStore`` constructor (see these methods for
                 details). These arguments will be
                 routed to the respective methods as they are.
@@ -1878,7 +1877,7 @@ class AstraDBVectorStore(VectorStore):
             metadatas: metadata dicts for the texts.
             ids: ids to associate to the texts.
             **kwargs: you can pass any argument that you would
-                to :meth:``~aadd_texts`` and/or to the ``AstraDBVectorStore``
+                to :meth:`~aadd_texts` and/or to the ``AstraDBVectorStore``
                 constructor (see these methods for details). These arguments
                 will be routed to the respective methods as they are.
 
@@ -1914,10 +1913,17 @@ class AstraDBVectorStore(VectorStore):
     ) -> AstraDBVectorStore:
         """Create an Astra DB vectorstore from a document list.
 
-        Utility method that defers to ``from_texts`` (see that one).
+        Utility method that defers to :meth:`from_texts` (see that one).
 
-        Args: see ``from_texts``, except here you have to supply 'documents'
-            in place of ``texts`` and ``metadatas``.
+        Args:
+            texts: the texts to insert.
+            documents: a list of `Document` objects for insertion in the store.
+            embedding: the embedding function to use in the store.
+            **kwargs: you can pass any argument that you would
+                to :meth:`~add_texts` and/or to the
+                ``AstraDBVectorStore`` constructor (see these methods for
+                details). These arguments will be
+                routed to the respective methods as they are.
 
         Returns:
             an ``AstraDBVectorStore`` vectorstore.
@@ -1940,9 +1946,9 @@ class AstraDBVectorStore(VectorStore):
     ) -> AstraDBVectorStore:
         """Create an Astra DB vectorstore from a document list.
 
-        Utility method that defers to 'afrom_texts' (see that one).
+        Utility method that defers to :meth:`afrom_texts` (see that one).
 
-        Args: see ``afrom_texts``, except here you have to supply ``documents``
+        Args: see :meth:`afrom_texts`, except here you have to supply ``documents``
             in place of ``texts`` and ``metadatas``.
 
         Returns:
