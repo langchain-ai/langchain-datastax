@@ -383,20 +383,20 @@ class AstraDBVectorStore(VectorStore):
         Args:
             embedding: the embeddings function or service to use.
                 This enables client-side embedding functions or calls to external
-                embedding providers. If `embedding` is provided, arguments
-                `collection_vector_service_options` and
-                `collection_embedding_api_key` cannot be provided.
+                embedding providers. If ``embedding`` is provided, arguments
+                ``collection_vector_service_options`` and
+                ``collection_embedding_api_key`` cannot be provided.
             collection_name: name of the Astra DB collection to create/use.
             token: API token for Astra DB usage, either in the form of a string
-                or a subclass of `astrapy.authentication.TokenProvider`.
+                or a subclass of ``astrapy.authentication.TokenProvider``.
                 If not provided, the environment variable
                 ASTRA_DB_APPLICATION_TOKEN is inspected.
             api_endpoint: full URL to the API endpoint, such as
-                `https://<DB-ID>-us-east1.apps.astra.datastax.com`. If not provided,
+                ``https://<DB-ID>-us-east1.apps.astra.datastax.com``. If not provided,
                 the environment variable ASTRA_DB_API_ENDPOINT is inspected.
             environment: a string specifying the environment of the target Data API.
                 If omitted, defaults to "prod" (Astra DB production).
-                Other values are in `astrapy.constants.Environment` enum class.
+                Other values are in ``astrapy.constants.Environment`` enum class.
             astra_db_client:
                 *DEPRECATED starting from version 0.3.5.*
                 *Please use 'token', 'api_endpoint' and optionally 'environment'.*
@@ -436,18 +436,18 @@ class AstraDBVectorStore(VectorStore):
                 (see docs.datastax.com/en/astra/astra-db-vector/api-reference/
                 data-api-commands.html#advanced-feature-indexing-clause-on-createcollection)
             collection_vector_service_options: specifies the use of server-side
-                embeddings within Astra DB. If passing this parameter, `embedding`
+                embeddings within Astra DB. If passing this parameter, ``embedding``
                 cannot be provided.
             collection_embedding_api_key: for usage of server-side embeddings
                 within Astra DB. With this parameter one can supply an API Key
                 that will be passed to Astra DB with each data request.
                 This parameter can be either a string or a subclass of
-                `astrapy.authentication.EmbeddingHeadersProvider`.
+                ``astrapy.authentication.EmbeddingHeadersProvider``.
                 This is useful when the service is configured for the collection,
                 but no corresponding secret is stored within
                 Astra's key management system.
                 This parameter cannot be provided without
-                specifying `collection_vector_service_options`.
+                specifying ``collection_vector_service_options``.
             content_field: name of the field containing the textual content
                 in the documents when saved on Astra DB. For vectorize collections,
                 this cannot be specified; for non-vectorize collection, defaults
@@ -457,36 +457,36 @@ class AstraDBVectorStore(VectorStore):
                 guessed by inspection of a few documents from the collection, under the
                 assumption that the longer strings are the most likely candidates.
                 Please understand the limitations of this method and get some
-                understanding of your data before passing `"*"` for this parameter.
+                understanding of your data before passing ``"*"`` for this parameter.
             ignore_invalid_documents: if False (default), exceptions are raised
                 when a document is found on the Astra DB collectin that does
                 not have the expected shape. If set to True, such results
                 from the database are ignored and a warning is issued. Note
                 that in this case a similarity search may end up returning fewer
-                results than the required `k`.
+                results than the required ``k``.
             autodetect_collection: if True, turns on autodetect behavior.
                 The store will look for an existing collection of the provided name
                 and infer the store settings from it. Default is False.
-                In autodetect mode, `content_field` can be given as "*", meaning
-                that an attempt will be made to determine it by inspection
-                (unless vectorize is enabled, in which case `content_field` is ignored).
+                In autodetect mode, ``content_field`` can be given as ``"*"``, meaning
+                that an attempt will be made to determine it by inspection (unless
+                vectorize is enabled, in which case ``content_field`` is ignored).
                 In autodetect mode, the store not only determines whether embeddings
                 are client- or server-side, but - most importantly - switches
                 automatically between "nested" and "flat" representations of documents
-                on DB (i.e. having the metadata key-value pairs grouped in a `metadata`
-                field or spread at the documents' top-level). The former scheme
-                is the native mode of the AstraDBVectorStore; the store resorts
+                on DB (i.e. having the metadata key-value pairs grouped in a
+                ``metadata`` field or spread at the documents' top-level). The former
+                scheme is the native mode of the AstraDBVectorStore; the store resorts
                 to the latter in case of vector collections populated with external
                 means (such as a third-party data import tool) before applying
                 an AstraDBVectorStore to them.
                 Note that the following parameters cannot be used if this is True:
-                `metric`, `setup_mode`, `metadata_indexing_include`,
-                `metadata_indexing_exclude`, `collection_indexing_policy`,
-                `collection_vector_service_options`.
+                ``metric``, ``setup_mode``, ``metadata_indexing_include``,
+                ``metadata_indexing_exclude``, ``collection_indexing_policy``,
+                ``collection_vector_service_options``.
 
         Note:
-            For concurrency in synchronous :meth:`~add_texts`:, as a rule of thumb, on a
-            typical client machine it is suggested to keep the quantity
+            For concurrency in synchronous :meth:``~add_texts``:, as a rule of thumb,
+            on a typical client machine it is suggested to keep the quantity
             bulk_insert_batch_concurrency * bulk_insert_overwrite_concurrency
             much below 1000 to avoid exhausting the client multithreading/networking
             resources. The hardcoded defaults are somewhat conservative to meet
@@ -499,7 +499,7 @@ class AstraDBVectorStore(VectorStore):
             depending on both the machine/network specs and the expected workload
             (specifically, how often a write is an update of an existing id).
             Remember you can pass concurrency settings to individual calls to
-            :meth:`~add_texts` and :meth:`~add_documents` as well.
+            :meth:``~add_texts`` and :meth:``~add_documents`` as well.
         """
         # general collection settings
         self.collection_name = collection_name
@@ -820,7 +820,7 @@ class AstraDBVectorStore(VectorStore):
         """Completely delete the collection from the database.
 
         Completely delete the collection from the database (as opposed
-        to :meth:`~clear`, which empties it only).
+        to :meth:``~clear``, which empties it only).
         Stored data is lost and unrecoverable, resources are freed.
         Use with caution.
         """
@@ -831,7 +831,7 @@ class AstraDBVectorStore(VectorStore):
         """Completely delete the collection from the database.
 
         Completely delete the collection from the database (as opposed
-        to :meth:`~aclear`, which empties it only).
+        to :meth:``~aclear``, which empties it only).
         Stored data is lost and unrecoverable, resources are freed.
         Use with caution.
         """
@@ -933,7 +933,7 @@ class AstraDBVectorStore(VectorStore):
         Note:
             There are constraints on the allowed field names
             in the metadata dictionaries, coming from the underlying Astra DB API.
-            For instance, the `$` (dollar sign) cannot be used in the dict keys.
+            For instance, the ``$`` (dollar sign) cannot be used in the dict keys.
             See this document for details:
             https://docs.datastax.com/en/astra/astra-db-vector/api-reference/data-api.html
 
@@ -1055,7 +1055,7 @@ class AstraDBVectorStore(VectorStore):
         Note:
             There are constraints on the allowed field names
             in the metadata dictionaries, coming from the underlying Astra DB API.
-            For instance, the `$` (dollar sign) cannot be used in the dict keys.
+            For instance, the ``$`` (dollar sign) cannot be used in the dict keys.
             See this document for details:
             https://docs.datastax.com/en/astra/astra-db-vector/api-reference/data-api.html
 
@@ -1833,12 +1833,13 @@ class AstraDBVectorStore(VectorStore):
             metadatas: metadata dicts for the texts.
             ids: ids to associate to the texts.
             **kwargs: you can pass any argument that you would
-                to :meth:`~add_texts` and/or to the 'AstraDBVectorStore' constructor
-                (see these methods for details). These arguments will be
+                to :meth:``~add_texts`` and/or to the
+                ``AstraDBVectorStore`` constructor (see these methods for
+                details). These arguments will be
                 routed to the respective methods as they are.
 
         Returns:
-            an `AstraDBVectorStore` vectorstore.
+            an ``AstraDBVectorStore`` vectorstore.
         """
         _add_texts_inspection = inspect.getfullargspec(AstraDBVectorStore.add_texts)
         _method_args = (
@@ -1877,12 +1878,12 @@ class AstraDBVectorStore(VectorStore):
             metadatas: metadata dicts for the texts.
             ids: ids to associate to the texts.
             **kwargs: you can pass any argument that you would
-                to :meth:`~aadd_texts` and/or to the 'AstraDBVectorStore' constructor
-                (see these methods for details). These arguments will be
-                routed to the respective methods as they are.
+                to :meth:``~aadd_texts`` and/or to the ``AstraDBVectorStore``
+                constructor (see these methods for details). These arguments
+                will be routed to the respective methods as they are.
 
         Returns:
-            an `AstraDBVectorStore` vectorstore.
+            an ``AstraDBVectorStore`` vectorstore.
         """
         _aadd_texts_inspection = inspect.getfullargspec(AstraDBVectorStore.aadd_texts)
         _method_args = (
@@ -1913,13 +1914,13 @@ class AstraDBVectorStore(VectorStore):
     ) -> AstraDBVectorStore:
         """Create an Astra DB vectorstore from a document list.
 
-        Utility method that defers to 'from_texts' (see that one).
+        Utility method that defers to ``from_texts`` (see that one).
 
-        Args: see 'from_texts', except here you have to supply 'documents'
-            in place of 'texts' and 'metadatas'.
+        Args: see ``from_texts``, except here you have to supply 'documents'
+            in place of ``texts`` and ``metadatas``.
 
         Returns:
-            an `AstraDBVectorStore` vectorstore.
+            an ``AstraDBVectorStore`` vectorstore.
         """
         texts = [d.page_content for d in documents]
         metadatas = [d.metadata for d in documents]
@@ -1941,11 +1942,11 @@ class AstraDBVectorStore(VectorStore):
 
         Utility method that defers to 'afrom_texts' (see that one).
 
-        Args: see 'afrom_texts', except here you have to supply 'documents'
-            in place of 'texts' and 'metadatas'.
+        Args: see ``afrom_texts``, except here you have to supply ``documents``
+            in place of ``texts`` and ``metadatas``.
 
         Returns:
-            an `AstraDBVectorStore` vectorstore.
+            an ``AstraDBVectorStore`` vectorstore.
         """
         texts = [d.page_content for d in documents]
         metadatas = [d.metadata for d in documents]
