@@ -1,6 +1,7 @@
 """Astra DB graph vector store integration."""
 
-# ruff: noqa: SLF001 C901
+# Leave TODO's alone
+# ruff: noqa: FIX002 TD002 TD003
 
 from __future__ import annotations
 
@@ -18,10 +19,10 @@ from langchain_core.graph_vectorstores.base import (
     GraphVectorStore,
     Node,
 )
+from langchain_astradb.utils.mmr_traversal import MmrHelper
 from typing_extensions import override
 
 from langchain_astradb import AstraDBVectorStore
-from langchain_astradb._mmr_helper import MmrHelper
 
 if TYPE_CHECKING:
     from langchain_core.embeddings import Embeddings
@@ -54,6 +55,7 @@ class AstraDBGraphVectorStore(GraphVectorStore):
         metadata_indexing_include: Iterable[str] | None = None,
         metadata_indexing_exclude: Iterable[str] | None = None,
         collection_indexing_policy: dict[str, Any] | None = None,
+        **kwargs: Any,
     ):
         """Create a new Graph Vector Store backed by AstraDB."""
         self.link_to_metadata_key = link_to_metadata_key
@@ -68,6 +70,7 @@ class AstraDBGraphVectorStore(GraphVectorStore):
             metadata_indexing_include=metadata_indexing_include,
             metadata_indexing_exclude=metadata_indexing_exclude,
             collection_indexing_policy=collection_indexing_policy,
+            **kwargs,
         )
 
         self.astra_env = self.vectorstore.astra_env
@@ -77,10 +80,11 @@ class AstraDBGraphVectorStore(GraphVectorStore):
     def embeddings(self) -> Embeddings | None:
         return self.embedding
 
+    @override
     def add_nodes(
         self,
         nodes: Iterable[Node],
-        **kwargs: Any, # noqa: ARG002
+        **kwargs: Any,
     ) -> Iterable[str]:
         """Add nodes to the graph store."""
         docs = []
@@ -141,6 +145,7 @@ class AstraDBGraphVectorStore(GraphVectorStore):
         store.add_documents(documents, ids=ids)
         return store
 
+    @override
     def similarity_search(
         self,
         query: str,
@@ -148,9 +153,9 @@ class AstraDBGraphVectorStore(GraphVectorStore):
         metadata_filter: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> list[Document]:
-        """Return docs most similar to query."""
         return self.vectorstore.similarity_search(query, k, metadata_filter, **kwargs)
 
+    @override
     def similarity_search_by_vector(
         self,
         embedding: list[float],
@@ -158,12 +163,12 @@ class AstraDBGraphVectorStore(GraphVectorStore):
         metadata_filter: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> list[Document]:
-        """Return docs most similar to embedding vector."""
         return self.vectorstore.similarity_search_by_vector(
             embedding, k, metadata_filter, **kwargs
         )
 
-    def traversal_search(
+    @override
+    def traversal_search( # noqa: C901
         self,
         query: str,
         *,
@@ -173,7 +178,7 @@ class AstraDBGraphVectorStore(GraphVectorStore):
         metadata_filter: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> Iterable[Document]:
-        """Retrieve documents from traversing this graph store."""
+
         # Map from visited ID to depth
         visited_ids: dict[str, int] = {}
         visited_docs: list[Document] = []
@@ -249,7 +254,38 @@ class AstraDBGraphVectorStore(GraphVectorStore):
 
         return visited_docs
 
-    def mmr_traversal_search(
+    def _filter_to_metadata(self, filter_dict: dict[str, Any] | None) -> dict[str, Any]:
+        if filter_dict is None:
+            return {}
+
+        return self.document_encoder.encode_filter(filter_dict)
+
+    def _get_outgoing_tags(
+        self,
+        source_ids: Iterable[str],
+    ) -> set[tuple[str, str]]:
+        """Return the set of outgoing tags for the given source ID(s).
+
+        Args:
+            source_ids: The IDs of the source nodes to retrieve outgoing tags for.
+        """
+        tags = set()
+
+        for source_id in source_ids:
+                hits = list(self.astra_env.collection.find(
+                    filter={f"metadata.{self.content_id_key}": source_id},
+                    projection={
+                        "metadata": True,
+                    },
+                ))
+
+                for hit in hits:
+                    tags.update(hit["metadata"].get(self.link_to_metadata_key, []))
+
+        return tags
+
+    @override
+    def mmr_traversal_search( # noqa: C901
         self,
         query: str,
         *,
@@ -261,8 +297,8 @@ class AstraDBGraphVectorStore(GraphVectorStore):
         lambda_mult: float = 0.5,
         score_threshold: float = float("-inf"),
         metadata_filter: dict[str, Any] | None = None,
+        **kwargs: Any,
     ) -> Iterable[Document]:
-        """Retrieve documents from this graph store using MMR-traversal."""
         query_embedding = self.embedding.embed_query(query)
         helper = MmrHelper(
             k=k,
@@ -279,9 +315,9 @@ class AstraDBGraphVectorStore(GraphVectorStore):
         def get_adjacent(tags: set[str]) -> Iterable[_Edge]:
             targets: dict[str, _Edge] = {}
 
-            # NOTE: Would be better parralelized
+            # TODO: Would be better parralelized
             for tag in tags:
-                metadata_parameter = self.vectorstore._filter_to_metadata(
+                metadata_parameter = self._filter_to_metadata(
                     metadata_filter
                 )
                 metadata_parameter[f"metadata.{self.link_from_metadata_key}"] = tag
@@ -318,6 +354,8 @@ class AstraDBGraphVectorStore(GraphVectorStore):
                             ),
                         )
 
+            # TODO: Consider a combined limit based on the similarity and/or
+            # predicated MMR score?
             return targets.values()
 
         def fetch_neighborhood(neighborhood: Sequence[str]) -> None:
@@ -346,7 +384,7 @@ class AstraDBGraphVectorStore(GraphVectorStore):
             helper.add_candidates(new_candidates)
 
         def fetch_initial_candidates() -> None:
-            metadata_parameter = self.vectorstore._filter_to_metadata(metadata_filter)
+            metadata_parameter = self._filter_to_metadata(metadata_filter)
             hits = list(
                 self.astra_env.collection.find(
                     filter=metadata_parameter,
@@ -395,7 +433,7 @@ class AstraDBGraphVectorStore(GraphVectorStore):
                 # If the next nodes would not exceed the depth limit, find the
                 # adjacent nodes.
                 #
-                # NOTE: For a big performance win, we should track which tags we've
+                # TODO: For a big performance win, we should track which tags we've
                 # already incorporated. We don't need to issue adjacent queries for
                 # those.
 

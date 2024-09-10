@@ -1,3 +1,5 @@
+"""Tools for the Graph Traversal Maximal Marginal Relevance (MMR) reranking."""
+
 # ruff: noqa: EM101 TRY003
 
 from __future__ import annotations
@@ -7,7 +9,7 @@ from typing import TYPE_CHECKING, Iterable
 
 import numpy as np
 
-from langchain_astradb._math import cosine_similarity
+from langchain_astradb.utils.mmr import cosine_similarity
 
 if TYPE_CHECKING:
     from langchain_core.documents import Document
@@ -97,6 +99,7 @@ class MmrHelper:
         lambda_mult: float = 0.5,
         score_threshold: float = NEG_INF,
     ) -> None:
+        """Create a new Traversal MMR helper."""
         self.query_embedding = _emb_to_ndarray(query_embedding)
         self.dimensions = self.query_embedding.shape[1]
 
@@ -137,7 +140,7 @@ class MmrHelper:
         """
         # Get the embedding for the id.
         index = self.candidate_id_to_index.pop(candidate_id)
-        if not self.candidates[index].id == candidate_id:
+        if self.candidates[index].id != candidate_id:
             raise ValueError(
                 "ID in self.candidate_id_to_index doesn't match the ID of the "
                 "corresponding index in self.candidates"
