@@ -78,7 +78,10 @@ class TestAstraDB:
                 limit=22,
                 filter_criteria={"foo": "bar"},
             )
-            assert len(rec_warnings) == 1
+            f_rec_warnings = [
+                wrn for wrn in rec_warnings if issubclass(wrn.category, UserWarning)
+            ]
+            assert len(f_rec_warnings) == 1
 
         docs = loader.load()
         assert len(docs) == 22
@@ -174,9 +177,7 @@ class TestAstraDB:
             )
             # cleaning out 'spurious' "unclosed socket/transport..." warnings
             f_rec_warnings = [
-                wrn
-                for wrn in rec_warnings
-                if not issubclass(wrn.category, ResourceWarning)
+                wrn for wrn in rec_warnings if issubclass(wrn.category, UserWarning)
             ]
             assert len(f_rec_warnings) == 1
 
@@ -276,7 +277,10 @@ class TestAstraDB:
                 astra_db_client=core_astra_db,
                 limit=1,
             )
-        assert len(rec_warnings) == 1
+        f_rec_warnings = [
+            wrn for wrn in rec_warnings if issubclass(wrn.category, DeprecationWarning)
+        ]
+        assert len(f_rec_warnings) == 1
         assert loader_init_core.load() == docs
 
     def test_astradb_loader_findoptions_deprecation(
@@ -304,7 +308,10 @@ class TestAstraDB:
                 environment=astra_db_credentials["environment"],
                 find_options={"limit": 1},
             )
-        assert len(rec_warnings) == 1
+        f_rec_warnings = [
+            wrn for wrn in rec_warnings if issubclass(wrn.category, DeprecationWarning)
+        ]
+        assert len(f_rec_warnings) == 1
         assert loader_lo.load() == docs0
 
         with pytest.raises(ValueError, match="Duplicate 'limit' directive supplied."):
@@ -328,5 +335,8 @@ class TestAstraDB:
                 find_options={"planets": 8, "spiders": 40000},
                 limit=1,
             )
-        assert len(rec_warnings) == 1
+        f_rec_warnings = [
+            wrn for wrn in rec_warnings if issubclass(wrn.category, DeprecationWarning)
+        ]
+        assert len(f_rec_warnings) == 1
         assert loader_uo.load() == docs0

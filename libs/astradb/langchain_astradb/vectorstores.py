@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+import logging
 import uuid
 import warnings
 from concurrent.futures import ThreadPoolExecutor
@@ -31,13 +32,17 @@ from langchain_astradb.utils.astradb import (
     MAX_CONCURRENT_DOCUMENT_REPLACEMENTS,
     SetupMode,
     _AstraDBCollectionEnvironment,
-)
-from langchain_astradb.utils.encoders import (
-    _AstraDBVectorStoreDocumentEncoder,
-    _DefaultVectorizeVSDocumentEncoder,
-    _DefaultVSDocumentEncoder,
+    _survey_collection,
 )
 from langchain_astradb.utils.mmr import maximal_marginal_relevance
+from langchain_astradb.utils.vector_store_autodetect import (
+    _detect_document_codec,
+)
+from langchain_astradb.utils.vector_store_codecs import (
+    _AstraDBVectorStoreDocumentCodec,
+    _DefaultVectorizeVSDocumentCodec,
+    _DefaultVSDocumentCodec,
+)
 
 if TYPE_CHECKING:
     from astrapy.authentication import EmbeddingHeadersProvider, TokenProvider
@@ -59,6 +64,8 @@ DocDict = Dict[str, Any]  # dicts expressing entries to insert
 # indexing options when creating a collection
 DEFAULT_INDEXING_OPTIONS = {"allow": ["metadata"]}
 
+logger = logging.getLogger(__name__)
+
 
 def _unique_list(lst: list[T], key: Callable[[T], U]) -> list[T]:
     visited_keys: set[U] = set()
@@ -71,11 +78,77 @@ def _unique_list(lst: list[T], key: Callable[[T], U]) -> list[T]:
     return new_lst
 
 
+def _normalize_content_field(
+    content_field: str | None,
+    *,
+    is_autodetect: bool,
+    has_vectorize: bool,
+) -> str:
+    if has_vectorize:
+        if content_field is not None:
+            msg = "content_field is not configurable for vectorize collections."
+            raise ValueError(msg)
+        return "$vectorize"
+
+    if content_field is None:
+        return "*" if is_autodetect else "content"
+
+    if content_field == "*":
+        if not is_autodetect:
+            msg = "content_field='*' illegal if autodetect_collection is False."
+            raise ValueError(msg)
+        return content_field
+
+    return content_field
+
+
+def _validate_autodetect_init_params(
+    *,
+    metric: str | None = None,
+    setup_mode: SetupMode | None,
+    pre_delete_collection: bool,
+    metadata_indexing_include: Iterable[str] | None,
+    metadata_indexing_exclude: Iterable[str] | None,
+    collection_indexing_policy: dict[str, Any] | None,
+    collection_vector_service_options: CollectionVectorServiceOptions | None,
+) -> None:
+    """Check that the passed parameters do not violate the autodetect constraints."""
+    forbidden_parameters = [
+        p_name
+        for p_name, p_value in (
+            ("metric", metric),
+            ("metadata_indexing_include", metadata_indexing_include),
+            ("metadata_indexing_exclude", metadata_indexing_exclude),
+            ("collection_indexing_policy", collection_indexing_policy),
+            ("collection_vector_service_options", collection_vector_service_options),
+        )
+        if p_value is not None
+    ]
+    fp_error: str | None = None
+    if forbidden_parameters:
+        fp_error = (
+            f"Parameter(s) {', '.join(forbidden_parameters)}. were provided "
+            "but cannot be passed."
+        )
+    pd_error: str | None = None
+    if pre_delete_collection:
+        pd_error = "Parameter `pre_delete_collection` cannot be True."
+    sm_error: str | None = None
+    if setup_mode is not None:
+        sm_error = "Parameter `setup_mode` not allowed."
+    am_errors = [err_s for err_s in (fp_error, pd_error, sm_error) if err_s is not None]
+    if am_errors:
+        msg = f"Invalid parameters for autodetect mode: {'; '.join(am_errors)}"
+        raise ValueError(msg)
+
+
 class AstraDBVectorStore(VectorStore):
     """AstraDB vector store integration.
 
     Setup:
-        Install ``langchain-astradb`` and head to the [AstraDB website](https://astra.datastax.com), create an account, create a new database and [create an application token](https://docs.datastax.com/en/astra-db-serverless/administration/manage-application-tokens.html#generate-application-token).
+        Install the ``langchain-astradb`` package and head to the
+        `AstraDB website <https://astra.datastax.com>`, create an account, create a
+        new database and `create an application token <https://docs.datastax.com/en/astra-db-serverless/administration/manage-application-tokens.html>`.
 
         .. code-block:: bash
 
@@ -95,7 +168,6 @@ class AstraDBVectorStore(VectorStore):
         namespace: Optional[str]
             Namespace (aka keyspace) where the collection is created
 
-    # TODO: Replace with relevant init params.
     Instantiate:
 
         Get your API endpoint and application token from the dashboard of your database.
@@ -116,7 +188,26 @@ class AstraDBVectorStore(VectorStore):
                 token=ASTRA_DB_APPLICATION_TOKEN,
             )
 
+        Have the vector store figure out its configuration (documents scheme on DB)
+        from an existing collection, in the case of `server-side-embeddings <https://docs.datastax.com/en/astra-db-serverless/databases/embedding-generation.html>`:
+
+        .. code-block:: python
+
+            import getpass
+            from langchain_astradb import AstraDBVectorStore
+
+            ASTRA_DB_API_ENDPOINT = getpass.getpass("ASTRA_DB_API_ENDPOINT = ")
+            ASTRA_DB_APPLICATION_TOKEN = getpass.getpass("ASTRA_DB_APPLICATION_TOKEN = ")
+
+            vector_store = AstraDBVectorStore(
+                collection_name="astra_vector_langchain",
+                api_endpoint=ASTRA_DB_API_ENDPOINT,
+                token=ASTRA_DB_APPLICATION_TOKEN,
+                autodetect_collection=True,
+            )
+
     Add Documents:
+
         .. code-block:: python
 
             from langchain_core.documents import Document
@@ -130,65 +221,71 @@ class AstraDBVectorStore(VectorStore):
             vector_store.add_documents(documents=documents, ids=ids)
 
     Delete Documents:
+
         .. code-block:: python
 
             vector_store.delete(ids=["3"])
 
     Search:
+
         .. code-block:: python
 
             results = vector_store.similarity_search(query="thud",k=1)
             for doc in results:
                 print(f"* {doc.page_content} [{doc.metadata}]")
 
-        .. code-block:: python
+        .. code-block:: none
 
-            * thud [{'bar': 'baz'}]
+            thud [{'bar': 'baz'}]
 
     Search with filter:
+
         .. code-block:: python
 
             results = vector_store.similarity_search(query="thud",k=1,filter={"bar": "baz"})
             for doc in results:
                 print(f"* {doc.page_content} [{doc.metadata}]")
 
-        .. code-block:: python
+        .. code-block:: none
 
-            * thud [{'bar': 'baz'}]
+            thud [{'bar': 'baz'}]
 
     Search with score:
+
         .. code-block:: python
 
             results = vector_store.similarity_search_with_score(query="qux",k=1)
             for doc, score in results:
                 print(f"* [SIM={score:3f}] {doc.page_content} [{doc.metadata}]")
 
-        .. code-block:: python
+        .. code-block:: none
 
-            * [SIM=0.916135] foo [{'baz': 'bar'}]
+            [SIM=0.916135] foo [{'baz': 'bar'}]
 
     Async:
+
         .. code-block:: python
 
             # add documents
-            # await vector_store.aadd_documents(documents=documents, ids=ids)
+            await vector_store.aadd_documents(documents=documents, ids=ids)
 
             # delete documents
-            # await vector_store.adelete(ids=["3"])
+            await vector_store.adelete(ids=["3"])
 
             # search
-            # results = vector_store.asimilarity_search(query="thud",k=1)
+            results = vector_store.asimilarity_search(query="thud",k=1)
 
             # search with score
             results = await vector_store.asimilarity_search_with_score(query="qux",k=1)
             for doc,score in results:
                 print(f"* [SIM={score:3f}] {doc.page_content} [{doc.metadata}]")
 
-        .. code-block:: python
+        .. code-block:: none
 
-            * [SIM=0.916135] foo [{'baz': 'bar'}]
+            [SIM=0.916135] foo [{'baz': 'bar'}]
 
     Use as Retriever:
+
         .. code-block:: python
 
             retriever = vector_store.as_retriever(
@@ -197,7 +294,7 @@ class AstraDBVectorStore(VectorStore):
             )
             retriever.invoke("thud")
 
-        .. code-block:: python
+        .. code-block:: none
 
             [Document(metadata={'bar': 'baz'}, page_content='thud')]
 
@@ -207,7 +304,7 @@ class AstraDBVectorStore(VectorStore):
         if filter_dict is None:
             return {}
 
-        return self.document_encoder.encode_filter(filter_dict)
+        return self.document_codec.encode_filter(filter_dict)
 
     @staticmethod
     def _normalize_metadata_indexing_policy(
@@ -267,36 +364,39 @@ class AstraDBVectorStore(VectorStore):
         bulk_insert_batch_concurrency: int | None = None,
         bulk_insert_overwrite_concurrency: int | None = None,
         bulk_delete_concurrency: int | None = None,
-        setup_mode: SetupMode = SetupMode.SYNC,
+        setup_mode: SetupMode | None = None,
         pre_delete_collection: bool = False,
         metadata_indexing_include: Iterable[str] | None = None,
         metadata_indexing_exclude: Iterable[str] | None = None,
         collection_indexing_policy: dict[str, Any] | None = None,
         collection_vector_service_options: CollectionVectorServiceOptions | None = None,
         collection_embedding_api_key: str | EmbeddingHeadersProvider | None = None,
+        content_field: str | None = None,
+        ignore_invalid_documents: bool = False,
+        autodetect_collection: bool = False,
     ) -> None:
         """Wrapper around DataStax Astra DB for vector-store workloads.
 
         For quickstart and details, visit
-        https://docs.datastax.com/en/astra/astra-db-vector/
+        https://docs.datastax.com/en/astra-db-serverless/index.html
 
         Args:
             embedding: the embeddings function or service to use.
                 This enables client-side embedding functions or calls to external
-                embedding providers. If `embedding` is provided, arguments
-                `collection_vector_service_options` and
-                `collection_embedding_api_key` cannot be provided.
+                embedding providers. If ``embedding`` is provided, arguments
+                ``collection_vector_service_options`` and
+                ``collection_embedding_api_key`` cannot be provided.
             collection_name: name of the Astra DB collection to create/use.
             token: API token for Astra DB usage, either in the form of a string
-                or a subclass of `astrapy.authentication.TokenProvider`.
+                or a subclass of ``astrapy.authentication.TokenProvider``.
                 If not provided, the environment variable
                 ASTRA_DB_APPLICATION_TOKEN is inspected.
             api_endpoint: full URL to the API endpoint, such as
-                `https://<DB-ID>-us-east1.apps.astra.datastax.com`. If not provided,
+                ``https://<DB-ID>-us-east1.apps.astra.datastax.com``. If not provided,
                 the environment variable ASTRA_DB_API_ENDPOINT is inspected.
             environment: a string specifying the environment of the target Data API.
                 If omitted, defaults to "prod" (Astra DB production).
-                Other values are in `astrapy.constants.Environment` enum class.
+                Other values are in ``astrapy.constants.Environment`` enum class.
             astra_db_client:
                 *DEPRECATED starting from version 0.3.5.*
                 *Please use 'token', 'api_endpoint' and optionally 'environment'.*
@@ -333,25 +433,59 @@ class AstraDBVectorStore(VectorStore):
             collection_indexing_policy: a full "indexing" specification for
                 what fields should be indexed for later filtering in searches.
                 This dict must conform to to the API specifications
-                (see docs.datastax.com/en/astra/astra-db-vector/api-reference/
-                data-api-commands.html#advanced-feature-indexing-clause-on-createcollection)
+                (see https://docs.datastax.com/en/astra-db-serverless/api-reference/collections.html#the-indexing-option)
             collection_vector_service_options: specifies the use of server-side
-                embeddings within Astra DB. If passing this parameter, `embedding`
+                embeddings within Astra DB. If passing this parameter, ``embedding``
                 cannot be provided.
             collection_embedding_api_key: for usage of server-side embeddings
                 within Astra DB. With this parameter one can supply an API Key
                 that will be passed to Astra DB with each data request.
                 This parameter can be either a string or a subclass of
-                `astrapy.authentication.EmbeddingHeadersProvider`.
+                ``astrapy.authentication.EmbeddingHeadersProvider``.
                 This is useful when the service is configured for the collection,
                 but no corresponding secret is stored within
                 Astra's key management system.
                 This parameter cannot be provided without
-                specifying `collection_vector_service_options`.
+                specifying ``collection_vector_service_options``.
+            content_field: name of the field containing the textual content
+                in the documents when saved on Astra DB. For vectorize collections,
+                this cannot be specified; for non-vectorize collection, defaults
+                to "content".
+                The special value "*" can be passed only if autodetect_collection=True.
+                In this case, the actual name of the key for the textual content is
+                guessed by inspection of a few documents from the collection, under the
+                assumption that the longer strings are the most likely candidates.
+                Please understand the limitations of this method and get some
+                understanding of your data before passing ``"*"`` for this parameter.
+            ignore_invalid_documents: if False (default), exceptions are raised
+                when a document is found on the Astra DB collectin that does
+                not have the expected shape. If set to True, such results
+                from the database are ignored and a warning is issued. Note
+                that in this case a similarity search may end up returning fewer
+                results than the required ``k``.
+            autodetect_collection: if True, turns on autodetect behavior.
+                The store will look for an existing collection of the provided name
+                and infer the store settings from it. Default is False.
+                In autodetect mode, ``content_field`` can be given as ``"*"``, meaning
+                that an attempt will be made to determine it by inspection (unless
+                vectorize is enabled, in which case ``content_field`` is ignored).
+                In autodetect mode, the store not only determines whether embeddings
+                are client- or server-side, but - most importantly - switches
+                automatically between "nested" and "flat" representations of documents
+                on DB (i.e. having the metadata key-value pairs grouped in a
+                ``metadata`` field or spread at the documents' top-level). The former
+                scheme is the native mode of the AstraDBVectorStore; the store resorts
+                to the latter in case of vector collections populated with external
+                means (such as a third-party data import tool) before applying
+                an AstraDBVectorStore to them.
+                Note that the following parameters cannot be used if this is True:
+                ``metric``, ``setup_mode``, ``metadata_indexing_include``,
+                ``metadata_indexing_exclude``, ``collection_indexing_policy``,
+                ``collection_vector_service_options``.
 
         Note:
-            For concurrency in synchronous :meth:`~add_texts`:, as a rule of thumb, on a
-            typical client machine it is suggested to keep the quantity
+            For concurrency in synchronous :meth:`~add_texts`:, as a rule of thumb,
+            on a typical client machine it is suggested to keep the quantity
             bulk_insert_batch_concurrency * bulk_insert_overwrite_concurrency
             much below 1000 to avoid exhausting the client multithreading/networking
             resources. The hardcoded defaults are somewhat conservative to meet
@@ -366,47 +500,23 @@ class AstraDBVectorStore(VectorStore):
             Remember you can pass concurrency settings to individual calls to
             :meth:`~add_texts` and :meth:`~add_documents` as well.
         """
-        # Embedding and the server-side embeddings are mutually exclusive,
-        # as both specify how to produce embeddings
-        if embedding is None and collection_vector_service_options is None:
-            msg = (
-                "Either an `embedding` or a `collection_vector_service_options` "
-                "must be provided."
-            )
-            raise ValueError(msg)
-
-        if embedding is not None and collection_vector_service_options is not None:
-            msg = (
-                "Only one of `embedding` or `collection_vector_service_options` "
-                "can be provided."
-            )
-            raise ValueError(msg)
-
-        if (
-            collection_vector_service_options is None
-            and collection_embedding_api_key is not None
-        ):
-            msg = (
-                "`collection_embedding_api_key` cannot be provided unless"
-                " `collection_vector_service_options` is also passed."
-            )
-            raise ValueError(msg)
-
-        self.embedding_dimension: int | None = None
-        self.embedding = embedding
+        # general collection settings
         self.collection_name = collection_name
         self.token = token
         self.api_endpoint = api_endpoint
         self.environment = environment
         self.namespace = namespace
-        self.collection_vector_service_options = collection_vector_service_options
-        self.document_encoder: _AstraDBVectorStoreDocumentEncoder
-        if self.collection_vector_service_options is not None:
-            self.document_encoder = _DefaultVectorizeVSDocumentEncoder()
-        else:
-            self.document_encoder = _DefaultVSDocumentEncoder()
+        self.indexing_policy: dict[str, Any]
+        self.autodetect_collection = autodetect_collection
+        # vector-related settings
+        self.embedding_dimension: int | None = None
+        self.embedding = embedding
+        self.metric = metric
         self.collection_embedding_api_key = collection_embedding_api_key
-        # Concurrency settings
+        self.collection_vector_service_options = collection_vector_service_options
+        # DB-encoding settings:
+        self.document_codec: _AstraDBVectorStoreDocumentCodec
+        # concurrency settings
         self.batch_size: int | None = batch_size or DEFAULT_DOCUMENT_CHUNK_SIZE
         self.bulk_insert_batch_concurrency: int = (
             bulk_insert_batch_concurrency or MAX_CONCURRENT_DOCUMENT_INSERTIONS
@@ -417,21 +527,111 @@ class AstraDBVectorStore(VectorStore):
         self.bulk_delete_concurrency: int = (
             bulk_delete_concurrency or MAX_CONCURRENT_DOCUMENT_DELETIONS
         )
-        # "vector-related" settings
-        self.metric = metric
-        embedding_dimension_m: int | Awaitable[int] | None = None
-        if self.embedding is not None:
-            if setup_mode == SetupMode.ASYNC:
-                embedding_dimension_m = self._aget_embedding_dimension()
-            elif setup_mode in (SetupMode.SYNC, SetupMode.OFF):
-                embedding_dimension_m = self._get_embedding_dimension()
 
-        # indexing policy setting
-        self.indexing_policy: dict[str, Any] = self._normalize_metadata_indexing_policy(
-            metadata_indexing_include=metadata_indexing_include,
-            metadata_indexing_exclude=metadata_indexing_exclude,
-            collection_indexing_policy=collection_indexing_policy,
-        )
+        _setup_mode: SetupMode
+        _embedding_dimension: int | Awaitable[int] | None
+
+        if not self.autodetect_collection:
+            logger.info(
+                "vector store default init, collection '%s'", self.collection_name
+            )
+            _setup_mode = SetupMode.SYNC if setup_mode is None else setup_mode
+            _embedding_dimension = self._prepare_embedding_dimension(_setup_mode)
+            # determine vectorize/nonvectorize
+            has_vectorize = self.collection_vector_service_options is not None
+            _content_field = _normalize_content_field(
+                content_field,
+                is_autodetect=False,
+                has_vectorize=has_vectorize,
+            )
+
+            if self.collection_vector_service_options is not None:
+                self.document_codec = _DefaultVectorizeVSDocumentCodec(
+                    ignore_invalid_documents=ignore_invalid_documents,
+                )
+            else:
+                self.document_codec = _DefaultVSDocumentCodec(
+                    content_field=_content_field,
+                    ignore_invalid_documents=ignore_invalid_documents,
+                )
+            # indexing policy setting
+            self.indexing_policy = self._normalize_metadata_indexing_policy(
+                metadata_indexing_include=metadata_indexing_include,
+                metadata_indexing_exclude=metadata_indexing_exclude,
+                collection_indexing_policy=collection_indexing_policy,
+            )
+        else:
+            logger.info(
+                "vector store autodetect init, collection '%s'", self.collection_name
+            )
+            # specific checks for autodetect logic
+            _validate_autodetect_init_params(
+                metric=self.metric,
+                setup_mode=setup_mode,
+                pre_delete_collection=pre_delete_collection,
+                metadata_indexing_include=metadata_indexing_include,
+                metadata_indexing_exclude=metadata_indexing_exclude,
+                collection_indexing_policy=collection_indexing_policy,
+                collection_vector_service_options=self.collection_vector_service_options,
+            )
+            _setup_mode = SetupMode.OFF
+
+            # fetch collection intelligence
+            c_descriptor, c_documents = _survey_collection(
+                collection_name=self.collection_name,
+                token=self.token,
+                api_endpoint=self.api_endpoint,
+                environment=self.environment,
+                astra_db_client=astra_db_client,
+                async_astra_db_client=async_astra_db_client,
+                namespace=self.namespace,
+            )
+            if c_descriptor is None:
+                msg = f"Collection '{self.collection_name}' not found."
+                raise ValueError(msg)
+            # use the collection info to set the store properties
+            self.indexing_policy = self._normalize_metadata_indexing_policy(
+                metadata_indexing_include=None,
+                metadata_indexing_exclude=None,
+                collection_indexing_policy=c_descriptor.options.indexing,
+            )
+            if c_descriptor.options.vector is None:
+                msg = "Non-vector collection detected."
+                raise ValueError(msg)
+            _embedding_dimension = c_descriptor.options.vector.dimension
+            self.collection_vector_service_options = c_descriptor.options.vector.service
+            has_vectorize = self.collection_vector_service_options is not None
+            logger.info("vector store autodetect: has_vectorize = %s", has_vectorize)
+            norm_content_field = _normalize_content_field(
+                content_field,
+                is_autodetect=True,
+                has_vectorize=has_vectorize,
+            )
+            self.document_codec = _detect_document_codec(
+                c_documents,
+                has_vectorize=has_vectorize,
+                ignore_invalid_documents=ignore_invalid_documents,
+                norm_content_field=norm_content_field,
+            )
+
+        # validate embedding/vectorize compatibility and such.
+        # Embedding and the server-side embeddings are mutually exclusive,
+        # as both specify how to produce embeddings.
+        # Also API key makes no sense unless vectorize.
+        if self.embedding is None and not self.document_codec.server_side_embeddings:
+            msg = "Embedding is required for non-vectorize collections."
+            raise ValueError(msg)
+
+        if self.embedding is not None and self.document_codec.server_side_embeddings:
+            msg = "Embedding cannot be provided for vectorize collections."
+            raise ValueError(msg)
+
+        if (
+            not self.document_codec.server_side_embeddings
+            and self.collection_embedding_api_key is not None
+        ):
+            msg = "Embedding API Key cannot be provided for non-vectorize collections."
+            raise ValueError(msg)
 
         self.astra_env = _AstraDBCollectionEnvironment(
             collection_name=collection_name,
@@ -441,9 +641,9 @@ class AstraDBVectorStore(VectorStore):
             astra_db_client=astra_db_client,
             async_astra_db_client=async_astra_db_client,
             namespace=self.namespace,
-            setup_mode=setup_mode,
+            setup_mode=_setup_mode,
             pre_delete_collection=pre_delete_collection,
-            embedding_dimension=embedding_dimension_m,
+            embedding_dimension=_embedding_dimension,
             metric=self.metric,
             requested_indexing_policy=self.indexing_policy,
             default_indexing_policy=DEFAULT_INDEXING_OPTIONS,
@@ -457,19 +657,28 @@ class AstraDBVectorStore(VectorStore):
             raise ValueError(msg)
         return self.embedding
 
-    def _get_embedding_dimension(self) -> int:
+    def _prepare_embedding_dimension(
+        self, setup_mode: SetupMode
+    ) -> int | Awaitable[int] | None:
+        """Return the right kind of object for the astra_env to use."""
+        if self.embedding is None:
+            return None
+        if setup_mode == SetupMode.ASYNC:
+            # in this case, we wrap the computation as an awaitable
+            async def _aget_embedding_dimension() -> int:
+                if self.embedding_dimension is None:
+                    self.embedding_dimension = len(
+                        await self._get_safe_embedding().aembed_query(
+                            text="This is a sample sentence."
+                        )
+                    )
+                return self.embedding_dimension
+
+            return _aget_embedding_dimension()
+        # case of setup_mode = SetupMode.SYNC, SetupMode.OFF
         if self.embedding_dimension is None:
             self.embedding_dimension = len(
                 self._get_safe_embedding().embed_query(
-                    text="This is a sample sentence."
-                )
-            )
-        return self.embedding_dimension
-
-    async def _aget_embedding_dimension(self) -> int:
-        if self.embedding_dimension is None:
-            self.embedding_dimension = len(
-                await self._get_safe_embedding().aembed_query(
                     text="This is a sample sentence."
                 )
             )
@@ -640,7 +849,7 @@ class AstraDBVectorStore(VectorStore):
         if metadatas is None:
             metadatas = [{} for _ in texts]
         documents_to_insert = [
-            self.document_encoder.encode(
+            self.document_codec.encode(
                 content=b_txt,
                 document_id=b_id,
                 vector=b_emb,
@@ -723,9 +932,9 @@ class AstraDBVectorStore(VectorStore):
         Note:
             There are constraints on the allowed field names
             in the metadata dictionaries, coming from the underlying Astra DB API.
-            For instance, the `$` (dollar sign) cannot be used in the dict keys.
+            For instance, the ``$`` (dollar sign) cannot be used in the dict keys.
             See this document for details:
-            https://docs.datastax.com/en/astra/astra-db-vector/api-reference/data-api.html
+            https://docs.datastax.com/en/astra-db-serverless/api-reference/overview.html#limits
 
         Returns:
             The list of ids of the added texts.
@@ -740,7 +949,7 @@ class AstraDBVectorStore(VectorStore):
         self.astra_env.ensure_db_setup()
 
         embedding_vectors: Sequence[list[float] | None]
-        if self.document_encoder.server_side_embeddings:
+        if self.document_codec.server_side_embeddings:
             embedding_vectors = [None for _ in list(texts)]
         else:
             embedding_vectors = self._get_safe_embedding().embed_documents(list(texts))
@@ -845,9 +1054,9 @@ class AstraDBVectorStore(VectorStore):
         Note:
             There are constraints on the allowed field names
             in the metadata dictionaries, coming from the underlying Astra DB API.
-            For instance, the `$` (dollar sign) cannot be used in the dict keys.
+            For instance, the ``$`` (dollar sign) cannot be used in the dict keys.
             See this document for details:
-            https://docs.datastax.com/en/astra/astra-db-vector/api-reference/data-api.html
+            https://docs.datastax.com/en/astra-db-serverless/api-reference/overview.html#limits
 
         Returns:
             The list of ids of the added texts.
@@ -862,7 +1071,7 @@ class AstraDBVectorStore(VectorStore):
         await self.astra_env.aensure_db_setup()
 
         embedding_vectors: Sequence[list[float] | None]
-        if self.document_encoder.server_side_embeddings:
+        if self.document_codec.server_side_embeddings:
             embedding_vectors = [None for _ in list(texts)]
         else:
             embedding_vectors = await self._get_safe_embedding().aembed_documents(
@@ -1005,7 +1214,7 @@ class AstraDBVectorStore(VectorStore):
         Returns:
             The list of (Document, score, id), the most similar to the query.
         """
-        if self.document_encoder.server_side_embeddings:
+        if self.document_codec.server_side_embeddings:
             sort = {"$vectorize": query}
             return self._similarity_search_with_score_id_by_sort(
                 sort=sort,
@@ -1089,7 +1298,7 @@ class AstraDBVectorStore(VectorStore):
         Returns:
             The list of (Document, score, id), the most similar to the query vector.
         """
-        if self.document_encoder.server_side_embeddings:
+        if self.document_codec.server_side_embeddings:
             msg = (
                 "Searching by vector on a Vector Store that uses server-side "
                 "embeddings is not allowed."
@@ -1113,18 +1322,22 @@ class AstraDBVectorStore(VectorStore):
         metadata_parameter = self._filter_to_metadata(filter)
         hits_ite = self.astra_env.collection.find(
             filter=metadata_parameter,
-            projection=self.document_encoder.base_projection,
+            projection=self.document_codec.base_projection,
             limit=k,
             include_similarity=True,
             sort=sort,
         )
         return [
-            (
-                self.document_encoder.decode(hit),
-                hit["$similarity"],
-                hit["_id"],
+            (doc, sim, did)
+            for (doc, sim, did) in (
+                (
+                    self.document_codec.decode(hit),
+                    hit["$similarity"],
+                    hit["_id"],
+                )
+                for hit in hits_ite
             )
-            for hit in hits_ite
+            if doc is not None
         ]
 
     @override
@@ -1197,7 +1410,7 @@ class AstraDBVectorStore(VectorStore):
         Returns:
             The list of (Document, score, id), the most similar to the query.
         """
-        if self.document_encoder.server_side_embeddings:
+        if self.document_codec.server_side_embeddings:
             sort = {"$vectorize": query}
             return await self._asimilarity_search_with_score_id_by_sort(
                 sort=sort,
@@ -1281,7 +1494,7 @@ class AstraDBVectorStore(VectorStore):
         Returns:
             The list of (Document, score, id), the most similar to the query vector.
         """
-        if self.document_encoder.server_side_embeddings:
+        if self.document_codec.server_side_embeddings:
             msg = (
                 "Searching by vector on a Vector Store that uses server-side "
                 "embeddings is not allowed."
@@ -1304,18 +1517,22 @@ class AstraDBVectorStore(VectorStore):
         await self.astra_env.aensure_db_setup()
         metadata_parameter = self._filter_to_metadata(filter)
         return [
-            (
-                self.document_encoder.decode(hit),
-                hit["$similarity"],
-                hit["_id"],
+            (doc, sim, did)
+            async for (doc, sim, did) in (
+                (
+                    self.document_codec.decode(hit),
+                    hit["$similarity"],
+                    hit["_id"],
+                )
+                async for hit in self.astra_env.async_collection.find(
+                    filter=metadata_parameter,
+                    projection=self.document_codec.base_projection,
+                    limit=k,
+                    include_similarity=True,
+                    sort=sort,
+                )
             )
-            async for hit in self.astra_env.async_collection.find(
-                filter=metadata_parameter,
-                projection=self.document_encoder.base_projection,
-                limit=k,
-                include_similarity=True,
-                sort=sort,
-            )
+            if doc is not None
         ]
 
     def _run_mmr_query_by_sort(
@@ -1328,7 +1545,7 @@ class AstraDBVectorStore(VectorStore):
     ) -> list[Document]:
         prefetch_cursor = self.astra_env.collection.find(
             filter=metadata_parameter,
-            projection=self.document_encoder.full_projection,
+            projection=self.document_codec.full_projection,
             limit=fetch_k,
             include_similarity=True,
             include_sort_vector=True,
@@ -1353,7 +1570,7 @@ class AstraDBVectorStore(VectorStore):
     ) -> list[Document]:
         prefetch_cursor = self.astra_env.async_collection.find(
             filter=metadata_parameter,
-            projection=self.document_encoder.full_projection,
+            projection=self.document_codec.full_projection,
             limit=fetch_k,
             include_similarity=True,
             include_sort_vector=True,
@@ -1386,7 +1603,11 @@ class AstraDBVectorStore(VectorStore):
             for prefetch_index, prefetch_hit in enumerate(prefetch_hits)
             if prefetch_index in mmr_chosen_indices
         ]
-        return [self.document_encoder.decode(hit) for hit in mmr_hits]
+        return [
+            doc
+            for doc in (self.document_codec.decode(hit) for hit in mmr_hits)
+            if doc is not None
+        ]
 
     @override
     def max_marginal_relevance_search_by_vector(
@@ -1494,7 +1715,7 @@ class AstraDBVectorStore(VectorStore):
         Returns:
             The list of Documents selected by maximal marginal relevance.
         """
-        if self.document_encoder.server_side_embeddings:
+        if self.document_codec.server_side_embeddings:
             # this case goes directly to the "_by_sort" method
             # (and does its own filter normalization, as it cannot
             #  use the path for the with-embedding mmr querying)
@@ -1545,7 +1766,7 @@ class AstraDBVectorStore(VectorStore):
         Returns:
             The list of Documents selected by maximal marginal relevance.
         """
-        if self.document_encoder.server_side_embeddings:
+        if self.document_codec.server_side_embeddings:
             # this case goes directly to the "_by_sort" method
             # (and does its own filter normalization, as it cannot
             #  use the path for the with-embedding mmr querying)
@@ -1611,12 +1832,13 @@ class AstraDBVectorStore(VectorStore):
             metadatas: metadata dicts for the texts.
             ids: ids to associate to the texts.
             **kwargs: you can pass any argument that you would
-                to :meth:`~add_texts` and/or to the 'AstraDBVectorStore' constructor
-                (see these methods for details). These arguments will be
+                to :meth:`~add_texts` and/or to the
+                ``AstraDBVectorStore`` constructor (see these methods for
+                details). These arguments will be
                 routed to the respective methods as they are.
 
         Returns:
-            an `AstraDBVectorStore` vectorstore.
+            an ``AstraDBVectorStore`` vectorstore.
         """
         _add_texts_inspection = inspect.getfullargspec(AstraDBVectorStore.add_texts)
         _method_args = (
@@ -1655,12 +1877,12 @@ class AstraDBVectorStore(VectorStore):
             metadatas: metadata dicts for the texts.
             ids: ids to associate to the texts.
             **kwargs: you can pass any argument that you would
-                to :meth:`~aadd_texts` and/or to the 'AstraDBVectorStore' constructor
-                (see these methods for details). These arguments will be
-                routed to the respective methods as they are.
+                to :meth:`~aadd_texts` and/or to the ``AstraDBVectorStore``
+                constructor (see these methods for details). These arguments
+                will be routed to the respective methods as they are.
 
         Returns:
-            an `AstraDBVectorStore` vectorstore.
+            an ``AstraDBVectorStore`` vectorstore.
         """
         _aadd_texts_inspection = inspect.getfullargspec(AstraDBVectorStore.aadd_texts)
         _method_args = (
@@ -1691,13 +1913,20 @@ class AstraDBVectorStore(VectorStore):
     ) -> AstraDBVectorStore:
         """Create an Astra DB vectorstore from a document list.
 
-        Utility method that defers to 'from_texts' (see that one).
+        Utility method that defers to :meth:`from_texts` (see that one).
 
-        Args: see 'from_texts', except here you have to supply 'documents'
-            in place of 'texts' and 'metadatas'.
+        Args:
+            texts: the texts to insert.
+            documents: a list of `Document` objects for insertion in the store.
+            embedding: the embedding function to use in the store.
+            **kwargs: you can pass any argument that you would
+                to :meth:`~add_texts` and/or to the
+                ``AstraDBVectorStore`` constructor (see these methods for
+                details). These arguments will be
+                routed to the respective methods as they are.
 
         Returns:
-            an `AstraDBVectorStore` vectorstore.
+            an ``AstraDBVectorStore`` vectorstore.
         """
         texts = [d.page_content for d in documents]
         metadatas = [d.metadata for d in documents]
@@ -1717,13 +1946,13 @@ class AstraDBVectorStore(VectorStore):
     ) -> AstraDBVectorStore:
         """Create an Astra DB vectorstore from a document list.
 
-        Utility method that defers to 'afrom_texts' (see that one).
+        Utility method that defers to :meth:`afrom_texts` (see that one).
 
-        Args: see 'afrom_texts', except here you have to supply 'documents'
-            in place of 'texts' and 'metadatas'.
+        Args: see :meth:`afrom_texts`, except here you have to supply ``documents``
+            in place of ``texts`` and ``metadatas``.
 
         Returns:
-            an `AstraDBVectorStore` vectorstore.
+            an ``AstraDBVectorStore`` vectorstore.
         """
         texts = [d.page_content for d in documents]
         metadatas = [d.metadata for d in documents]

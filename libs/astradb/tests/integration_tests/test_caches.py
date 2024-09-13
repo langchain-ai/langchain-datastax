@@ -20,7 +20,6 @@ from langchain_core.embeddings import Embeddings
 from langchain_core.globals import get_llm_cache, set_llm_cache
 from langchain_core.language_models import LLM
 from langchain_core.outputs import Generation, LLMResult
-from langchain_core.pydantic_v1 import validator
 from typing_extensions import override
 
 from langchain_astradb import AstraDBCache, AstraDBSemanticCache
@@ -68,15 +67,6 @@ class FakeLLM(LLM):
     queries: Optional[Mapping] = None  # noqa: UP007
     sequential_responses: Optional[bool] = False  # noqa: UP007
     response_index: int = 0
-
-    @validator("queries", always=True)
-    def check_queries_required(
-        cls, queries: Mapping | None, values: Mapping[str, Any]
-    ) -> Mapping | None:
-        if values.get("sequential_response") and not queries:
-            msg = "queries is required when sequential_response is set to True"
-            raise ValueError(msg)
-        return queries
 
     @override
     def get_num_tokens(self, text: str) -> int:
@@ -270,7 +260,12 @@ class TestAstraDBCaches:
                     collection_name=collection_name,
                     astra_db_client=core_astra_db,
                 )
-            assert len(rec_warnings) == 1
+            f_rec_warnings = [
+                wrn
+                for wrn in rec_warnings
+                if issubclass(wrn.category, DeprecationWarning)
+            ]
+            assert len(f_rec_warnings) == 1
             assert cache_init_core.lookup("pr", "llms") == test_gens
         finally:
             cache_init_ok.astra_env.database.drop_collection(collection_name)
@@ -303,7 +298,12 @@ class TestAstraDBCaches:
                     astra_db_client=core_astra_db,
                     setup_mode=SetupMode.ASYNC,
                 )
-            assert len(rec_warnings) == 1
+            f_rec_warnings = [
+                wrn
+                for wrn in rec_warnings
+                if issubclass(wrn.category, DeprecationWarning)
+            ]
+            assert len(f_rec_warnings) == 1
             assert await cache_init_core.alookup("pr", "llms") == test_gens
         finally:
             await cache_init_ok.astra_env.async_database.drop_collection(
@@ -339,7 +339,12 @@ class TestAstraDBCaches:
                     astra_db_client=core_astra_db,
                     embedding=fake_embe,
                 )
-            assert len(rec_warnings) == 1
+            f_rec_warnings = [
+                wrn
+                for wrn in rec_warnings
+                if issubclass(wrn.category, DeprecationWarning)
+            ]
+            assert len(f_rec_warnings) == 1
             assert cache_init_core.lookup("pr", "llms") == test_gens
         finally:
             cache_init_ok.astra_env.database.drop_collection(collection_name)
@@ -375,7 +380,12 @@ class TestAstraDBCaches:
                     setup_mode=SetupMode.ASYNC,
                     embedding=fake_embe,
                 )
-            assert len(rec_warnings) == 1
+            f_rec_warnings = [
+                wrn
+                for wrn in rec_warnings
+                if issubclass(wrn.category, DeprecationWarning)
+            ]
+            assert len(f_rec_warnings) == 1
             assert await cache_init_core.alookup("pr", "llms") == test_gens
         finally:
             await cache_init_ok.astra_env.async_database.drop_collection(

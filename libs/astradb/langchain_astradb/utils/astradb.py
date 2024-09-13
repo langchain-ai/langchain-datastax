@@ -35,6 +35,9 @@ MAX_CONCURRENT_DOCUMENT_REPLACEMENTS = 20
 # Thread/coroutine count for one-doc-at-a-time deletes:
 MAX_CONCURRENT_DOCUMENT_DELETIONS = 20
 
+# Amount of (max) number of documents for surveying a collection
+SURVEY_NUMBER_OF_DOCUMENTS = 15
+
 logger = logging.getLogger()
 
 
@@ -44,6 +47,42 @@ class SetupMode(Enum):
     SYNC = 1
     ASYNC = 2
     OFF = 3
+
+
+def _survey_collection(
+    collection_name: str,
+    *,
+    token: str | TokenProvider | None = None,
+    api_endpoint: str | None = None,
+    environment: str | None = None,
+    astra_db_client: AstraDB | None = None,
+    async_astra_db_client: AsyncAstraDB | None = None,
+    namespace: str | None = None,
+) -> tuple[CollectionDescriptor | None, list[dict[str, Any]]]:
+    """Return the collection descriptor (if found) and a sample of documents."""
+    _environment = _AstraDBEnvironment(
+        token=token,
+        api_endpoint=api_endpoint,
+        environment=environment,
+        astra_db_client=astra_db_client,
+        async_astra_db_client=async_astra_db_client,
+        namespace=namespace,
+    )
+    descriptors = [
+        coll_d
+        for coll_d in _environment.database.list_collections()
+        if coll_d.name == collection_name
+    ]
+    if not descriptors:
+        return None, []
+    descriptor = descriptors[0]
+    # fetch some documents
+    document_ite = _environment.database.get_collection(collection_name).find(
+        filter={},
+        projection={"*": True},
+        limit=SURVEY_NUMBER_OF_DOCUMENTS,
+    )
+    return (descriptor, list(document_ite))
 
 
 class _AstraDBEnvironment:

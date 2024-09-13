@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "langchain-astradb"
-version = "0.3.5"
+version = "0.4.0"
 description = "An integration package connecting Astra DB and LangChain"
 authors = []
 readme = "README.md"
@@ -12,7 +12,7 @@ license = "MIT"
 
 [tool.poetry.dependencies]
 python = ">=3.8.1,<4.0"
-langchain-core = ">=0.1.31,<0.3"
+langchain-core = ">=0.1.31,<0.4"
 astrapy = "^1.4"
 # Resolve numpy version for 3.8 to 3.12+
 numpy = [
@@ -31,9 +31,9 @@ pytest-mock = "^3.10.0"
 syrupy = "^4.0.2"
 pytest-watcher = "^0.3.4"
 pytest-asyncio = "^0.21.1"
-langchain = { git = "https://github.com/langchain-ai/langchain.git", subdirectory = "libs/langchain" }
-langchain-text-splitters = { git = "https://github.com/langchain-ai/langchain.git", subdirectory = "libs/text-splitters" }
-langchain-core = { git = "https://github.com/langchain-ai/langchain.git", subdirectory = "libs/core" }
+langchain = { git = "https://github.com/langchain-ai/langchain.git", subdirectory = "libs/langchain", tag = "langchain-core==0.2.40" }
+langchain-text-splitters = { git = "https://github.com/langchain-ai/langchain.git", subdirectory = "libs/text-splitters", tag = "langchain-core==0.2.40"}
+langchain-core = {git = "https://github.com/langchain-ai/langchain.git", subdirectory = "libs/core", tag = "langchain-core==0.2.40"}
 
 [tool.poetry.group.codespell]
 optional = true
@@ -55,13 +55,11 @@ ruff = "^0.6"
 [tool.poetry.group.typing.dependencies]
 mypy = "^0.991"
 simsimd = "^5.1"
-langchain-core = { git = "https://github.com/langchain-ai/langchain.git", subdirectory = "libs/core" }
-
+langchain-core = {git = "https://github.com/langchain-ai/langchain.git", subdirectory = "libs/core", tag = "langchain-core==0.2.40"}
 [tool.poetry.group.dev]
 optional = true
 
 [tool.poetry.group.dev.dependencies]
-langchain-core = { git = "https://github.com/langchain-ai/langchain.git", subdirectory = "libs/core" }
 
 [tool.ruff.lint]
 pydocstyle.convention = "google"
@@ -121,3 +119,4 @@ markers = [
   "compile: mark placeholder test used to compile integration tests without running them",
 ]
 asyncio_mode = "auto"
+filterwarnings = "ignore::pytest.PytestUnraisableExceptionWarning"
