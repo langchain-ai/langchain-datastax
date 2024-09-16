@@ -209,6 +209,7 @@ class _DefaultVSDocumentCodec(_AstraDBVectorStoreDocumentCodec):
         return Document(
             page_content=astra_document[self.content_field],
             metadata=astra_document["metadata"],
+            id=astra_document["_id"],
         )
 
     @override
@@ -291,6 +292,7 @@ class _DefaultVectorizeVSDocumentCodec(_AstraDBVectorStoreDocumentCodec):
         return Document(
             page_content=astra_document["$vectorize"],
             metadata=astra_document["metadata"],
+            id=astra_document["_id"],
         )
 
     @override
@@ -377,6 +379,7 @@ class _FlatVSDocumentCodec(_AstraDBVectorStoreDocumentCodec):
         return Document(
             page_content=astra_document[self.content_field],
             metadata=_metadata,
+            id=astra_document["_id"],
         )
 
     @override
@@ -457,6 +460,7 @@ class _FlatVectorizeVSDocumentCodec(_AstraDBVectorStoreDocumentCodec):
         return Document(
             page_content=astra_document["$vectorize"],
             metadata=_metadata,
+            id=astra_document["_id"],
         )
 
     @override
