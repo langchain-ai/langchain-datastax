@@ -19,10 +19,10 @@ from langchain_core.graph_vectorstores.base import (
     GraphVectorStore,
     Node,
 )
-from langchain_astradb.utils.mmr_traversal import MmrHelper
 from typing_extensions import override
 
 from langchain_astradb import AstraDBVectorStore
+from langchain_astradb.utils.mmr_traversal import MmrHelper
 
 if TYPE_CHECKING:
     from langchain_core.embeddings import Embeddings
@@ -165,7 +165,7 @@ class AstraDBGraphVectorStore(GraphVectorStore):
         )
 
     @override
-    def traversal_search( # noqa: C901
+    def traversal_search(  # noqa: C901
         self,
         query: str,
         *,
@@ -175,7 +175,6 @@ class AstraDBGraphVectorStore(GraphVectorStore):
         metadata_filter: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> Iterable[Document]:
-
         # Map from visited ID to depth
         visited_ids: dict[str, int] = {}
         visited_docs: list[Document] = []
@@ -231,6 +230,8 @@ class AstraDBGraphVectorStore(GraphVectorStore):
 
             new_docs_at_next_depth = {}
             for target in targets:
+                if target.id is None:
+                    continue
                 if d < visited_ids.get(target.id, depth):
                     new_docs_at_next_depth[target.id] = target
 
@@ -256,7 +257,7 @@ class AstraDBGraphVectorStore(GraphVectorStore):
     def _get_outgoing_tags(
         self,
         source_ids: Iterable[str],
-    ) -> set[tuple[str, str]]:
+    ) -> set[str]:
         """Return the set of outgoing tags for the given source ID(s).
 
         Args:
@@ -265,20 +266,25 @@ class AstraDBGraphVectorStore(GraphVectorStore):
         tags = set()
 
         for source_id in source_ids:
-                hits = list(self.astra_env.collection.find(
+            hits = list(
+                self.astra_env.collection.find(
                     filter=self.vectorstore.document_codec.encode_id(source_id),
                     # NOTE: Really, only the link-to metadata value is needed here
-                    projection=self.vectorstore.document_codec.base_projection, 
-                ))
+                    projection=self.vectorstore.document_codec.base_projection,
+                )
+            )
 
-                for hit in hits:
-                    doc = self.vectorstore.document_code.decode(hit)
-                    tags.update(doc.metadata.get(self.link_to_metadata_key, []))
+            for hit in hits:
+                doc = self.vectorstore.document_codec.decode(hit)
+                if doc is None:
+                    continue
+                metadata = doc.metadata or {}
+                tags.update(metadata.get(self.link_to_metadata_key, []))
 
         return tags
 
     @override
-    def mmr_traversal_search( # noqa: C901
+    def mmr_traversal_search(  # noqa: C901
         self,
         query: str,
         *,
@@ -310,23 +316,31 @@ class AstraDBGraphVectorStore(GraphVectorStore):
 
             # TODO: Would be better parralelized
             for tag in tags:
-                m_filter = metadata_filter.copy()
+                m_filter = (metadata_filter or {}).copy()
                 m_filter[self.link_from_metadata_key] = tag
                 metadata_parameter = self._filter_to_metadata(m_filter)
 
-
-                hits = list(self.astra_env.collection.find(
-                    filter=metadata_parameter,
-                    projection=self.vectorstore.document_codec.full_projection,
-                    limit=adjacent_k,
-                    include_similarity=True,
-                    include_sort_vector=True,
-                    sort=self.vectorstore.document_codec.encode_vector_sort(query_embedding),
-                ))
+                hits = list(
+                    self.astra_env.collection.find(
+                        filter=metadata_parameter,
+                        projection=self.vectorstore.document_codec.full_projection,
+                        limit=adjacent_k,
+                        include_similarity=True,
+                        include_sort_vector=True,
+                        sort=self.vectorstore.document_codec.encode_vector_sort(
+                            query_embedding
+                        ),
+                    )
+                )
 
                 for hit in hits:
                     doc = self.vectorstore.document_codec.decode(hit)
+                    if doc is None or doc.id is None:
+                        continue
+
                     vector = self.vectorstore.document_codec.decode_vector(hit)
+                    if vector is None:
+                        continue
 
                     if doc.id not in targets:
                         targets[doc.id] = _Edge(
@@ -376,14 +390,21 @@ class AstraDBGraphVectorStore(GraphVectorStore):
                     limit=fetch_k,
                     include_similarity=True,
                     include_sort_vector=True,
-                    sort=self.vectorstore.document_codec.encode_vector_sort(query_embedding),
+                    sort=self.vectorstore.document_codec.encode_vector_sort(
+                        query_embedding
+                    ),
                 )
             )
 
             candidates = {}
             for hit in hits:
                 doc = self.vectorstore.document_codec.decode(hit)
+                if doc is None or doc.id is None:
+                    continue
+
                 vector = self.vectorstore.document_codec.decode_vector(hit)
+                if vector is None:
+                    continue
 
                 candidates[doc.id] = (doc, vector)
                 tags = set(doc.metadata.get(self.link_to_metadata_key, []))

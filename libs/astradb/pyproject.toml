@@ -54,7 +54,6 @@ ruff = "^0.6"
 
 [tool.poetry.group.typing.dependencies]
 mypy = "^0.991"
-simsimd = "^5.1"
 langchain-core = { git = "https://github.com/langchain-ai/langchain.git", subdirectory = "libs/core" }
 
 [tool.poetry.group.dev]

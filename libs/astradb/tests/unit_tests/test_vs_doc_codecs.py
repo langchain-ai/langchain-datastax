@@ -19,7 +19,7 @@ METADATA: dict[str, Any] = {"m1": 1, "m2": "two"}
 CONTENT = "The content"
 VECTOR: list[float] = [1, 2, 3]
 DOCUMENT_ID = "the_id"
-LC_DOCUMENT = Document(page_content=CONTENT, metadata=METADATA)
+LC_DOCUMENT = Document(id=DOCUMENT_ID, page_content=CONTENT, metadata=METADATA)
 LC_FILTER = {"a0": 0, "$or": [{"b1": 1}, {"b2": 2}]}
 
 ASTRA_DEFAULT_DOCUMENT_NOVECTORIZE = {
