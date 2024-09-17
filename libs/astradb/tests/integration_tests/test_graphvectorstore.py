@@ -2,6 +2,7 @@
 
 Refer to `test_vectorstores.py` for the requirements to run.
 """
+
 # ruff: noqa: FIX002 TD002 TD003
 
 from __future__ import annotations
@@ -91,7 +92,7 @@ def novectorize_empty_graph_store(
 
 @pytest.fixture
 def novectorize_full_graph_store(
-        novectorize_empty_graph_store: AstraDBGraphVectorStore,
+    novectorize_empty_graph_store: AstraDBGraphVectorStore,
 ) -> AstraDBGraphVectorStore:
     """
     This is a pre-populated graph vector store,
@@ -142,19 +143,17 @@ def novectorize_full_graph_store(
         Document(page_content="[-10, 0]", metadata={"label": "T0"}),
         Document(page_content="[-9, 1]", metadata={"label": "TR"}),
     ]
-    for doc_a, suffix in zip(docs_a, ["l","0","r"]):
+    for doc_a, suffix in zip(docs_a, ["l", "0", "r"]):
         add_links(doc_a, Link.bidir(kind="ab_example", tag=f"tag_{suffix}"))
         add_links(doc_a, Link.outgoing(kind="at_example", tag=f"tag_{suffix}"))
         add_links(doc_a, Link.incoming(kind="af_example", tag=f"tag_{suffix}"))
-    for doc_b, suffix in zip(docs_b, ["l","0","r"]):
+    for doc_b, suffix in zip(docs_b, ["l", "0", "r"]):
         add_links(doc_b, Link.bidir(kind="ab_example", tag=f"tag_{suffix}"))
-    for doc_t, suffix in zip(docs_t, ["l","0","r"]):
+    for doc_t, suffix in zip(docs_t, ["l", "0", "r"]):
         add_links(doc_t, Link.incoming(kind="at_example", tag=f"tag_{suffix}"))
-    for doc_f, suffix in zip(docs_f, ["l","0","r"]):
+    for doc_f, suffix in zip(docs_f, ["l", "0", "r"]):
         add_links(doc_f, Link.outgoing(kind="af_example", tag=f"tag_{suffix}"))
-    novectorize_empty_graph_store.add_documents(
-        docs_a + docs_b + docs_f + docs_t
-    )
+    novectorize_empty_graph_store.add_documents(docs_a + docs_b + docs_f + docs_t)
     return novectorize_empty_graph_store
 
 

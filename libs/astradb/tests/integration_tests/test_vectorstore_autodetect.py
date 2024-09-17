@@ -188,18 +188,19 @@ class TestVectorStoreAutodetect:
         assert "m2" in results[0].metadata
 
         # inserting
+        id4 = "4"
         pc4 = "Cont4"
         md4 = {"q1": "Q1", "q2": "Q2"}
         inserted_ids = ad_store.add_texts(
             texts=[pc4],
             metadatas=[md4],
-            ids=["4"],
+            ids=[id4],
         )
-        assert inserted_ids == ["4"]
+        assert inserted_ids == [id4]
 
         # reading with filtering
         results2 = ad_store.similarity_search("query", k=3, filter={"q2": "Q2"})
-        assert results2 == [Document(page_content=pc4, metadata=md4)]
+        assert results2 == [Document(id=id4, page_content=pc4, metadata=md4)]
 
     def test_autodetect_default_novectorize_crud(
         self,
@@ -244,18 +245,19 @@ class TestVectorStoreAutodetect:
         assert "m2" in results[0].metadata
 
         # inserting
+        id4 = "4"
         pc4 = "Cont4"
         md4 = {"q1": "Q1", "q2": "Q2"}
         inserted_ids = ad_store.add_texts(
             texts=[pc4],
             metadatas=[md4],
-            ids=["4"],
+            ids=[id4],
         )
-        assert inserted_ids == ["4"]
+        assert inserted_ids == [id4]
 
         # reading with filtering
         results2 = ad_store.similarity_search("query", k=3, filter={"q2": "Q2"})
-        assert results2 == [Document(page_content=pc4, metadata=md4)]
+        assert results2 == [Document(id=id4, page_content=pc4, metadata=md4)]
 
     def test_autodetect_flat_vectorize_crud(
         self,
@@ -301,6 +303,7 @@ class TestVectorStoreAutodetect:
         assert "m2" in results[0].metadata
 
         # inserting
+        id4 = "4"
         pc4 = "Cont4"
         md4 = {"q1": "Q1", "q2": "Q2"}
         inserted_ids = ad_store.add_texts(
@@ -308,11 +311,11 @@ class TestVectorStoreAutodetect:
             metadatas=[md4],
             ids=["4"],
         )
-        assert inserted_ids == ["4"]
+        assert inserted_ids == [id4]
 
         # reading with filtering
         results2 = ad_store.similarity_search("query", k=3, filter={"q2": "Q2"})
-        assert results2 == [Document(page_content=pc4, metadata=md4)]
+        assert results2 == [Document(id=id4, page_content=pc4, metadata=md4)]
 
     def test_autodetect_default_vectorize_crud(
         self,
@@ -355,18 +358,19 @@ class TestVectorStoreAutodetect:
         assert "m2" in results[0].metadata
 
         # inserting
+        id4 = "4"
         pc4 = "Cont4"
         md4 = {"q1": "Q1", "q2": "Q2"}
         inserted_ids = ad_store.add_texts(
             texts=[pc4],
             metadatas=[md4],
-            ids=["4"],
+            ids=[id4],
         )
-        assert inserted_ids == ["4"]
+        assert inserted_ids == [id4]
 
         # reading with filtering
         results2 = ad_store.similarity_search("query", k=3, filter={"q2": "Q2"})
-        assert results2 == [Document(page_content=pc4, metadata=md4)]
+        assert results2 == [Document(id=id4, page_content=pc4, metadata=md4)]
 
     def test_failed_docs_autodetect_flat_novectorize_crud(
         self,

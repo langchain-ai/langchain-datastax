@@ -19,10 +19,10 @@ from langchain_core.graph_vectorstores.base import (
     GraphVectorStore,
     Node,
 )
-from langchain_astradb.utils.mmr_traversal import MmrHelper
 from typing_extensions import override
 
 from langchain_astradb import AstraDBVectorStore
+from langchain_astradb.utils.mmr_traversal import MmrHelper
 
 if TYPE_CHECKING:
     from langchain_core.embeddings import Embeddings
@@ -51,7 +51,6 @@ class AstraDBGraphVectorStore(GraphVectorStore):
         collection_name: str,
         link_to_metadata_key: str = "links_to",
         link_from_metadata_key: str = "links_from",
-        content_id_key: str = "content_id",
         metadata_indexing_include: Iterable[str] | None = None,
         metadata_indexing_exclude: Iterable[str] | None = None,
         collection_indexing_policy: dict[str, Any] | None = None,
@@ -60,7 +59,6 @@ class AstraDBGraphVectorStore(GraphVectorStore):
         """Create a new Graph Vector Store backed by AstraDB."""
         self.link_to_metadata_key = link_to_metadata_key
         self.link_from_metadata_key = link_from_metadata_key
-        self.content_id_key = content_id_key
         self.session = None
         self.embedding = embedding
 
@@ -104,7 +102,6 @@ class AstraDBGraphVectorStore(GraphVectorStore):
                     link_to_tags.add(_tag_to_str(tag.kind, tag.tag))
 
             metadata = node.metadata
-            metadata[self.content_id_key] = node_id
             metadata[self.link_to_metadata_key] = list(link_to_tags)
             metadata[self.link_from_metadata_key] = list(link_from_tags)
 
@@ -168,7 +165,7 @@ class AstraDBGraphVectorStore(GraphVectorStore):
         )
 
     @override
-    def traversal_search( # noqa: C901
+    def traversal_search(  # noqa: C901
         self,
         query: str,
         *,
@@ -178,7 +175,6 @@ class AstraDBGraphVectorStore(GraphVectorStore):
         metadata_filter: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> Iterable[Document]:
-
         # Map from visited ID to depth
         visited_ids: dict[str, int] = {}
         visited_docs: list[Document] = []
@@ -200,11 +196,9 @@ class AstraDBGraphVectorStore(GraphVectorStore):
             # lower depth.
             outgoing_tags = set()
             for doc in docs:
-                content_id = doc.metadata[self.content_id_key]
-
                 # Add visited ID. If it is closer it is a new document at this depth:
-                if d <= visited_ids.get(content_id, depth):
-                    visited_ids[content_id] = d
+                if d <= visited_ids.get(doc.id, depth):
+                    visited_ids[doc.id] = d
                     visited_docs.append(doc)
 
                     # If we can continue traversing from this document,
@@ -215,7 +209,7 @@ class AstraDBGraphVectorStore(GraphVectorStore):
                             if d <= visited_tags.get(tag, depth):
                                 # Record that we'll query this tag at the
                                 # given depth, so we don't fetch it again
-                                # (unless we find it an earlier depth)
+                                # (unless we find it at an earlier depth)
                                 visited_tags[tag] = d
                                 outgoing_tags.add(tag)
 
@@ -236,10 +230,10 @@ class AstraDBGraphVectorStore(GraphVectorStore):
 
             new_docs_at_next_depth = {}
             for target in targets:
-                content_id = target.metadata[self.content_id_key]
-
-                if d < visited_ids.get(content_id, depth):
-                    new_docs_at_next_depth[content_id] = target
+                if target.id is None:
+                    continue
+                if d < visited_ids.get(target.id, depth):
+                    new_docs_at_next_depth[target.id] = target
 
             if new_docs_at_next_depth:
                 visit_documents(d + 1, new_docs_at_next_depth.values())
@@ -258,12 +252,12 @@ class AstraDBGraphVectorStore(GraphVectorStore):
         if filter_dict is None:
             return {}
 
-        return self.document_encoder.encode_filter(filter_dict)
+        return self.vectorstore.document_codec.encode_filter(filter_dict)
 
     def _get_outgoing_tags(
         self,
         source_ids: Iterable[str],
-    ) -> set[tuple[str, str]]:
+    ) -> set[str]:
         """Return the set of outgoing tags for the given source ID(s).
 
         Args:
@@ -272,20 +266,25 @@ class AstraDBGraphVectorStore(GraphVectorStore):
         tags = set()
 
         for source_id in source_ids:
-                hits = list(self.astra_env.collection.find(
-                    filter={f"metadata.{self.content_id_key}": source_id},
-                    projection={
-                        "metadata": True,
-                    },
-                ))
+            hits = list(
+                self.astra_env.collection.find(
+                    filter=self.vectorstore.document_codec.encode_id(source_id),
+                    # NOTE: Really, only the link-to metadata value is needed here
+                    projection=self.vectorstore.document_codec.base_projection,
+                )
+            )
 
-                for hit in hits:
-                    tags.update(hit["metadata"].get(self.link_to_metadata_key, []))
+            for hit in hits:
+                doc = self.vectorstore.document_codec.decode(hit)
+                if doc is None:
+                    continue
+                metadata = doc.metadata or {}
+                tags.update(metadata.get(self.link_to_metadata_key, []))
 
         return tags
 
     @override
-    def mmr_traversal_search( # noqa: C901
+    def mmr_traversal_search(  # noqa: C901
         self,
         query: str,
         *,
@@ -317,41 +316,40 @@ class AstraDBGraphVectorStore(GraphVectorStore):
 
             # TODO: Would be better parralelized
             for tag in tags:
-                metadata_parameter = self._filter_to_metadata(
-                    metadata_filter
+                m_filter = (metadata_filter or {}).copy()
+                m_filter[self.link_from_metadata_key] = tag
+                metadata_parameter = self._filter_to_metadata(m_filter)
+
+                hits = list(
+                    self.astra_env.collection.find(
+                        filter=metadata_parameter,
+                        projection=self.vectorstore.document_codec.full_projection,
+                        limit=adjacent_k,
+                        include_similarity=True,
+                        include_sort_vector=True,
+                        sort=self.vectorstore.document_codec.encode_vector_sort(
+                            query_embedding
+                        ),
+                    )
                 )
-                metadata_parameter[f"metadata.{self.link_from_metadata_key}"] = tag
-
-
-                hits = list(self.astra_env.collection.find(
-                    filter=metadata_parameter,
-                    projection={
-                        "_id": True,
-                        "content": True,
-                        "metadata": True,
-                        "$vector": True,
-                    },
-                    limit=adjacent_k,
-                    include_similarity=True,
-                    include_sort_vector=True,
-                    sort={"$vector": query_embedding},
-                ))
 
                 for hit in hits:
-                    vector = hit["$vector"]
-                    content_id = hit["metadata"][self.content_id_key]
+                    doc = self.vectorstore.document_codec.decode(hit)
+                    if doc is None or doc.id is None:
+                        continue
 
-                    if content_id not in targets:
-                        targets[content_id] = _Edge(
-                            target_content_id=content_id,
+                    vector = self.vectorstore.document_codec.decode_vector(hit)
+                    if vector is None:
+                        continue
+
+                    if doc.id not in targets:
+                        targets[doc.id] = _Edge(
+                            target_content_id=doc.id,
                             target_text_embedding=vector,
                             target_link_to_tags=set(
                                 hit.get(self.link_to_metadata_key, [])
                             ),
-                            target_doc=Document(
-                                page_content=hit["content"],
-                                metadata=hit["metadata"],
-                            ),
+                            target_doc=doc,
                         )
 
             # TODO: Consider a combined limit based on the similarity and/or
@@ -384,32 +382,33 @@ class AstraDBGraphVectorStore(GraphVectorStore):
             helper.add_candidates(new_candidates)
 
         def fetch_initial_candidates() -> None:
-            metadata_parameter = self._filter_to_metadata(metadata_filter)
+            metadata_parameter = self._filter_to_metadata(metadata_filter).copy()
             hits = list(
                 self.astra_env.collection.find(
                     filter=metadata_parameter,
-                    projection={
-                        "_id": True,
-                        "content": True,
-                        "metadata": True,
-                        "$vector": True,
-                    },
+                    projection=self.vectorstore.document_codec.full_projection,
                     limit=fetch_k,
                     include_similarity=True,
                     include_sort_vector=True,
-                    sort={"$vector": query_embedding},
+                    sort=self.vectorstore.document_codec.encode_vector_sort(
+                        query_embedding
+                    ),
                 )
             )
 
             candidates = {}
             for hit in hits:
-                vector = hit["$vector"]
-                content_id = hit["metadata"][self.content_id_key]
-                doc = Document(page_content=hit["content"], metadata=hit["metadata"])
+                doc = self.vectorstore.document_codec.decode(hit)
+                if doc is None or doc.id is None:
+                    continue
 
-                candidates[content_id] = (doc, vector)
-                tags = set(hit["metadata"].get(self.link_to_metadata_key, []))
-                outgoing_tags[content_id] = tags
+                vector = self.vectorstore.document_codec.decode_vector(hit)
+                if vector is None:
+                    continue
+
+                candidates[doc.id] = (doc, vector)
+                tags = set(doc.metadata.get(self.link_to_metadata_key, []))
+                outgoing_tags[doc.id] = tags
 
             helper.add_candidates(candidates)
 
