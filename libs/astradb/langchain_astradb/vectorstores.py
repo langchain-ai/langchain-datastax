@@ -1943,6 +1943,13 @@ class AstraDBVectorStore(VectorStore):
         """
         texts = [d.page_content for d in documents]
         metadatas = [d.metadata for d in documents]
+        if "ids" not in kwargs:
+            ids = [doc.id for doc in documents]
+
+            # If there's at least one valid ID, we'll assume that IDs
+            # should be used.
+            if any(ids):
+                kwargs["ids"] = ids
         return cls.from_texts(
             texts,
             embedding=embedding,
@@ -1969,6 +1976,13 @@ class AstraDBVectorStore(VectorStore):
         """
         texts = [d.page_content for d in documents]
         metadatas = [d.metadata for d in documents]
+        if "ids" not in kwargs:
+            ids = [doc.id for doc in documents]
+
+            # If there's at least one valid ID, we'll assume that IDs
+            # should be used.
+            if any(ids):
+                kwargs["ids"] = ids
         return await cls.afrom_texts(
             texts,
             embedding=embedding,

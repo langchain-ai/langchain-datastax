@@ -477,7 +477,7 @@ class TestAstraDBVectorStore:
     ) -> None:
         """from_documents methods."""
         emb = SomeEmbeddings(dimension=2)
-        v_store_2 = AstraDBVectorStore.from_documents(
+        v_store = AstraDBVectorStore.from_documents(
             [
                 Document(page_content="Hee"),
                 Document(page_content="Hoi"),
@@ -490,19 +490,19 @@ class TestAstraDBVectorStore:
             environment=astra_db_credentials["environment"],
         )
         try:
-            assert v_store_2.similarity_search("Hoi", k=1)[0].page_content == "Hoi"
+            assert v_store.similarity_search("Hoi", k=1)[0].page_content == "Hoi"
         finally:
             if not SKIP_COLLECTION_DELETE:
-                v_store_2.delete_collection()
+                v_store.delete_collection()
             else:
-                v_store_2.clear()
+                v_store.clear()
 
     def test_astradb_vectorstore_from_documents_containing_ids_sync(
         self, astra_db_credentials: AstraDBCredentials
     ) -> None:
         """from_documents methods."""
         emb = SomeEmbeddings(dimension=2)
-        v_store_2 = AstraDBVectorStore.from_documents(
+        v_store = AstraDBVectorStore.from_documents(
             [
                 Document(page_content="Hee", id="idx0"),
                 Document(page_content="Hoi", id="idx1"),
@@ -515,35 +515,44 @@ class TestAstraDBVectorStore:
             environment=astra_db_credentials["environment"],
         )
         try:
-            hits = v_store_2.similarity_search("Hoi", k=1)
+            hits = v_store.similarity_search("Hoi", k=1)
             assert len(hits) == 1
             assert hits[0].page_content == "Hoi"
             assert hits[0].id == "idx1"
         finally:
             if not SKIP_COLLECTION_DELETE:
-                v_store_2.delete_collection()
+                v_store.delete_collection()
             else:
-                v_store_2.clear()
+                v_store.clear()
 
     def test_astradb_vectorstore_from_documents_pass_ids_twice_sync(
         self, astra_db_credentials: AstraDBCredentials
     ) -> None:
         """from_documents methods."""
         emb = SomeEmbeddings(dimension=2)
-        with pytest.raises(ValueError, match="duplicate"):
-            AstraDBVectorStore.from_documents(
-                [
-                    Document(page_content="Hee", id="idx0"),
-                    Document(page_content="Hoi"),
-                ],
-                ids=["idx0", "idx1"],
-                embedding=emb,
-                collection_name=COLLECTION_NAME_DIM2,
-                token=astra_db_credentials["token"],
-                api_endpoint=astra_db_credentials["api_endpoint"],
-                namespace=astra_db_credentials["namespace"],
-                environment=astra_db_credentials["environment"],
-            )
+        v_store = AstraDBVectorStore.from_documents(
+            [
+                Document(page_content="Hee"),
+                Document(page_content="Hoi", id="idy1"),
+            ],
+            ids=["idx0", "idx1"],
+            embedding=emb,
+            collection_name=COLLECTION_NAME_DIM2,
+            token=astra_db_credentials["token"],
+            api_endpoint=astra_db_credentials["api_endpoint"],
+            namespace=astra_db_credentials["namespace"],
+            environment=astra_db_credentials["environment"],
+        )
+        try:
+            hits = v_store.similarity_search("Hoi", k=1)
+            assert len(hits) == 1
+            assert hits[0].page_content == "Hoi"
+            assert hits[0].id == "idx1"
+        finally:
+            if not SKIP_COLLECTION_DELETE:
+                v_store.delete_collection()
+            else:
+                v_store.clear()
 
     def test_astradb_vectorstore_from_texts_vectorize_sync(
         self, astra_db_credentials: AstraDBCredentials
@@ -579,7 +588,7 @@ class TestAstraDBVectorStore:
         self, astra_db_credentials: AstraDBCredentials
     ) -> None:
         """from_documents methods with vectorize."""
-        v_store_2 = AstraDBVectorStore.from_documents(
+        v_store = AstraDBVectorStore.from_documents(
             [
                 Document(page_content="Hee"),
                 Document(page_content="Hoi"),
@@ -593,9 +602,9 @@ class TestAstraDBVectorStore:
             environment=astra_db_credentials["environment"],
         )
         try:
-            assert v_store_2.similarity_search("Hoi", k=1)[0].page_content == "Hoi"
+            assert v_store.similarity_search("Hoi", k=1)[0].page_content == "Hoi"
         finally:
-            v_store_2.delete_collection()
+            v_store.delete_collection()
 
     async def test_astradb_vectorstore_from_texts_async(
         self, astra_db_credentials: AstraDBCredentials
@@ -680,7 +689,7 @@ class TestAstraDBVectorStore:
     ) -> None:
         """afrom_documents methods."""
         emb = SomeEmbeddings(dimension=2)
-        v_store_2 = await AstraDBVectorStore.afrom_documents(
+        v_store = await AstraDBVectorStore.afrom_documents(
             [
                 Document(page_content="Hee"),
                 Document(page_content="Hoi"),
@@ -693,21 +702,21 @@ class TestAstraDBVectorStore:
             environment=astra_db_credentials["environment"],
         )
         try:
-            assert (await v_store_2.asimilarity_search("Hoi", k=1))[
+            assert (await v_store.asimilarity_search("Hoi", k=1))[
                 0
             ].page_content == "Hoi"
         finally:
             if not SKIP_COLLECTION_DELETE:
-                await v_store_2.adelete_collection()
+                await v_store.adelete_collection()
             else:
-                await v_store_2.aclear()
+                await v_store.aclear()
 
     async def test_astradb_vectorstore_from_documents_containing_ids_async(
         self, astra_db_credentials: AstraDBCredentials
     ) -> None:
         """from_documents methods."""
         emb = SomeEmbeddings(dimension=2)
-        v_store_2 = await AstraDBVectorStore.afrom_documents(
+        v_store = await AstraDBVectorStore.afrom_documents(
             [
                 Document(page_content="Hee", id="idx0"),
                 Document(page_content="Hoi", id="idx1"),
@@ -720,35 +729,44 @@ class TestAstraDBVectorStore:
             environment=astra_db_credentials["environment"],
         )
         try:
-            hits = v_store_2.similarity_search("Hoi", k=1)
+            hits = v_store.similarity_search("Hoi", k=1)
             assert len(hits) == 1
             assert hits[0].page_content == "Hoi"
             assert hits[0].id == "idx1"
         finally:
             if not SKIP_COLLECTION_DELETE:
-                v_store_2.delete_collection()
+                v_store.delete_collection()
             else:
-                v_store_2.clear()
+                v_store.clear()
 
     async def test_astradb_vectorstore_from_documents_pass_ids_twice_async(
         self, astra_db_credentials: AstraDBCredentials
     ) -> None:
         """from_documents methods."""
         emb = SomeEmbeddings(dimension=2)
-        with pytest.raises(ValueError, match="duplicate"):
-            await AstraDBVectorStore.afrom_documents(
-                [
-                    Document(page_content="Hee", id="idx0"),
-                    Document(page_content="Hoi"),
-                ],
-                ids=["idx0", "idx1"],
-                embedding=emb,
-                collection_name=COLLECTION_NAME_DIM2,
-                token=astra_db_credentials["token"],
-                api_endpoint=astra_db_credentials["api_endpoint"],
-                namespace=astra_db_credentials["namespace"],
-                environment=astra_db_credentials["environment"],
-            )
+        v_store = await AstraDBVectorStore.afrom_documents(
+            [
+                Document(page_content="Hee"),
+                Document(page_content="Hoi", id="idy0"),
+            ],
+            ids=["idx0", "idx1"],
+            embedding=emb,
+            collection_name=COLLECTION_NAME_DIM2,
+            token=astra_db_credentials["token"],
+            api_endpoint=astra_db_credentials["api_endpoint"],
+            namespace=astra_db_credentials["namespace"],
+            environment=astra_db_credentials["environment"],
+        )
+        try:
+            hits = await v_store.asimilarity_search("Hoi", k=1)
+            assert len(hits) == 1
+            assert hits[0].page_content == "Hoi"
+            assert hits[0].id == "idx1"
+        finally:
+            if not SKIP_COLLECTION_DELETE:
+                v_store.delete_collection()
+            else:
+                v_store.clear()
 
     async def test_astradb_vectorstore_from_texts_vectorize_async(
         self, astra_db_credentials: AstraDBCredentials
@@ -776,7 +794,7 @@ class TestAstraDBVectorStore:
         self, astra_db_credentials: AstraDBCredentials
     ) -> None:
         """afrom_documents methods with vectorize."""
-        v_store_2 = await AstraDBVectorStore.afrom_documents(
+        v_store = await AstraDBVectorStore.afrom_documents(
             [
                 Document(page_content="HeeH"),
                 Document(page_content="HooH"),
@@ -790,11 +808,11 @@ class TestAstraDBVectorStore:
             environment=astra_db_credentials["environment"],
         )
         try:
-            assert (await v_store_2.asimilarity_search("HeeH", k=1))[
+            assert (await v_store.asimilarity_search("HeeH", k=1))[
                 0
             ].page_content == "HeeH"
         finally:
-            await v_store_2.adelete_collection()
+            await v_store.adelete_collection()
 
     @pytest.mark.parametrize(
         "vector_store",

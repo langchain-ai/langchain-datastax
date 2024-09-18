@@ -14,8 +14,8 @@ import pytest
 from astrapy import DataAPIClient
 from astrapy.authentication import StaticTokenProvider
 from langchain_core.documents import Document
-from langchain_core.graph_vectorstores import Link
-from langchain_core.graph_vectorstores.links import add_links
+from langchain_core.graph_vectorstores.base import Node
+from langchain_core.graph_vectorstores.links import Link, add_links
 
 from langchain_astradb.graph_vectorstores import AstraDBGraphVectorStore
 from langchain_astradb.utils.astradb import SetupMode
@@ -405,21 +405,57 @@ class TestAstraDBGraphVectorStore:
         novectorize_empty_collection: Collection,  # noqa: ARG002
         embedding: Embeddings,
     ) -> None:
+        """The explicitly-provided `ids` parameter should take precedence."""
         the_document = Document(
             page_content="[1, 2]",
             metadata={"md": 1},
-            id="x_id",
+            id="y_id",
         )
-        with pytest.raises(ValueError, match="duplicate"):
-            AstraDBGraphVectorStore.from_documents(
-                documents=[the_document],
-                embedding=embedding,
-                ids=["x_id"],
-                collection_name=GVS_NOVECTORIZE_COLLECTION,
-                token=StaticTokenProvider(astra_db_credentials["token"]),
-                api_endpoint=astra_db_credentials["api_endpoint"],
-                namespace=astra_db_credentials["namespace"],
-                environment=astra_db_credentials["environment"],
-                content_field=CUSTOM_CONTENT_KEY,
-                setup_mode=SetupMode.OFF,
-            )
+        g_store = AstraDBGraphVectorStore.from_documents(
+            documents=[the_document],
+            embedding=embedding,
+            ids=["x_id"],
+            collection_name=GVS_NOVECTORIZE_COLLECTION,
+            token=StaticTokenProvider(astra_db_credentials["token"]),
+            api_endpoint=astra_db_credentials["api_endpoint"],
+            namespace=astra_db_credentials["namespace"],
+            environment=astra_db_credentials["environment"],
+            content_field=CUSTOM_CONTENT_KEY,
+            setup_mode=SetupMode.OFF,
+        )
+        hits = g_store.similarity_search("[2, 1]", k=2)
+        assert len(hits) == 1
+        assert hits[0].page_content == "[1, 2]"
+        assert hits[0].id == "x_id"
+        # there may be more re:graph structure.
+        assert hits[0].metadata["md"] == 1
+
+    def test_gvs_add_nodes(
+        self,
+        *,
+        novectorize_empty_graph_store: AstraDBGraphVectorStore,
+    ) -> None:
+        links0 = [
+            Link(kind="kA", direction="out", tag="tA"),
+            Link(kind="kB", direction="bidir", tag="tB"),
+        ]
+        links1 = [
+            Link(kind="kC", direction="in", tag="tC"),
+        ]
+        nodes = [
+            Node(id="id0", text="[0, 2]", metadata={"m": 0}, links=links0),
+            Node(text="[0, 1]", metadata={"m": 1}, links=links1),
+        ]
+        novectorize_empty_graph_store.add_nodes(nodes)
+        hits = novectorize_empty_graph_store.similarity_search_by_vector([0, 3])
+        assert len(hits) == 2
+        assert hits[0].id == "id0"
+        assert hits[0].page_content == "[0, 2]"
+        md0 = hits[0].metadata
+        assert md0["m"] == 0
+        assert any(isinstance(v, list) for k, v in md0.items() if k != "m")
+        assert hits[1].id != "id0"
+        assert hits[1].page_content == "[0, 1]"
+        md1 = hits[1].metadata
+        assert md1["m"] == 1
+        assert any(isinstance(v, list) for k, v in md1.items() if k != "m")
