@@ -21,6 +21,8 @@ VECTOR: list[float] = [1, 2, 3]
 DOCUMENT_ID = "the_id"
 LC_DOCUMENT = Document(id=DOCUMENT_ID, page_content=CONTENT, metadata=METADATA)
 LC_FILTER = {"a0": 0, "$or": [{"b1": 1}, {"b2": 2}]}
+ID_FILTER = {"_id": DOCUMENT_ID}
+VECTOR_SORT = {"$vector": VECTOR}
 
 ASTRA_DEFAULT_DOCUMENT_NOVECTORIZE = {
     "_id": DOCUMENT_ID,
@@ -28,10 +30,14 @@ ASTRA_DEFAULT_DOCUMENT_NOVECTORIZE = {
     "metadata": METADATA,
     "$vector": VECTOR,
 }
-ASTRA_DEFAULT_DOCUMENT_VECTORIZE = {
+ASTRA_DEFAULT_DOCUMENT_VECTORIZE: dict[str, Any] = {
     "_id": DOCUMENT_ID,
     "$vectorize": CONTENT,
     "metadata": METADATA,
+}
+ASTRA_DEFAULT_DOCUMENT_VECTORIZE_READ = {
+    "$vector": VECTOR,
+    **ASTRA_DEFAULT_DOCUMENT_VECTORIZE,
 }
 ASTRA_DEFAULT_FILTER = {
     "metadata.a0": 0,
@@ -122,6 +128,28 @@ class TestVSDocCodecs:
         encoded_flt = codec.encode_filter(LC_FILTER)
         assert encoded_flt == ASTRA_DEFAULT_FILTER
 
+    def test_default_novectorize_vector_decoding(self) -> None:
+        """Test vector-decoding for default, no-vectorize."""
+        codec = _DefaultVSDocumentCodec(
+            content_field="content_x", ignore_invalid_documents=False
+        )
+        assert codec.decode_vector(ASTRA_DEFAULT_DOCUMENT_NOVECTORIZE) == VECTOR
+        assert codec.decode_vector({}) is None
+
+    def test_default_novectorize_id_encoding(self) -> None:
+        """Test id-encoding for default, no-vectorize."""
+        codec = _DefaultVSDocumentCodec(
+            content_field="content_x", ignore_invalid_documents=False
+        )
+        assert codec.encode_id(DOCUMENT_ID) == ID_FILTER
+
+    def test_default_novectorize_vectorsort_encoding(self) -> None:
+        """Test vector-sort-encoding for default, no-vectorize."""
+        codec = _DefaultVSDocumentCodec(
+            content_field="content_x", ignore_invalid_documents=False
+        )
+        assert codec.encode_vector_sort(VECTOR) == VECTOR_SORT
+
     def test_default_vectorize_encoding(self) -> None:
         """Test encoding for default, vectorize."""
         codec = _DefaultVectorizeVSDocumentCodec(ignore_invalid_documents=False)
@@ -171,6 +199,22 @@ class TestVSDocCodecs:
         codec = _DefaultVectorizeVSDocumentCodec(ignore_invalid_documents=False)
         encoded_flt = codec.encode_filter(LC_FILTER)
         assert encoded_flt == ASTRA_DEFAULT_FILTER
+
+    def test_default_vectorize_vector_decoding(self) -> None:
+        """Test vector-decoding for default, vectorize."""
+        codec = _DefaultVectorizeVSDocumentCodec(ignore_invalid_documents=False)
+        assert codec.decode_vector(ASTRA_DEFAULT_DOCUMENT_VECTORIZE_READ) == VECTOR
+        assert codec.decode_vector({}) is None
+
+    def test_default_vectorize_id_encoding(self) -> None:
+        """Test id-encoding for default, vectorize."""
+        codec = _DefaultVectorizeVSDocumentCodec(ignore_invalid_documents=False)
+        assert codec.encode_id(DOCUMENT_ID) == ID_FILTER
+
+    def test_default_vectorize_vectorsort_encoding(self) -> None:
+        """Test vector-sort-encoding for default, vectorize."""
+        codec = _DefaultVectorizeVSDocumentCodec(ignore_invalid_documents=False)
+        assert codec.encode_vector_sort(VECTOR) == VECTOR_SORT
 
     def test_flat_novectorize_encoding(self) -> None:
         """Test encoding for flat, no-vectorize."""
@@ -234,6 +278,28 @@ class TestVSDocCodecs:
         encoded_flt = codec.encode_filter(LC_FILTER)
         assert encoded_flt == ASTRA_FLAT_FILTER
 
+    def test_flat_novectorize_vector_decoding(self) -> None:
+        """Test vector-decoding for flat, no-vectorize."""
+        codec = _FlatVSDocumentCodec(
+            content_field="content_x", ignore_invalid_documents=False
+        )
+        assert codec.decode_vector(ASTRA_FLAT_DOCUMENT_NOVECTORIZE) == VECTOR
+        assert codec.decode_vector({}) is None
+
+    def test_flat_novectorize_id_encoding(self) -> None:
+        """Test id-encoding for flat, no-vectorize."""
+        codec = _FlatVSDocumentCodec(
+            content_field="content_x", ignore_invalid_documents=False
+        )
+        assert codec.encode_id(DOCUMENT_ID) == ID_FILTER
+
+    def test_flat_novectorize_vectorsort_encoding(self) -> None:
+        """Test vector-sort-encoding for flat, no-vectorize."""
+        codec = _FlatVSDocumentCodec(
+            content_field="content_x", ignore_invalid_documents=False
+        )
+        assert codec.encode_vector_sort(VECTOR) == VECTOR_SORT
+
     def test_flat_vectorize_encoding(self) -> None:
         """Test encoding for flat, vectorize."""
         codec = _FlatVectorizeVSDocumentCodec(ignore_invalid_documents=False)
@@ -283,3 +349,19 @@ class TestVSDocCodecs:
         codec = _FlatVectorizeVSDocumentCodec(ignore_invalid_documents=False)
         encoded_flt = codec.encode_filter(LC_FILTER)
         assert encoded_flt == ASTRA_FLAT_FILTER
+
+    def test_flat_vectorize_vector_decoding(self) -> None:
+        """Test vector-decoding for flat, vectorize."""
+        codec = _FlatVectorizeVSDocumentCodec(ignore_invalid_documents=False)
+        assert codec.decode_vector(ASTRA_FLAT_DOCUMENT_VECTORIZE_READ) == VECTOR
+        assert codec.decode_vector({}) is None
+
+    def test_flat_vectorize_id_encoding(self) -> None:
+        """Test id-encoding for flat, vectorize."""
+        codec = _FlatVectorizeVSDocumentCodec(ignore_invalid_documents=False)
+        assert codec.encode_id(DOCUMENT_ID) == ID_FILTER
+
+    def test_flat_vectorize_vectorsort_encoding(self) -> None:
+        """Test vector-sort-encoding for flat, vectorize."""
+        codec = _FlatVectorizeVSDocumentCodec(ignore_invalid_documents=False)
+        assert codec.encode_vector_sort(VECTOR) == VECTOR_SORT
