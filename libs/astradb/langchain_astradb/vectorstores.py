@@ -300,7 +300,20 @@ class AstraDBVectorStore(VectorStore):
 
     """  # noqa: E501
 
-    def _filter_to_metadata(self, filter_dict: dict[str, Any] | None) -> dict[str, Any]:
+    def filter_to_query(self, filter_dict: dict[str, Any] | None) -> dict[str, Any]:
+        """Prepare a query for use on DB based on metadata filter.
+
+        Encode an "abstract" filter clause on metadata into a query filter
+        condition aware of the collection schema choice.
+
+        Args:
+            filter_dict: a metadata condition in the form {"field": "value"}
+                or related.
+
+        Returns:
+            the corresponding mapping ready for use in queries,
+            aware of the details of the schema used to encode the document on DB.
+        """
         if filter_dict is None:
             return {}
 
@@ -1319,7 +1332,7 @@ class AstraDBVectorStore(VectorStore):
     ) -> list[tuple[Document, float, str]]:
         """Run ANN search with a provided sort clause."""
         self.astra_env.ensure_db_setup()
-        metadata_parameter = self._filter_to_metadata(filter)
+        metadata_parameter = self.filter_to_query(filter)
         hits_ite = self.astra_env.collection.find(
             filter=metadata_parameter,
             projection=self.document_codec.base_projection,
@@ -1515,7 +1528,7 @@ class AstraDBVectorStore(VectorStore):
     ) -> list[tuple[Document, float, str]]:
         """Run ANN search with a provided sort clause."""
         await self.astra_env.aensure_db_setup()
-        metadata_parameter = self._filter_to_metadata(filter)
+        metadata_parameter = self.filter_to_query(filter)
         return [
             (doc, sim, did)
             async for (doc, sim, did) in (
@@ -1638,7 +1651,7 @@ class AstraDBVectorStore(VectorStore):
             The list of Documents selected by maximal marginal relevance.
         """
         self.astra_env.ensure_db_setup()
-        metadata_parameter = self._filter_to_metadata(filter)
+        metadata_parameter = self.filter_to_query(filter)
 
         return self._run_mmr_query_by_sort(
             sort={"$vector": embedding},
@@ -1677,7 +1690,7 @@ class AstraDBVectorStore(VectorStore):
             The list of Documents selected by maximal marginal relevance.
         """
         await self.astra_env.aensure_db_setup()
-        metadata_parameter = self._filter_to_metadata(filter)
+        metadata_parameter = self.filter_to_query(filter)
 
         return await self._arun_mmr_query_by_sort(
             sort={"$vector": embedding},
@@ -1719,7 +1732,7 @@ class AstraDBVectorStore(VectorStore):
             # this case goes directly to the "_by_sort" method
             # (and does its own filter normalization, as it cannot
             #  use the path for the with-embedding mmr querying)
-            metadata_parameter = self._filter_to_metadata(filter)
+            metadata_parameter = self.filter_to_query(filter)
             return self._run_mmr_query_by_sort(
                 sort={"$vectorize": query},
                 k=k,
@@ -1770,7 +1783,7 @@ class AstraDBVectorStore(VectorStore):
             # this case goes directly to the "_by_sort" method
             # (and does its own filter normalization, as it cannot
             #  use the path for the with-embedding mmr querying)
-            metadata_parameter = self._filter_to_metadata(filter)
+            metadata_parameter = self.filter_to_query(filter)
             return await self._arun_mmr_query_by_sort(
                 sort={"$vectorize": query},
                 k=k,

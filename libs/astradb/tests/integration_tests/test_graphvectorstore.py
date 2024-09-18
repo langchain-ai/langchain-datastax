@@ -249,6 +249,9 @@ class TestAstraDBGraphVectorStore:
         ss_response = store.similarity_search(query="[2, 10]", k=2)
         ss_labels = [doc.metadata["label"] for doc in ss_response]
         assert ss_labels == ["AR", "A0"]
+        ss_by_v_response = store.similarity_search_by_vector(embedding=[2, 10], k=2)
+        ss_by_v_labels = [doc.metadata["label"] for doc in ss_by_v_response]
+        assert ss_by_v_labels == ["AR", "A0"]
         if is_autodetected:
             assert_all_flat_docs(store.vectorstore.astra_env.collection)
 
@@ -302,8 +305,121 @@ class TestAstraDBGraphVectorStore:
             adjacent_k=2,
             lambda_mult=0.1,
         )
-        # TODO: can this rightfully be a list (or must it be a set?)
+        # TODO: can this rightfully be a list (or must it be a set)?
         mt_labels = {doc.metadata["label"] for doc in mt_response}
         assert mt_labels == {"AR", "BR"}
         if is_autodetected:
             assert_all_flat_docs(store.vectorstore.astra_env.collection)
+
+    def test_gvs_from_texts(
+        self,
+        *,
+        astra_db_credentials: AstraDBCredentials,
+        novectorize_empty_collection: Collection,  # noqa: ARG002
+        embedding: Embeddings,
+    ) -> None:
+        g_store = AstraDBGraphVectorStore.from_texts(
+            texts=["[1, 2]"],
+            embedding=embedding,
+            metadatas=[{"md": 1}],
+            ids=["x_id"],
+            collection_name=GVS_NOVECTORIZE_COLLECTION,
+            token=StaticTokenProvider(astra_db_credentials["token"]),
+            api_endpoint=astra_db_credentials["api_endpoint"],
+            namespace=astra_db_credentials["namespace"],
+            environment=astra_db_credentials["environment"],
+            content_field=CUSTOM_CONTENT_KEY,
+            setup_mode=SetupMode.OFF,
+        )
+        hits = g_store.similarity_search("[2, 1]", k=2)
+        assert len(hits) == 1
+        assert hits[0].page_content == "[1, 2]"
+        assert hits[0].id == "x_id"
+        # there may be more re:graph structure.
+        assert hits[0].metadata["md"] == 1
+
+    def test_gvs_from_documents_separate_ids(
+        self,
+        *,
+        astra_db_credentials: AstraDBCredentials,
+        novectorize_empty_collection: Collection,  # noqa: ARG002
+        embedding: Embeddings,
+    ) -> None:
+        the_document = Document(
+            page_content="[1, 2]",
+            metadata={"md": 1},
+        )
+        g_store = AstraDBGraphVectorStore.from_documents(
+            documents=[the_document],
+            embedding=embedding,
+            ids=["x_id"],
+            collection_name=GVS_NOVECTORIZE_COLLECTION,
+            token=StaticTokenProvider(astra_db_credentials["token"]),
+            api_endpoint=astra_db_credentials["api_endpoint"],
+            namespace=astra_db_credentials["namespace"],
+            environment=astra_db_credentials["environment"],
+            content_field=CUSTOM_CONTENT_KEY,
+            setup_mode=SetupMode.OFF,
+        )
+        hits = g_store.similarity_search("[2, 1]", k=2)
+        assert len(hits) == 1
+        assert hits[0].page_content == "[1, 2]"
+        assert hits[0].id == "x_id"
+        # there may be more re:graph structure.
+        assert hits[0].metadata["md"] == 1
+
+    def test_gvs_from_documents_containing_ids(
+        self,
+        *,
+        astra_db_credentials: AstraDBCredentials,
+        novectorize_empty_collection: Collection,  # noqa: ARG002
+        embedding: Embeddings,
+    ) -> None:
+        the_document = Document(
+            page_content="[1, 2]",
+            metadata={"md": 1},
+            id="x_id",
+        )
+        g_store = AstraDBGraphVectorStore.from_documents(
+            documents=[the_document],
+            embedding=embedding,
+            collection_name=GVS_NOVECTORIZE_COLLECTION,
+            token=StaticTokenProvider(astra_db_credentials["token"]),
+            api_endpoint=astra_db_credentials["api_endpoint"],
+            namespace=astra_db_credentials["namespace"],
+            environment=astra_db_credentials["environment"],
+            content_field=CUSTOM_CONTENT_KEY,
+            setup_mode=SetupMode.OFF,
+        )
+        hits = g_store.similarity_search("[2, 1]", k=2)
+        assert len(hits) == 1
+        assert hits[0].page_content == "[1, 2]"
+        assert hits[0].id == "x_id"
+        # there may be more re:graph structure.
+        assert hits[0].metadata["md"] == 1
+
+    def test_gvs_from_documents_pass_ids_twice(
+        self,
+        *,
+        astra_db_credentials: AstraDBCredentials,
+        novectorize_empty_collection: Collection,  # noqa: ARG002
+        embedding: Embeddings,
+    ) -> None:
+        the_document = Document(
+            page_content="[1, 2]",
+            metadata={"md": 1},
+            id="x_id",
+        )
+        with pytest.raises(ValueError, match="duplicate"):
+            AstraDBGraphVectorStore.from_documents(
+                documents=[the_document],
+                embedding=embedding,
+                ids=["x_id"],
+                collection_name=GVS_NOVECTORIZE_COLLECTION,
+                token=StaticTokenProvider(astra_db_credentials["token"]),
+                api_endpoint=astra_db_credentials["api_endpoint"],
+                namespace=astra_db_credentials["namespace"],
+                environment=astra_db_credentials["environment"],
+                content_field=CUSTOM_CONTENT_KEY,
+                setup_mode=SetupMode.OFF,
+            )
