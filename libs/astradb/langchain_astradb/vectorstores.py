@@ -1943,17 +1943,27 @@ class AstraDBVectorStore(VectorStore):
         """
         texts = [d.page_content for d in documents]
         metadatas = [d.metadata for d in documents]
-        if "ids" not in kwargs:
-            ids = [doc.id for doc in documents]
 
-            # If there's at least one valid ID, we'll assume that IDs
-            # should be used.
-            if any(ids):
-                kwargs["ids"] = ids
+        if "ids" in kwargs:
+            warnings.warn(
+                (
+                    "Parameter `ids` to AstraDBVectorStore's `from_documents` "
+                    "method is deprecated. Please set the supplied documents' "
+                    "`.id` attribute instead. The id attribute of Document "
+                    "is ignored as long as the `ids` parameter is passed."
+                ),
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            ids = kwargs.pop("ids")
+        else:
+            _ids = [doc.id for doc in documents]
+            ids = _ids if any(the_id is not None for the_id in _ids) else None
         return cls.from_texts(
             texts,
             embedding=embedding,
             metadatas=metadatas,
+            ids=ids,
             **kwargs,
         )
 
@@ -1976,16 +1986,26 @@ class AstraDBVectorStore(VectorStore):
         """
         texts = [d.page_content for d in documents]
         metadatas = [d.metadata for d in documents]
-        if "ids" not in kwargs:
-            ids = [doc.id for doc in documents]
 
-            # If there's at least one valid ID, we'll assume that IDs
-            # should be used.
-            if any(ids):
-                kwargs["ids"] = ids
+        if "ids" in kwargs:
+            warnings.warn(
+                (
+                    "Parameter `ids` to AstraDBVectorStore's `from_documents` "
+                    "method is deprecated. Please set the supplied documents' "
+                    "`.id` attribute instead. The id attribute of Document "
+                    "is ignored as long as the `ids` parameter is passed."
+                ),
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            ids = kwargs.pop("ids")
+        else:
+            _ids = [doc.id for doc in documents]
+            ids = _ids if any(the_id is not None for the_id in _ids) else None
         return await cls.afrom_texts(
             texts,
             embedding=embedding,
             metadatas=metadatas,
+            ids=ids,
             **kwargs,
         )

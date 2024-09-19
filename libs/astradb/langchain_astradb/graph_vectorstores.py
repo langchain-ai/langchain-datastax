@@ -134,22 +134,11 @@ class AstraDBGraphVectorStore(GraphVectorStore):
         cls: type[AstraDBGraphVectorStore],
         documents: Iterable[Document],
         embedding: Embeddings,
-        ids: Iterable[str] | None = None,
         **kwargs: Any,
     ) -> AstraDBGraphVectorStore:
         """Return GraphVectorStore initialized from documents and embeddings."""
         store = cls(embedding, **kwargs)
-        # `store.add_documents` ends up calling store.add_nodes, which
-        # discards the kwargs including ids. This is the place to normalize
-        # the documents' .id and the separate ids into one and the same:
-        _documents: Iterable[Document]
-        if ids is not None:
-            _documents = [document.copy() for document in documents]
-            for _doc_id, _document in zip(ids, _documents):
-                _document.id = _doc_id
-        else:
-            _documents = documents
-        store.add_documents(_documents)
+        store.add_documents(documents)
         return store
 
     @override
