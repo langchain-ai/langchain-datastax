@@ -39,7 +39,7 @@ class _Edge:
 
 
 # NOTE: Conversion to string is necessary
-# becasue AstraDB doesn't support matching on arrays of tuples
+# because AstraDB doesn't support matching on arrays of tuples
 def _tag_to_str(kind: str, tag: str) -> str:
     return f"{kind}:{tag}"
 
@@ -134,12 +134,11 @@ class AstraDBGraphVectorStore(GraphVectorStore):
         cls: type[AstraDBGraphVectorStore],
         documents: Iterable[Document],
         embedding: Embeddings,
-        ids: Iterable[str] | None = None,
         **kwargs: Any,
     ) -> AstraDBGraphVectorStore:
         """Return GraphVectorStore initialized from documents and embeddings."""
         store = cls(embedding, **kwargs)
-        store.add_documents(documents, ids=ids)
+        store.add_documents(documents)
         return store
 
     @override
@@ -248,11 +247,21 @@ class AstraDBGraphVectorStore(GraphVectorStore):
 
         return visited_docs
 
-    def _filter_to_metadata(self, filter_dict: dict[str, Any] | None) -> dict[str, Any]:
-        if filter_dict is None:
-            return {}
+    def filter_to_query(self, filter_dict: dict[str, Any] | None) -> dict[str, Any]:
+        """Prepare a query for use on DB based on metadata filter.
 
-        return self.vectorstore.document_codec.encode_filter(filter_dict)
+        Encode an "abstract" filter clause on metadata into a query filter
+        condition aware of the collection schema choice.
+
+        Args:
+            filter_dict: a metadata condition in the form {"field": "value"}
+                or related.
+
+        Returns:
+            the corresponding mapping ready for use in queries,
+            aware of the details of the schema used to encode the document on DB.
+        """
+        return self.vectorstore.filter_to_query(filter_dict)
 
     def _get_outgoing_tags(
         self,
@@ -318,7 +327,7 @@ class AstraDBGraphVectorStore(GraphVectorStore):
             for tag in tags:
                 m_filter = (metadata_filter or {}).copy()
                 m_filter[self.link_from_metadata_key] = tag
-                metadata_parameter = self._filter_to_metadata(m_filter)
+                metadata_parameter = self.filter_to_query(m_filter)
 
                 hits = list(
                     self.astra_env.collection.find(
@@ -382,7 +391,7 @@ class AstraDBGraphVectorStore(GraphVectorStore):
             helper.add_candidates(new_candidates)
 
         def fetch_initial_candidates() -> None:
-            metadata_parameter = self._filter_to_metadata(metadata_filter).copy()
+            metadata_parameter = self.filter_to_query(metadata_filter).copy()
             hits = list(
                 self.astra_env.collection.find(
                     filter=metadata_parameter,

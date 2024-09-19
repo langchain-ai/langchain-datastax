@@ -50,7 +50,7 @@ def cosine_similarity(x: Matrix, y: Matrix) -> np.ndarray:
     else:
         x = np.array(x, dtype=np.float32)
         y = np.array(y, dtype=np.float32)
-        z = 1 - simd.cdist(x, y, metric="cosine")
+        z = 1 - np.array(simd.cdist(x, y, metric="cosine"))
         if isinstance(z, float):
             return np.array([z])
         return z

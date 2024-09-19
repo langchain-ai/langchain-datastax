@@ -394,10 +394,10 @@ class TestAstraDBVectorStore:
         finally:
             await v_store.adelete_collection()
 
-    def test_astradb_vectorstore_from_x_sync(
+    def test_astradb_vectorstore_from_texts_sync(
         self, astra_db_credentials: AstraDBCredentials
     ) -> None:
-        """from_texts and from_documents methods."""
+        """from_texts methods."""
         emb = SomeEmbeddings(dimension=2)
         # prepare empty collection
         AstraDBVectorStore(
@@ -472,8 +472,12 @@ class TestAstraDBVectorStore:
             else:
                 v_store.clear()
 
-        # from_documents
-        v_store_2 = AstraDBVectorStore.from_documents(
+    def test_astradb_vectorstore_from_documents_without_ids_sync(
+        self, astra_db_credentials: AstraDBCredentials
+    ) -> None:
+        """from_documents methods."""
+        emb = SomeEmbeddings(dimension=2)
+        v_store = AstraDBVectorStore.from_documents(
             [
                 Document(page_content="Hee"),
                 Document(page_content="Hoi"),
@@ -485,18 +489,119 @@ class TestAstraDBVectorStore:
             namespace=astra_db_credentials["namespace"],
             environment=astra_db_credentials["environment"],
         )
+
         try:
-            assert v_store_2.similarity_search("Hoi", k=1)[0].page_content == "Hoi"
+            hits = v_store.similarity_search("Hoi", k=1)
+            assert len(hits) == 1
+            assert hits[0].page_content == "Hoi"
         finally:
             if not SKIP_COLLECTION_DELETE:
-                v_store_2.delete_collection()
+                v_store.delete_collection()
             else:
-                v_store_2.clear()
+                v_store.clear()
 
-    def test_astradb_vectorstore_from_x_vectorize_sync(
+    def test_astradb_vectorstore_from_documents_separate_ids_sync(
         self, astra_db_credentials: AstraDBCredentials
     ) -> None:
-        """from_texts and from_documents methods with vectorize."""
+        """from_documents methods."""
+        emb = SomeEmbeddings(dimension=2)
+        with pytest.warns(DeprecationWarning) as rec_warnings:
+            v_store = AstraDBVectorStore.from_documents(
+                [
+                    Document(page_content="Hee"),
+                    Document(page_content="Hoi"),
+                ],
+                embedding=emb,
+                ids=["idx0", "idx1"],
+                collection_name=COLLECTION_NAME_DIM2,
+                token=astra_db_credentials["token"],
+                api_endpoint=astra_db_credentials["api_endpoint"],
+                namespace=astra_db_credentials["namespace"],
+                environment=astra_db_credentials["environment"],
+            )
+        f_rec_warnings = [
+            wrn for wrn in rec_warnings if issubclass(wrn.category, DeprecationWarning)
+        ]
+        assert len(f_rec_warnings) == 1
+
+        try:
+            hits = v_store.similarity_search("Hoi", k=1)
+            assert len(hits) == 1
+            assert hits[0].page_content == "Hoi"
+            assert hits[0].id == "idx1"
+        finally:
+            if not SKIP_COLLECTION_DELETE:
+                v_store.delete_collection()
+            else:
+                v_store.clear()
+
+    def test_astradb_vectorstore_from_documents_containing_ids_sync(
+        self, astra_db_credentials: AstraDBCredentials
+    ) -> None:
+        """from_documents methods."""
+        emb = SomeEmbeddings(dimension=2)
+        v_store = AstraDBVectorStore.from_documents(
+            [
+                Document(page_content="Hee", id="idx0"),
+                Document(page_content="Hoi", id="idx1"),
+            ],
+            embedding=emb,
+            collection_name=COLLECTION_NAME_DIM2,
+            token=astra_db_credentials["token"],
+            api_endpoint=astra_db_credentials["api_endpoint"],
+            namespace=astra_db_credentials["namespace"],
+            environment=astra_db_credentials["environment"],
+        )
+        try:
+            hits = v_store.similarity_search("Hoi", k=1)
+            assert len(hits) == 1
+            assert hits[0].page_content == "Hoi"
+            assert hits[0].id == "idx1"
+        finally:
+            if not SKIP_COLLECTION_DELETE:
+                v_store.delete_collection()
+            else:
+                v_store.clear()
+
+    def test_astradb_vectorstore_from_documents_pass_ids_twice_sync(
+        self, astra_db_credentials: AstraDBCredentials
+    ) -> None:
+        """from_documents methods."""
+        emb = SomeEmbeddings(dimension=2)
+        with pytest.warns(DeprecationWarning) as rec_warnings:
+            v_store = AstraDBVectorStore.from_documents(
+                [
+                    Document(page_content="Hee"),
+                    Document(page_content="Hoi", id="idy1"),
+                ],
+                ids=["idx0", "idx1"],
+                embedding=emb,
+                collection_name=COLLECTION_NAME_DIM2,
+                token=astra_db_credentials["token"],
+                api_endpoint=astra_db_credentials["api_endpoint"],
+                namespace=astra_db_credentials["namespace"],
+                environment=astra_db_credentials["environment"],
+            )
+        f_rec_warnings = [
+            wrn for wrn in rec_warnings if issubclass(wrn.category, DeprecationWarning)
+        ]
+        assert len(f_rec_warnings) == 1
+
+        try:
+            hits = v_store.similarity_search("Hoi", k=1)
+            assert len(hits) == 1
+            assert hits[0].page_content == "Hoi"
+            assert hits[0].id == "idx1"
+        finally:
+            if not SKIP_COLLECTION_DELETE:
+                v_store.delete_collection()
+            else:
+                v_store.clear()
+
+    def test_astradb_vectorstore_from_texts_vectorize_sync(
+        self, astra_db_credentials: AstraDBCredentials
+    ) -> None:
+        """from_texts methods with vectorize."""
         AstraDBVectorStore(
             collection_vector_service_options=OPENAI_VECTORIZE_OPTIONS_HEADER,
             collection_embedding_api_key=os.environ["OPENAI_API_KEY"],
@@ -523,29 +628,42 @@ class TestAstraDBVectorStore:
         finally:
             v_store.delete_collection()
 
-        # from_documents
-        v_store_2 = AstraDBVectorStore.from_documents(
-            [
-                Document(page_content="Hee"),
-                Document(page_content="Hoi"),
-            ],
-            collection_vector_service_options=OPENAI_VECTORIZE_OPTIONS_HEADER,
-            collection_embedding_api_key=os.environ["OPENAI_API_KEY"],
-            collection_name=COLLECTION_NAME_VECTORIZE_OPENAI_HEADER,
-            token=astra_db_credentials["token"],
-            api_endpoint=astra_db_credentials["api_endpoint"],
-            namespace=astra_db_credentials["namespace"],
-            environment=astra_db_credentials["environment"],
-        )
-        try:
-            assert v_store_2.similarity_search("Hoi", k=1)[0].page_content == "Hoi"
-        finally:
-            v_store_2.delete_collection()
-
-    async def test_astradb_vectorstore_from_x_async(
+    def test_astradb_vectorstore_from_documents_separate_ids_vectorize_sync(
         self, astra_db_credentials: AstraDBCredentials
     ) -> None:
-        """from_texts and from_documents methods."""
+        """from_documents methods with vectorize."""
+        with pytest.warns(DeprecationWarning) as rec_warnings:
+            v_store = AstraDBVectorStore.from_documents(
+                [
+                    Document(page_content="Hee"),
+                    Document(page_content="Hoi"),
+                ],
+                ids=["idx0", "idx1"],
+                collection_vector_service_options=OPENAI_VECTORIZE_OPTIONS_HEADER,
+                collection_embedding_api_key=os.environ["OPENAI_API_KEY"],
+                collection_name=COLLECTION_NAME_VECTORIZE_OPENAI_HEADER,
+                token=astra_db_credentials["token"],
+                api_endpoint=astra_db_credentials["api_endpoint"],
+                namespace=astra_db_credentials["namespace"],
+                environment=astra_db_credentials["environment"],
+            )
+        f_rec_warnings = [
+            wrn for wrn in rec_warnings if issubclass(wrn.category, DeprecationWarning)
+        ]
+        assert len(f_rec_warnings) == 1
+
+        try:
+            hits = v_store.similarity_search("Hoi", k=1)
+            assert len(hits) == 1
+            assert hits[0].page_content == "Hoi"
+            assert hits[0].id == "idx1"
+        finally:
+            v_store.delete_collection()
+
+    async def test_astradb_vectorstore_from_texts_async(
+        self, astra_db_credentials: AstraDBCredentials
+    ) -> None:
+        """from_texts methods."""
         emb = SomeEmbeddings(dimension=2)
         # prepare empty collection
         await AstraDBVectorStore(
@@ -620,8 +738,12 @@ class TestAstraDBVectorStore:
             else:
                 await v_store.aclear()
 
-        # from_documents
-        v_store_2 = await AstraDBVectorStore.afrom_documents(
+    async def test_astradb_vectorstore_from_documents_without_ids_async(
+        self, astra_db_credentials: AstraDBCredentials
+    ) -> None:
+        """afrom_documents methods."""
+        emb = SomeEmbeddings(dimension=2)
+        v_store = await AstraDBVectorStore.afrom_documents(
             [
                 Document(page_content="Hee"),
                 Document(page_content="Hoi"),
@@ -633,20 +755,119 @@ class TestAstraDBVectorStore:
             namespace=astra_db_credentials["namespace"],
             environment=astra_db_credentials["environment"],
         )
+
         try:
-            assert (await v_store_2.asimilarity_search("Hoi", k=1))[
-                0
-            ].page_content == "Hoi"
+            hits = await v_store.asimilarity_search("Hoi", k=1)
+            assert len(hits) == 1
+            assert hits[0].page_content == "Hoi"
         finally:
             if not SKIP_COLLECTION_DELETE:
-                await v_store_2.adelete_collection()
+                await v_store.adelete_collection()
             else:
-                await v_store_2.aclear()
+                await v_store.aclear()
 
-    async def test_astradb_vectorstore_from_x_vectorize_async(
+    async def test_astradb_vectorstore_from_documents_separate_ids_async(
         self, astra_db_credentials: AstraDBCredentials
     ) -> None:
-        """from_texts and from_documents methods with vectorize."""
+        """afrom_documents methods."""
+        emb = SomeEmbeddings(dimension=2)
+        with pytest.warns(DeprecationWarning) as rec_warnings:
+            v_store = await AstraDBVectorStore.afrom_documents(
+                [
+                    Document(page_content="Hee"),
+                    Document(page_content="Hoi"),
+                ],
+                embedding=emb,
+                ids=["idx0", "idx1"],
+                collection_name=COLLECTION_NAME_DIM2,
+                token=astra_db_credentials["token"],
+                api_endpoint=astra_db_credentials["api_endpoint"],
+                namespace=astra_db_credentials["namespace"],
+                environment=astra_db_credentials["environment"],
+            )
+        f_rec_warnings = [
+            wrn for wrn in rec_warnings if issubclass(wrn.category, DeprecationWarning)
+        ]
+        assert len(f_rec_warnings) == 1
+
+        try:
+            hits = await v_store.asimilarity_search("Hoi", k=1)
+            assert len(hits) == 1
+            assert hits[0].page_content == "Hoi"
+            assert hits[0].id == "idx1"
+        finally:
+            if not SKIP_COLLECTION_DELETE:
+                await v_store.adelete_collection()
+            else:
+                await v_store.aclear()
+
+    async def test_astradb_vectorstore_from_documents_containing_ids_async(
+        self, astra_db_credentials: AstraDBCredentials
+    ) -> None:
+        """from_documents methods."""
+        emb = SomeEmbeddings(dimension=2)
+        v_store = await AstraDBVectorStore.afrom_documents(
+            [
+                Document(page_content="Hee", id="idx0"),
+                Document(page_content="Hoi", id="idx1"),
+            ],
+            embedding=emb,
+            collection_name=COLLECTION_NAME_DIM2,
+            token=astra_db_credentials["token"],
+            api_endpoint=astra_db_credentials["api_endpoint"],
+            namespace=astra_db_credentials["namespace"],
+            environment=astra_db_credentials["environment"],
+        )
+        try:
+            hits = v_store.similarity_search("Hoi", k=1)
+            assert len(hits) == 1
+            assert hits[0].page_content == "Hoi"
+            assert hits[0].id == "idx1"
+        finally:
+            if not SKIP_COLLECTION_DELETE:
+                v_store.delete_collection()
+            else:
+                v_store.clear()
+
+    async def test_astradb_vectorstore_from_documents_pass_ids_twice_async(
+        self, astra_db_credentials: AstraDBCredentials
+    ) -> None:
+        """from_documents methods."""
+        emb = SomeEmbeddings(dimension=2)
+        with pytest.warns(DeprecationWarning) as rec_warnings:
+            v_store = await AstraDBVectorStore.afrom_documents(
+                [
+                    Document(page_content="Hee"),
+                    Document(page_content="Hoi", id="idy0"),
+                ],
+                ids=["idx0", "idx1"],
+                embedding=emb,
+                collection_name=COLLECTION_NAME_DIM2,
+                token=astra_db_credentials["token"],
+                api_endpoint=astra_db_credentials["api_endpoint"],
+                namespace=astra_db_credentials["namespace"],
+                environment=astra_db_credentials["environment"],
+            )
+        f_rec_warnings = [
+            wrn for wrn in rec_warnings if issubclass(wrn.category, DeprecationWarning)
+        ]
+        assert len(f_rec_warnings) == 1
+
+        try:
+            hits = await v_store.asimilarity_search("Hoi", k=1)
+            assert len(hits) == 1
+            assert hits[0].page_content == "Hoi"
+            assert hits[0].id == "idx1"
+        finally:
+            if not SKIP_COLLECTION_DELETE:
+                v_store.delete_collection()
+            else:
+                v_store.clear()
+
+    async def test_astradb_vectorstore_from_texts_vectorize_async(
+        self, astra_db_credentials: AstraDBCredentials
+    ) -> None:
+        """from_texts methods with vectorize."""
         # from_text with vectorize
         v_store = await AstraDBVectorStore.afrom_texts(
             texts=["Haa", "Huu"],
@@ -665,26 +886,37 @@ class TestAstraDBVectorStore:
         finally:
             await v_store.adelete_collection()
 
-        # from_documents with vectorize
-        v_store_2 = await AstraDBVectorStore.afrom_documents(
-            [
-                Document(page_content="HeeH"),
-                Document(page_content="HooH"),
-            ],
-            collection_vector_service_options=OPENAI_VECTORIZE_OPTIONS_HEADER,
-            collection_embedding_api_key=os.environ["OPENAI_API_KEY"],
-            collection_name=COLLECTION_NAME_VECTORIZE_OPENAI_HEADER,
-            token=astra_db_credentials["token"],
-            api_endpoint=astra_db_credentials["api_endpoint"],
-            namespace=astra_db_credentials["namespace"],
-            environment=astra_db_credentials["environment"],
-        )
+    async def test_astradb_vectorstore_from_documents_separate_ids_vectorize_async(
+        self, astra_db_credentials: AstraDBCredentials
+    ) -> None:
+        """afrom_documents methods with vectorize."""
+        with pytest.warns(DeprecationWarning) as rec_warnings:
+            v_store = await AstraDBVectorStore.afrom_documents(
+                [
+                    Document(page_content="HeeH"),
+                    Document(page_content="HooH"),
+                ],
+                ids=["idx0", "idx1"],
+                collection_vector_service_options=OPENAI_VECTORIZE_OPTIONS_HEADER,
+                collection_embedding_api_key=os.environ["OPENAI_API_KEY"],
+                collection_name=COLLECTION_NAME_VECTORIZE_OPENAI_HEADER,
+                token=astra_db_credentials["token"],
+                api_endpoint=astra_db_credentials["api_endpoint"],
+                namespace=astra_db_credentials["namespace"],
+                environment=astra_db_credentials["environment"],
+            )
+        f_rec_warnings = [
+            wrn for wrn in rec_warnings if issubclass(wrn.category, DeprecationWarning)
+        ]
+        assert len(f_rec_warnings) == 1
+
         try:
-            assert (await v_store_2.asimilarity_search("HeeH", k=1))[
-                0
-            ].page_content == "HeeH"
+            hits = await v_store.asimilarity_search("HeeH", k=1)
+            assert len(hits) == 1
+            assert hits[0].page_content == "HeeH"
+            assert hits[0].id == "idx0"
         finally:
-            await v_store_2.adelete_collection()
+            await v_store.adelete_collection()
 
     @pytest.mark.parametrize(
         "vector_store",
