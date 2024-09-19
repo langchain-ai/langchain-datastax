@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "langchain-astradb"
-version = "0.4.0"
+version = "0.4.1"
 description = "An integration package connecting Astra DB and LangChain"
 authors = []
 readme = "README.md"
@@ -11,14 +11,11 @@ license = "MIT"
 "Source Code" = "https://github.com/langchain-ai/langchain-datastax/tree/main/libs/astradb"
 
 [tool.poetry.dependencies]
-python = ">=3.8.1,<4.0"
+python = ">=3.9,<4.0"
 langchain-core = ">=0.1.31,<0.4"
-astrapy = "^1.4,!=1.4.2"
+astrapy = "^1.4"
 # Resolve numpy version for 3.8 to 3.12+
-numpy = [
-    { version = "^1.24.0", python = "<3.12" },
-    { version = "^1.26.0", python = ">=3.12" },
-]
+numpy = "^1.26.0"
 
 [tool.poetry.group.test]
 optional = true
@@ -31,9 +28,9 @@ pytest-mock = "^3.10.0"
 syrupy = "^4.0.2"
 pytest-watcher = "^0.3.4"
 pytest-asyncio = "^0.21.1"
-langchain = { git = "https://github.com/langchain-ai/langchain.git", subdirectory = "libs/langchain", tag = "langchain-core==0.2.40" }
-langchain-text-splitters = { git = "https://github.com/langchain-ai/langchain.git", subdirectory = "libs/text-splitters", tag = "langchain-core==0.2.40"}
-langchain-core = {git = "https://github.com/langchain-ai/langchain.git", subdirectory = "libs/core", tag = "langchain-core==0.2.40"}
+langchain = { git = "https://github.com/langchain-ai/langchain.git", subdirectory = "libs/langchain" }
+langchain-text-splitters = { git = "https://github.com/langchain-ai/langchain.git", subdirectory = "libs/text-splitters" }
+langchain-core = { git = "https://github.com/langchain-ai/langchain.git", subdirectory = "libs/core" }
 
 [tool.poetry.group.codespell]
 optional = true
@@ -54,12 +51,13 @@ ruff = "^0.6"
 
 [tool.poetry.group.typing.dependencies]
 mypy = "^0.991"
-simsimd = "^5.1"
-langchain-core = {git = "https://github.com/langchain-ai/langchain.git", subdirectory = "libs/core", tag = "langchain-core==0.2.40"}
+langchain-core = { git = "https://github.com/langchain-ai/langchain.git", subdirectory = "libs/core" }
+
 [tool.poetry.group.dev]
 optional = true
 
 [tool.poetry.group.dev.dependencies]
+langchain-core = { git = "https://github.com/langchain-ai/langchain.git", subdirectory = "libs/core" }
 
 [tool.ruff.lint]
 pydocstyle.convention = "google"
