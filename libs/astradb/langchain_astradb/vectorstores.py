@@ -63,6 +63,8 @@ DocDict = Dict[str, Any]  # dicts expressing entries to insert
 
 # indexing options when creating a collection
 DEFAULT_INDEXING_OPTIONS = {"allow": ["metadata"]}
+# error code to check for during bulk insertions
+DOCUMENT_ALREADY_EXISTS_API_ERROR_CODE = "DOCUMENT_ALREADY_EXISTS"
 
 logger = logging.getLogger(__name__)
 
@@ -983,13 +985,21 @@ class AstraDBVectorStore(VectorStore):
             ids_to_replace = []
             inserted_ids = insert_many_result.inserted_ids
         except InsertManyException as err:
-            inserted_ids = err.partial_result.inserted_ids
-            inserted_ids_set = set(inserted_ids)
-            ids_to_replace = [
-                document["_id"]
-                for document in documents_to_insert
-                if document["_id"] not in inserted_ids_set
-            ]
+            # check that the error is solely due to already-existing documents
+            error_codes = {
+                getattr(err_desc, "error_code", None)
+                for err_desc in err.error_descriptors
+            }
+            if error_codes == {DOCUMENT_ALREADY_EXISTS_API_ERROR_CODE}:
+                inserted_ids = err.partial_result.inserted_ids
+                inserted_ids_set = set(inserted_ids)
+                ids_to_replace = [
+                    document["_id"]
+                    for document in documents_to_insert
+                    if document["_id"] not in inserted_ids_set
+                ]
+            else:
+                raise
 
         # if necessary, replace docs for the non-inserted ids
         if ids_to_replace:
@@ -1107,13 +1117,21 @@ class AstraDBVectorStore(VectorStore):
             ids_to_replace = []
             inserted_ids = insert_many_result.inserted_ids
         except InsertManyException as err:
-            inserted_ids = err.partial_result.inserted_ids
-            inserted_ids_set = set(inserted_ids)
-            ids_to_replace = [
-                document["_id"]
-                for document in documents_to_insert
-                if document["_id"] not in inserted_ids_set
-            ]
+            # check that the error is solely due to already-existing documents
+            error_codes = {
+                getattr(err_desc, "error_code", None)
+                for err_desc in err.error_descriptors
+            }
+            if error_codes == {DOCUMENT_ALREADY_EXISTS_API_ERROR_CODE}:
+                inserted_ids = err.partial_result.inserted_ids
+                inserted_ids_set = set(inserted_ids)
+                ids_to_replace = [
+                    document["_id"]
+                    for document in documents_to_insert
+                    if document["_id"] not in inserted_ids_set
+                ]
+            else:
+                raise
 
         # if necessary, replace docs for the non-inserted ids
         if ids_to_replace:
