@@ -3,8 +3,6 @@
 Refer to `test_vectorstores.py` for the requirements to run.
 """
 
-# ruff: noqa: FIX002 TD002 TD003
-
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
