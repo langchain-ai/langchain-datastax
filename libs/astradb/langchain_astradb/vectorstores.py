@@ -473,7 +473,7 @@ class AstraDBVectorStore(VectorStore):
                 Please understand the limitations of this method and get some
                 understanding of your data before passing ``"*"`` for this parameter.
             ignore_invalid_documents: if False (default), exceptions are raised
-                when a document is found on the Astra DB collectin that does
+                when a document is found on the Astra DB collection that does
                 not have the expected shape. If set to True, such results
                 from the database are ignored and a warning is issued. Note
                 that in this case a similarity search may end up returning fewer

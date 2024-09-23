@@ -323,7 +323,7 @@ class AstraDBGraphVectorStore(GraphVectorStore):
         def get_adjacent(tags: set[str]) -> Iterable[_Edge]:
             targets: dict[str, _Edge] = {}
 
-            # TODO: Would be better parralelized
+            # TODO: Would be better parallelized
             for tag in tags:
                 m_filter = (metadata_filter or {}).copy()
                 m_filter[self.link_from_metadata_key] = tag

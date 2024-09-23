@@ -7,7 +7,7 @@ from langchain_astradb.vectorstores import (
     DEFAULT_INDEXING_OPTIONS,
     AstraDBVectorStore,
 )
-from tests.conftest import SomeEmbeddings
+from tests.conftest import ParserEmbeddings
 
 FAKE_TOKEN = "t"  # noqa: S105
 
@@ -25,7 +25,7 @@ class TestAstraDB:
             api_endpoint=a_e_string,
             namespace="n",
         )
-        embedding = SomeEmbeddings(dimension=2)
+        embedding = ParserEmbeddings(dimension=2)
         with pytest.warns(DeprecationWarning):
             AstraDBVectorStore(
                 embedding=embedding,
