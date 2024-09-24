@@ -5,148 +5,36 @@ Refer to `test_vectorstores.py` for the requirements to run.
 
 from __future__ import annotations
 
-import os
-from typing import TYPE_CHECKING, Iterable
+from typing import TYPE_CHECKING
 
 import pytest
-from astrapy import DataAPIClient
 from astrapy.authentication import StaticTokenProvider
 from langchain_core.documents import Document
 
-from langchain_astradb.utils.astradb import SetupMode
 from langchain_astradb.vectorstores import AstraDBVectorStore
-from tests.conftest import ParserEmbeddings
 
-from .conftest import OPENAI_VECTORIZE_OPTIONS, AstraDBCredentials, _has_env_vars
+from .conftest import (
+    COLLECTION_NAME_D2,
+    COLLECTION_NAME_VZ,
+    AstraDBCredentials,
+    _has_env_vars,
+)
 
 if TYPE_CHECKING:
     from astrapy import Collection
     from langchain_core.embeddings import Embeddings
-
-# Faster testing (no actual collection deletions). Off by default (=full tests)
-SKIP_COLLECTION_DELETE = (
-    int(os.environ.get("ASTRA_DB_SKIP_COLLECTION_DELETIONS", "0")) != 0
-)
-
-AD_NOVECTORIZE_COLLECTION = "lc_ad_novectorize"
-AD_VECTORIZE_COLLECTION = "lc_ad_vectorize"
-
-
-@pytest.fixture(scope="session")
-def provisioned_novectorize_collection(
-    astra_db_credentials: AstraDBCredentials,
-) -> Iterable[Collection]:
-    """Provision a general-purpose collection for the no-vectorize tests."""
-    client = DataAPIClient(environment=astra_db_credentials["environment"])
-    database = client.get_database(
-        astra_db_credentials["api_endpoint"],
-        token=StaticTokenProvider(astra_db_credentials["token"]),
-        namespace=astra_db_credentials["namespace"],
-    )
-    collection = database.create_collection(
-        AD_NOVECTORIZE_COLLECTION,
-        dimension=2,
-        check_exists=False,
-        metric="cosine",
-    )
-    yield collection
-
-    if not SKIP_COLLECTION_DELETE:
-        collection.drop()
-
-
-@pytest.fixture(scope="session")
-def provisioned_vectorize_collection(
-    astra_db_credentials: AstraDBCredentials,
-) -> Iterable[Collection]:
-    """Provision a general-purpose collection for the vectorize tests."""
-    client = DataAPIClient(environment=astra_db_credentials["environment"])
-    database = client.get_database(
-        astra_db_credentials["api_endpoint"],
-        token=StaticTokenProvider(astra_db_credentials["token"]),
-        namespace=astra_db_credentials["namespace"],
-    )
-    collection = database.create_collection(
-        AD_VECTORIZE_COLLECTION,
-        dimension=2,
-        check_exists=False,
-        metric="cosine",
-        service=OPENAI_VECTORIZE_OPTIONS,
-    )
-    yield collection
-
-    if not SKIP_COLLECTION_DELETE:
-        collection.drop()
-
-
-@pytest.fixture
-def novectorize_collection(
-    provisioned_novectorize_collection: Collection,
-) -> Iterable[Collection]:
-    provisioned_novectorize_collection.delete_many({})
-    yield provisioned_novectorize_collection
-
-    provisioned_novectorize_collection.delete_many({})
-
-
-@pytest.fixture
-def vectorize_collection(
-    provisioned_vectorize_collection: Collection,
-) -> Iterable[Collection]:
-    provisioned_vectorize_collection.delete_many({})
-    yield provisioned_vectorize_collection
-
-    provisioned_vectorize_collection.delete_many({})
-
-
-@pytest.fixture(scope="session")
-def embedding() -> Embeddings:
-    return ParserEmbeddings(dimension=2)
-
-
-@pytest.fixture
-def novectorize_store(
-    novectorize_collection: Collection,  # noqa: ARG001
-    astra_db_credentials: AstraDBCredentials,
-    embedding: Embeddings,
-) -> AstraDBVectorStore:
-    return AstraDBVectorStore(
-        embedding=embedding,
-        collection_name=AD_NOVECTORIZE_COLLECTION,
-        token=StaticTokenProvider(astra_db_credentials["token"]),
-        api_endpoint=astra_db_credentials["api_endpoint"],
-        namespace=astra_db_credentials["namespace"],
-        environment=astra_db_credentials["environment"],
-        setup_mode=SetupMode.OFF,
-    )
-
-
-@pytest.fixture
-def vectorize_store(
-    vectorize_collection: Collection,  # noqa: ARG001
-    astra_db_credentials: AstraDBCredentials,
-) -> AstraDBVectorStore:
-    return AstraDBVectorStore(
-        collection_name=AD_VECTORIZE_COLLECTION,
-        token=StaticTokenProvider(astra_db_credentials["token"]),
-        api_endpoint=astra_db_credentials["api_endpoint"],
-        namespace=astra_db_credentials["namespace"],
-        environment=astra_db_credentials["environment"],
-        setup_mode=SetupMode.OFF,
-        collection_vector_service_options=OPENAI_VECTORIZE_OPTIONS,
-    )
 
 
 @pytest.mark.skipif(not _has_env_vars(), reason="Missing Astra DB env. vars")
 class TestVectorStoreAutodetect:
     def test_autodetect_flat_novectorize_crud(
         self,
-        novectorize_collection: Collection,
+        empty_collection_d2: Collection,
         astra_db_credentials: AstraDBCredentials,
-        embedding: Embeddings,
+        embedding_d2: Embeddings,
     ) -> None:
         """Test autodetect on a populated flat collection, checking all codecs."""
-        novectorize_collection.insert_many(
+        empty_collection_d2.insert_many(
             [
                 {
                     "_id": "1",
@@ -172,8 +60,8 @@ class TestVectorStoreAutodetect:
             ]
         )
         ad_store = AstraDBVectorStore(
-            embedding=embedding,
-            collection_name=AD_NOVECTORIZE_COLLECTION,
+            embedding=embedding_d2,
+            collection_name=COLLECTION_NAME_D2,
             token=StaticTokenProvider(astra_db_credentials["token"]),
             api_endpoint=astra_db_credentials["api_endpoint"],
             namespace=astra_db_credentials["namespace"],
@@ -204,13 +92,13 @@ class TestVectorStoreAutodetect:
 
     def test_autodetect_default_novectorize_crud(
         self,
-        novectorize_collection: Collection,  # noqa: ARG002
+        empty_collection_d2: Collection,  # noqa: ARG002
         astra_db_credentials: AstraDBCredentials,
-        embedding: Embeddings,
-        novectorize_store: AstraDBVectorStore,
+        embedding_d2: Embeddings,
+        vector_store_d2: AstraDBVectorStore,
     ) -> None:
         """Test autodetect on a VS-made collection, checking all codecs."""
-        novectorize_store.add_texts(
+        vector_store_d2.add_texts(
             texts=[
                 "[1,2]",
                 "[3,4]",
@@ -229,8 +117,8 @@ class TestVectorStoreAutodetect:
         )
         # now with the autodetect
         ad_store = AstraDBVectorStore(
-            embedding=embedding,
-            collection_name=AD_NOVECTORIZE_COLLECTION,
+            embedding=embedding_d2,
+            collection_name=COLLECTION_NAME_D2,
             token=StaticTokenProvider(astra_db_credentials["token"]),
             api_endpoint=astra_db_credentials["api_endpoint"],
             namespace=astra_db_credentials["namespace"],
@@ -261,11 +149,11 @@ class TestVectorStoreAutodetect:
 
     def test_autodetect_flat_vectorize_crud(
         self,
-        vectorize_collection: Collection,
+        empty_collection_vz: Collection,
         astra_db_credentials: AstraDBCredentials,
     ) -> None:
         """Test autodetect on a populated flat collection, checking all codecs."""
-        vectorize_collection.insert_many(
+        empty_collection_vz.insert_many(
             [
                 {
                     "_id": "1",
@@ -288,7 +176,7 @@ class TestVectorStoreAutodetect:
             ]
         )
         ad_store = AstraDBVectorStore(
-            collection_name=AD_VECTORIZE_COLLECTION,
+            collection_name=COLLECTION_NAME_VZ,
             token=StaticTokenProvider(astra_db_credentials["token"]),
             api_endpoint=astra_db_credentials["api_endpoint"],
             namespace=astra_db_credentials["namespace"],
@@ -319,12 +207,12 @@ class TestVectorStoreAutodetect:
 
     def test_autodetect_default_vectorize_crud(
         self,
-        vectorize_collection: Collection,  # noqa: ARG002
+        empty_collection_vz: Collection,  # noqa: ARG002
         astra_db_credentials: AstraDBCredentials,
-        vectorize_store: AstraDBVectorStore,
+        vector_store_vz: AstraDBVectorStore,
     ) -> None:
         """Test autodetect on a VS-made collection, checking all codecs."""
-        vectorize_store.add_texts(
+        vector_store_vz.add_texts(
             texts=[
                 "Cont1",
                 "Cont2",
@@ -343,7 +231,7 @@ class TestVectorStoreAutodetect:
         )
         # now with the autodetect
         ad_store = AstraDBVectorStore(
-            collection_name=AD_VECTORIZE_COLLECTION,
+            collection_name=COLLECTION_NAME_VZ,
             token=StaticTokenProvider(astra_db_credentials["token"]),
             api_endpoint=astra_db_credentials["api_endpoint"],
             namespace=astra_db_credentials["namespace"],
@@ -374,12 +262,12 @@ class TestVectorStoreAutodetect:
 
     def test_failed_docs_autodetect_flat_novectorize_crud(
         self,
-        novectorize_collection: Collection,
+        empty_collection_d2: Collection,
         astra_db_credentials: AstraDBCredentials,
-        embedding: Embeddings,
+        embedding_d2: Embeddings,
     ) -> None:
         """Test autodetect + skipping failing documents."""
-        novectorize_collection.insert_many(
+        empty_collection_d2.insert_many(
             [
                 {
                     "_id": "1",
@@ -391,8 +279,8 @@ class TestVectorStoreAutodetect:
             ]
         )
         ad_store_e = AstraDBVectorStore(
-            collection_name=AD_NOVECTORIZE_COLLECTION,
-            embedding=embedding,
+            collection_name=COLLECTION_NAME_D2,
+            embedding=embedding_d2,
             token=StaticTokenProvider(astra_db_credentials["token"]),
             api_endpoint=astra_db_credentials["api_endpoint"],
             namespace=astra_db_credentials["namespace"],
@@ -401,8 +289,8 @@ class TestVectorStoreAutodetect:
             ignore_invalid_documents=False,
         )
         ad_store_w = AstraDBVectorStore(
-            collection_name=AD_NOVECTORIZE_COLLECTION,
-            embedding=embedding,
+            collection_name=COLLECTION_NAME_D2,
+            embedding=embedding_d2,
             token=StaticTokenProvider(astra_db_credentials["token"]),
             api_endpoint=astra_db_credentials["api_endpoint"],
             namespace=astra_db_credentials["namespace"],
@@ -417,7 +305,7 @@ class TestVectorStoreAutodetect:
         results_w = ad_store_w.similarity_search("[-1,-1]", k=3)
         assert len(results_w) == 1
 
-        novectorize_collection.insert_one(
+        empty_collection_d2.insert_one(
             {
                 "_id": "2",
                 "$vector": [3, 4],
