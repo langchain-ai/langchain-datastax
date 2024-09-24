@@ -7,11 +7,9 @@ Refer to `test_vectorstores.py` for the requirements to run.
 
 from __future__ import annotations
 
-import os
-from typing import TYPE_CHECKING, Iterable
+from typing import TYPE_CHECKING
 
 import pytest
-from astrapy import DataAPIClient
 from astrapy.authentication import StaticTokenProvider
 from langchain_core.documents import Document
 from langchain_core.graph_vectorstores.base import Node
@@ -19,145 +17,24 @@ from langchain_core.graph_vectorstores.links import Link, add_links
 
 from langchain_astradb.graph_vectorstores import AstraDBGraphVectorStore
 from langchain_astradb.utils.astradb import SetupMode
-from tests.conftest import ParserEmbeddings
 
-from .conftest import AstraDBCredentials, _has_env_vars
+from .conftest import (
+    COLLECTION_NAME_D2,
+    CUSTOM_CONTENT_KEY,
+    LONG_TEXT,
+    AstraDBCredentials,
+    _has_env_vars,
+)
 
 if TYPE_CHECKING:
     from astrapy import Collection
     from langchain_core.embeddings import Embeddings
 
-# Faster testing (no actual collection deletions). Off by default (=full tests)
-SKIP_COLLECTION_DELETE = (
-    int(os.environ.get("ASTRA_DB_SKIP_COLLECTION_DELETIONS", "0")) != 0
-)
-
-GVS_NOVECTORIZE_COLLECTION = "lc_gvs_novectorize"
-# for testing with autodetect
-CUSTOM_CONTENT_KEY = "xcontent"
-LONG_TEXT = "This is the textual content field in the doc."
-
-
-@pytest.fixture(scope="session")
-def provisioned_novectorize_collection(
-    astra_db_credentials: AstraDBCredentials,
-) -> Iterable[Collection]:
-    """Provision a general-purpose collection for the no-vectorize tests."""
-    client = DataAPIClient(environment=astra_db_credentials["environment"])
-    database = client.get_database(
-        astra_db_credentials["api_endpoint"],
-        token=StaticTokenProvider(astra_db_credentials["token"]),
-        namespace=astra_db_credentials["namespace"],
-    )
-    collection = database.create_collection(
-        GVS_NOVECTORIZE_COLLECTION,
-        dimension=2,
-        check_exists=False,
-        metric="euclidean",
-    )
-    yield collection
-
-    if not SKIP_COLLECTION_DELETE:
-        collection.drop()
-
 
 @pytest.fixture
-def novectorize_empty_collection(
-    provisioned_novectorize_collection: Collection,
-) -> Iterable[Collection]:
-    provisioned_novectorize_collection.delete_many({})
-    yield provisioned_novectorize_collection
-
-    provisioned_novectorize_collection.delete_many({})
-
-
-@pytest.fixture
-def embedding() -> Embeddings:
-    return ParserEmbeddings(dimension=2)
-
-
-@pytest.fixture
-def novectorize_empty_graph_store(
-    novectorize_empty_collection: Collection,  # noqa: ARG001
-    astra_db_credentials: AstraDBCredentials,
-    embedding: Embeddings,
-) -> AstraDBGraphVectorStore:
-    return AstraDBGraphVectorStore(
-        embedding=embedding,
-        collection_name=GVS_NOVECTORIZE_COLLECTION,
-        token=StaticTokenProvider(astra_db_credentials["token"]),
-        api_endpoint=astra_db_credentials["api_endpoint"],
-        namespace=astra_db_credentials["namespace"],
-        environment=astra_db_credentials["environment"],
-        setup_mode=SetupMode.OFF,
-    )
-
-
-@pytest.fixture
-def novectorize_autodetect_full_graph_store(
-    astra_db_credentials: AstraDBCredentials,
-    novectorize_empty_collection: Collection,
-    embedding: Embeddings,
-    graph_docs: list[Document],
-) -> AstraDBGraphVectorStore:
+def graph_vector_store_docs() -> list[Document]:
     """
-    Pre-populate the collection and have (VectorStore)autodetect work on it,
-    then create and return a GraphVectorStore, additionally filled with
-    the same (graph-)entries as for `novectorize_full_graph_store`.
-    """
-    novectorize_empty_collection.insert_many(
-        [
-            {
-                CUSTOM_CONTENT_KEY: LONG_TEXT,
-                "$vector": [100, 0],
-                "mds": "S",
-                "mdi": 100,
-            },
-            {
-                CUSTOM_CONTENT_KEY: LONG_TEXT,
-                "$vector": [100, 1],
-                "mds": "T",
-                "mdi": 101,
-            },
-            {
-                CUSTOM_CONTENT_KEY: LONG_TEXT,
-                "$vector": [100, 2],
-                "mds": "U",
-                "mdi": 102,
-            },
-        ]
-    )
-    gstore = AstraDBGraphVectorStore(
-        embedding=embedding,
-        collection_name=GVS_NOVECTORIZE_COLLECTION,
-        link_to_metadata_key="x_link_to_x",
-        link_from_metadata_key="x_link_from_x",
-        token=StaticTokenProvider(astra_db_credentials["token"]),
-        api_endpoint=astra_db_credentials["api_endpoint"],
-        namespace=astra_db_credentials["namespace"],
-        environment=astra_db_credentials["environment"],
-        content_field="*",
-        autodetect_collection=True,
-    )
-    gstore.add_documents(graph_docs)
-    return gstore
-
-
-def assert_all_flat_docs(collection: Collection) -> None:
-    """
-    Check that after graph-insertions all docs in the store
-    still obey the underlying autodetected doc schema on DB.
-    """
-    for doc in collection.find({}, projection={"*": True}):
-        assert all(not isinstance(v, dict) for v in doc.values())
-        assert CUSTOM_CONTENT_KEY in doc
-        assert isinstance(doc["$vector"], list)
-
-
-@pytest.fixture
-def graph_docs() -> list[Document]:
-    """
-    This is a pre-populated graph vector store,
+    This is a set of Documents to pre-populate a graph vector store,
     with entries placed in a certain way.
 
     Space of the entries (under Euclidean similarity):
@@ -178,7 +55,7 @@ def graph_docs() -> list[Document]:
                     FL   FR
                       F0
 
-    the query point is at (*).
+    the query point is meant to be at (*).
     the A are bidirectionally with B
     the A are outgoing to T
     the A are incoming from F
@@ -219,12 +96,91 @@ def graph_docs() -> list[Document]:
 
 
 @pytest.fixture
-def novectorize_full_graph_store(
-    novectorize_empty_graph_store: AstraDBGraphVectorStore,
-    graph_docs: list[Document],
+def graph_vector_store_d2(
+    empty_collection_d2: Collection,  # noqa: ARG001
+    astra_db_credentials: AstraDBCredentials,
+    embedding_d2: Embeddings,
 ) -> AstraDBGraphVectorStore:
-    novectorize_empty_graph_store.add_documents(graph_docs)
-    return novectorize_empty_graph_store
+    return AstraDBGraphVectorStore(
+        embedding=embedding_d2,
+        collection_name=COLLECTION_NAME_D2,
+        token=StaticTokenProvider(astra_db_credentials["token"]),
+        api_endpoint=astra_db_credentials["api_endpoint"],
+        namespace=astra_db_credentials["namespace"],
+        environment=astra_db_credentials["environment"],
+        setup_mode=SetupMode.OFF,
+    )
+
+
+@pytest.fixture
+def populated_graph_vector_store_d2(
+    graph_vector_store_d2: AstraDBGraphVectorStore,
+    graph_vector_store_docs: list[Document],
+) -> AstraDBGraphVectorStore:
+    graph_vector_store_d2.add_documents(graph_vector_store_docs)
+    return graph_vector_store_d2
+
+
+@pytest.fixture
+def autodetect_populated_graph_vector_store_d2(
+    astra_db_credentials: AstraDBCredentials,
+    empty_collection_d2: Collection,
+    embedding_d2: Embeddings,
+    graph_vector_store_docs: list[Document],
+) -> AstraDBGraphVectorStore:
+    """
+    Pre-populate the collection and have (VectorStore)autodetect work on it,
+    then create and return a GraphVectorStore, additionally filled with
+    the same (graph-)entries as for `populated_graph_vector_store_d2`.
+    """
+    empty_collection_d2.insert_many(
+        [
+            {
+                CUSTOM_CONTENT_KEY: LONG_TEXT,
+                "$vector": [100, 0],
+                "mds": "S",
+                "mdi": 100,
+            },
+            {
+                CUSTOM_CONTENT_KEY: LONG_TEXT,
+                "$vector": [100, 1],
+                "mds": "T",
+                "mdi": 101,
+            },
+            {
+                CUSTOM_CONTENT_KEY: LONG_TEXT,
+                "$vector": [100, 2],
+                "mds": "U",
+                "mdi": 102,
+            },
+        ]
+    )
+    gstore = AstraDBGraphVectorStore(
+        embedding=embedding_d2,
+        collection_name=COLLECTION_NAME_D2,
+        link_to_metadata_key="x_link_to_x",
+        link_from_metadata_key="x_link_from_x",
+        token=StaticTokenProvider(astra_db_credentials["token"]),
+        api_endpoint=astra_db_credentials["api_endpoint"],
+        namespace=astra_db_credentials["namespace"],
+        environment=astra_db_credentials["environment"],
+        content_field="*",
+        autodetect_collection=True,
+    )
+    gstore.add_documents(graph_vector_store_docs)
+    return gstore
+
+
+def assert_all_flat_docs(collection: Collection) -> None:
+    """
+    Check that all docs in the store obey the underlying (flat) autodetected
+    doc schema on DB.
+    Useful for checking the store after graph-store-driven insertions.
+    """
+    for doc in collection.find({}, projection={"*": True}):
+        assert all(not isinstance(v, dict) for v in doc.values())
+        assert CUSTOM_CONTENT_KEY in doc
+        assert isinstance(doc["$vector"], list)
 
 
 @pytest.mark.skipif(not _has_env_vars(), reason="Missing Astra DB env. vars")
@@ -232,8 +188,8 @@ class TestAstraDBGraphVectorStore:
     @pytest.mark.parametrize(
         ("store_name", "is_autodetected"),
         [
-            ("novectorize_full_graph_store", False),
-            ("novectorize_autodetect_full_graph_store", True),
+            ("populated_graph_vector_store_d2", False),
+            ("autodetect_populated_graph_vector_store_d2", True),
         ],
         ids=["native_store", "autodetected_store"],
     )
@@ -258,8 +214,8 @@ class TestAstraDBGraphVectorStore:
     @pytest.mark.parametrize(
         ("store_name", "is_autodetected"),
         [
-            ("novectorize_full_graph_store", False),
-            ("novectorize_autodetect_full_graph_store", True),
+            ("populated_graph_vector_store_d2", False),
+            ("autodetect_populated_graph_vector_store_d2", True),
         ],
         ids=["native_store", "autodetected_store"],
     )
@@ -283,8 +239,8 @@ class TestAstraDBGraphVectorStore:
     @pytest.mark.parametrize(
         ("store_name", "is_autodetected"),
         [
-            ("novectorize_full_graph_store", False),
-            ("novectorize_autodetect_full_graph_store", True),
+            ("populated_graph_vector_store_d2", False),
+            ("autodetect_populated_graph_vector_store_d2", True),
         ],
         ids=["native_store", "autodetected_store"],
     )
@@ -315,15 +271,15 @@ class TestAstraDBGraphVectorStore:
         self,
         *,
         astra_db_credentials: AstraDBCredentials,
-        novectorize_empty_collection: Collection,  # noqa: ARG002
-        embedding: Embeddings,
+        empty_collection_d2: Collection,  # noqa: ARG002
+        embedding_d2: Embeddings,
     ) -> None:
         g_store = AstraDBGraphVectorStore.from_texts(
             texts=["[1, 2]"],
-            embedding=embedding,
+            embedding=embedding_d2,
             metadatas=[{"md": 1}],
             ids=["x_id"],
-            collection_name=GVS_NOVECTORIZE_COLLECTION,
+            collection_name=COLLECTION_NAME_D2,
             token=StaticTokenProvider(astra_db_credentials["token"]),
             api_endpoint=astra_db_credentials["api_endpoint"],
             namespace=astra_db_credentials["namespace"],
@@ -342,8 +298,8 @@ class TestAstraDBGraphVectorStore:
         self,
         *,
         astra_db_credentials: AstraDBCredentials,
-        novectorize_empty_collection: Collection,  # noqa: ARG002
-        embedding: Embeddings,
+        empty_collection_d2: Collection,  # noqa: ARG002
+        embedding_d2: Embeddings,
     ) -> None:
         the_document = Document(
             page_content="[1, 2]",
@@ -352,8 +308,8 @@ class TestAstraDBGraphVectorStore:
         )
         g_store = AstraDBGraphVectorStore.from_documents(
             documents=[the_document],
-            embedding=embedding,
-            collection_name=GVS_NOVECTORIZE_COLLECTION,
+            embedding=embedding_d2,
+            collection_name=COLLECTION_NAME_D2,
             token=StaticTokenProvider(astra_db_credentials["token"]),
             api_endpoint=astra_db_credentials["api_endpoint"],
             namespace=astra_db_credentials["namespace"],
@@ -371,7 +327,7 @@ class TestAstraDBGraphVectorStore:
     def test_gvs_add_nodes(
         self,
         *,
-        novectorize_empty_graph_store: AstraDBGraphVectorStore,
+        graph_vector_store_d2: AstraDBGraphVectorStore,
     ) -> None:
         links0 = [
             Link(kind="kA", direction="out", tag="tA"),
@@ -384,8 +340,8 @@ class TestAstraDBGraphVectorStore:
             Node(id="id0", text="[0, 2]", metadata={"m": 0}, links=links0),
             Node(text="[0, 1]", metadata={"m": 1}, links=links1),
         ]
-        novectorize_empty_graph_store.add_nodes(nodes)
-        hits = novectorize_empty_graph_store.similarity_search_by_vector([0, 3])
+        graph_vector_store_d2.add_nodes(nodes)
+        hits = graph_vector_store_d2.similarity_search_by_vector([0, 3])
         assert len(hits) == 2
         assert hits[0].id == "id0"
         assert hits[0].page_content == "[0, 2]"

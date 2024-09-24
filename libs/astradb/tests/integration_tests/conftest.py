@@ -28,6 +28,9 @@ PROJECT_DIR = Path(ABS_PATH).parent.parent
 # Collection names
 COLLECTION_NAME_D2 = "lc_test_d2_euclidean"
 COLLECTION_NAME_VZ = "lc_test_vz"
+# autodetect assets
+CUSTOM_CONTENT_KEY = "xcontent"
+LONG_TEXT = "This is the textual content field in the doc."
 
 
 # Loading the .env file if it exists

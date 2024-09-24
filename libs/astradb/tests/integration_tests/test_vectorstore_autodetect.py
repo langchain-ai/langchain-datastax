@@ -16,6 +16,7 @@ from langchain_astradb.vectorstores import AstraDBVectorStore
 from .conftest import (
     COLLECTION_NAME_D2,
     COLLECTION_NAME_VZ,
+    CUSTOM_CONTENT_KEY,
     AstraDBCredentials,
     _has_env_vars,
 )
@@ -39,21 +40,21 @@ class TestVectorStoreAutodetect:
                 {
                     "_id": "1",
                     "$vector": [1, 2],
-                    "cont": "[1,2]",
+                    CUSTOM_CONTENT_KEY: "[1,2]",
                     "m1": "a",
                     "m2": "x",
                 },
                 {
                     "_id": "2",
                     "$vector": [3, 4],
-                    "cont": "[3,4]",
+                    CUSTOM_CONTENT_KEY: "[3,4]",
                     "m1": "b",
                     "m2": "y",
                 },
                 {
                     "_id": "3",
                     "$vector": [5, 6],
-                    "cont": "[5,6]",
+                    CUSTOM_CONTENT_KEY: "[5,6]",
                     "m1": "c",
                     "m2": "z",
                 },
@@ -272,7 +273,7 @@ class TestVectorStoreAutodetect:
                 {
                     "_id": "1",
                     "$vector": [1, 2],
-                    "cont": "[1,2]",
+                    CUSTOM_CONTENT_KEY: "[1,2]",
                     "m1": "a",
                     "m2": "x",
                 },
