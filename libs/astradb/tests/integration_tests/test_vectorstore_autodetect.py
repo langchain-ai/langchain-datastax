@@ -17,13 +17,14 @@ from .conftest import (
     COLLECTION_NAME_D2,
     COLLECTION_NAME_VZ,
     CUSTOM_CONTENT_KEY,
-    AstraDBCredentials,
     _has_env_vars,
 )
 
 if TYPE_CHECKING:
     from astrapy import Collection
     from langchain_core.embeddings import Embeddings
+
+    from .conftest import AstraDBCredentials
 
 
 @pytest.mark.skipif(not _has_env_vars(), reason="Missing Astra DB env. vars")

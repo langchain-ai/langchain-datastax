@@ -22,13 +22,14 @@ from .conftest import (
     COLLECTION_NAME_D2,
     CUSTOM_CONTENT_KEY,
     LONG_TEXT,
-    AstraDBCredentials,
     _has_env_vars,
 )
 
 if TYPE_CHECKING:
     from astrapy import Collection
     from langchain_core.embeddings import Embeddings
+
+    from .conftest import AstraDBCredentials
 
 
 @pytest.fixture

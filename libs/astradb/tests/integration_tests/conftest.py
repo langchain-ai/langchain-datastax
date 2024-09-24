@@ -25,12 +25,17 @@ ABS_PATH = (Path(__file__)).parent
 # Getting the absolute path of the project's root directory
 PROJECT_DIR = Path(ABS_PATH).parent.parent
 
-# Collection names
+# Long-lasting collection names
 COLLECTION_NAME_D2 = "lc_test_d2_euclidean"
 COLLECTION_NAME_VZ = "lc_test_vz"
+# Function-lived collection names
+EPHEMERAL_COLLECTION_NAME_D2 = "lc_test_d2_euclidean_short"
+EPHEMERAL_COLLECTION_NAME_VZ = "lc_test_vz_short"
 # autodetect assets
 CUSTOM_CONTENT_KEY = "xcontent"
 LONG_TEXT = "This is the textual content field in the doc."
+# vectorstore-related utilities/constants
+INCOMPATIBLE_INDEXING_MSG = "is detected as having the following indexing policy"
 
 
 # Loading the .env file if it exists
@@ -54,24 +59,15 @@ def _has_env_vars() -> bool:
 _load_env()
 
 
-# Faster testing (no actual collection deletions). Off by default (=full tests)
-SKIP_COLLECTION_DELETE = (
-    int(os.environ.get("ASTRA_DB_SKIP_COLLECTION_DELETIONS", "0")) != 0
-)
+OPENAI_API_KEY = os.environ["OPENAI_API_KEY"]
+OPENAI_SHARED_SECRET_KEY_NAME = os.environ.get("SHARED_SECRET_NAME_OPENAI", "")
+
 OPENAI_VECTORIZE_OPTIONS = CollectionVectorServiceOptions(
     provider="openai",
     model_name="text-embedding-3-small",
     authentication={
-        "providerKey": f"{os.environ.get('SHARED_SECRET_NAME_OPENAI', '')}",
+        "providerKey": OPENAI_SHARED_SECRET_KEY_NAME,
     },
-)
-OPENAI_VECTORIZE_OPTIONS_HEADER = CollectionVectorServiceOptions(
-    provider="openai",
-    model_name="text-embedding-3-small",
-)
-NVIDIA_VECTORIZE_OPTIONS = CollectionVectorServiceOptions(
-    provider="nvidia",
-    model_name="NV-Embed-QA",
 )
 
 
@@ -130,9 +126,6 @@ def collection_d2(
     )
     yield collection
 
-    if not SKIP_COLLECTION_DELETE:
-        collection.drop()
-
 
 @pytest.fixture
 def empty_collection_d2(
@@ -161,6 +154,39 @@ def vector_store_d2(
     )
 
 
+@pytest.fixture
+def vector_store_d2_stringtoken(
+    empty_collection_d2: Collection,  # noqa: ARG001
+    astra_db_credentials: AstraDBCredentials,
+    embedding_d2: Embeddings,
+) -> AstraDBVectorStore:
+    """
+    A fresh vector store on a d=2(Euclidean) collection,
+    but initialized with a token string instead of a TokenProvider.
+    """
+    return AstraDBVectorStore(
+        embedding=embedding_d2,
+        collection_name=COLLECTION_NAME_D2,
+        token=astra_db_credentials["token"],
+        api_endpoint=astra_db_credentials["api_endpoint"],
+        namespace=astra_db_credentials["namespace"],
+        environment=astra_db_credentials["environment"],
+        setup_mode=SetupMode.OFF,
+    )
+
+
+@pytest.fixture
+def ephemeral_collection_cleaner_d2(
+    database: Database,
+) -> Iterable[Collection]:
+    """
+    A nominal fixture to ensure the ephemeral collection is deleted
+    after the test function has finished.
+    """
+    if EPHEMERAL_COLLECTION_NAME_D2 in database.list_collection_names():
+        database.drop_collection(EPHEMERAL_COLLECTION_NAME_D2)
+
+
 @pytest.fixture(scope="session")
 def collection_vz(
     database: Database,
@@ -170,12 +196,10 @@ def collection_vz(
         COLLECTION_NAME_VZ,
         dimension=16,
         check_exists=False,
+        metric="euclidean",
         service=OPENAI_VECTORIZE_OPTIONS,
     )
     yield collection
-
-    if not SKIP_COLLECTION_DELETE:
-        collection.drop()
 
 
 @pytest.fixture
@@ -189,7 +213,7 @@ def empty_collection_vz(
 
 @pytest.fixture
 def vector_store_vz(
-    empty_collection_d2: Collection,  # noqa: ARG001
+    empty_collection_vz: Collection,  # noqa: ARG001
     astra_db_credentials: AstraDBCredentials,
 ) -> AstraDBVectorStore:
     """A fresh vector store on a $vectorize collection."""
@@ -202,3 +226,15 @@ def vector_store_vz(
         setup_mode=SetupMode.OFF,
         collection_vector_service_options=OPENAI_VECTORIZE_OPTIONS,
     )
+
+
+@pytest.fixture
+def ephemeral_collection_cleaner_vz(
+    database: Database,
+) -> Iterable[Collection]:
+    """
+    A nominal fixture to ensure the ephemeral vectorize collection is deleted
+    after the test function has finished.
+    """
+    if EPHEMERAL_COLLECTION_NAME_VZ in database.list_collection_names():
+        database.drop_collection(EPHEMERAL_COLLECTION_NAME_VZ)
