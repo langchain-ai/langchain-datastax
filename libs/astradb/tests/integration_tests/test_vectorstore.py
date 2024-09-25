@@ -38,7 +38,9 @@ from .conftest import (
     COLLECTION_NAME_VZ,
     EPHEMERAL_COLLECTION_NAME_D2,
     EPHEMERAL_COLLECTION_NAME_VZ,
+    EUCLIDEAN_MIN_SIM_UNIT_VECTORS,
     INCOMPATIBLE_INDEXING_MSG,
+    MATCH_EPSILON,
     OPENAI_VECTORIZE_OPTIONS,
     _has_env_vars,
 )
@@ -50,7 +52,6 @@ if TYPE_CHECKING:
     from .conftest import AstraDBCredentials
 
 
-MATCH_EPSILON = 0.0001
 
 
 @pytest.mark.skipif(not _has_env_vars(), reason="Missing Astra DB env. vars")
@@ -61,16 +62,17 @@ class TestAstraDBVectorStore:
         collection_d2: Collection,
         astra_db_credentials: AstraDBCredentials,
         embedding_d2: Embeddings,
-        ephemeral_collection_cleaner_vd2: Collection,
+        ephemeral_collection_cleaner_vd2:str,
     ) -> None:
         """Create and delete."""
         v_store = AstraDBVectorStore(
             embedding=embedding_d2,
             collection_name=EPHEMERAL_COLLECTION_NAME_D2,
-            token=astra_db_credentials["token"],
+            token=StaticTokenProvider(astra_db_credentials["token"]),
             api_endpoint=astra_db_credentials["api_endpoint"],
             namespace=astra_db_credentials["namespace"],
             environment=astra_db_credentials["environment"],
+            metric="cosine",
         )
         v_store.add_texts(["[1,2]"])
         v_store.delete_collection()
@@ -81,15 +83,16 @@ class TestAstraDBVectorStore:
         database: Database,
         collection_vz: Collection,
         astra_db_credentials: AstraDBCredentials,
-        ephemeral_collection_cleaner_vz: Collection,
+        ephemeral_collection_cleaner_vz: str,
     ) -> None:
         """Create and delete with vectorize option."""
         v_store = AstraDBVectorStore(
             collection_name=EPHEMERAL_COLLECTION_NAME_VZ,
-            token=astra_db_credentials["token"],
+            token=StaticTokenProvider(astra_db_credentials["token"]),
             api_endpoint=astra_db_credentials["api_endpoint"],
             namespace=astra_db_credentials["namespace"],
             environment=astra_db_credentials["environment"],
+            metric="cosine",
             collection_vector_service_options=OPENAI_VECTORIZE_OPTIONS_HEADER,
             collection_embedding_api_key=OPENAI_API_KEY,
         )
@@ -103,16 +106,17 @@ class TestAstraDBVectorStore:
         collection_d2: Collection,
         astra_db_credentials: AstraDBCredentials,
         embedding_d2: Embeddings,
-        ephemeral_collection_cleaner_d2: Collection,
+        ephemeral_collection_cleaner_d2: str,
     ) -> None:
         """Create and delete, async."""
         v_store = AstraDBVectorStore(
             embedding=embedding_d2,
             collection_name=EPHEMERAL_COLLECTION_NAME_D2,
-            token=astra_db_credentials["token"],
+            token=StaticTokenProvider(astra_db_credentials["token"]),
             api_endpoint=astra_db_credentials["api_endpoint"],
             namespace=astra_db_credentials["namespace"],
             environment=astra_db_credentials["environment"],
+            metric="cosine",
         )
         await v_store.aadd_texts(["[1,2]"])
         await v_store.adelete_collection()
@@ -123,15 +127,16 @@ class TestAstraDBVectorStore:
         database: Database,
         collection_vz: Collection,
         astra_db_credentials: AstraDBCredentials,
-        ephemeral_collection_cleaner_vz: Collection,
+        ephemeral_collection_cleaner_vz: str,
     ) -> None:
         """Create and delete with vectorize option, async."""
         v_store = AstraDBVectorStore(
             collection_name=EPHEMERAL_COLLECTION_NAME_VZ,
-            token=astra_db_credentials["token"],
+            token=StaticTokenProvider(astra_db_credentials["token"]),
             api_endpoint=astra_db_credentials["api_endpoint"],
             namespace=astra_db_credentials["namespace"],
             environment=astra_db_credentials["environment"],
+            metric="cosine",
             collection_vector_service_options=OPENAI_VECTORIZE_OPTIONS_HEADER,
             collection_embedding_api_key=OPENAI_API_KEY,
         )
@@ -143,16 +148,17 @@ class TestAstraDBVectorStore:
         self,
         embedding_d2: Embeddings,
         astra_db_credentials: AstraDBCredentials,
-        ephemeral_collection_cleaner_d2: Collection,
+        ephemeral_collection_cleaner_d2: str,
     ) -> None:
         """Use of the pre_delete_collection flag."""
         v_store = AstraDBVectorStore(
             embedding=embedding_d2,
             collection_name=EPHEMERAL_COLLECTION_NAME_D2,
-            token=astra_db_credentials["token"],
+            token=StaticTokenProvider(astra_db_credentials["token"]),
             api_endpoint=astra_db_credentials["api_endpoint"],
             namespace=astra_db_credentials["namespace"],
             environment=astra_db_credentials["environment"],
+            metric="cosine",
         )
         v_store.add_texts(texts=["[1,2]"])
         res1 = v_store.similarity_search("[-1,-1]", k=5)
@@ -160,10 +166,11 @@ class TestAstraDBVectorStore:
         v_store = AstraDBVectorStore(
             embedding=embedding_d2,
             collection_name=EPHEMERAL_COLLECTION_NAME_D2,
-            token=astra_db_credentials["token"],
+            token=StaticTokenProvider(astra_db_credentials["token"]),
             api_endpoint=astra_db_credentials["api_endpoint"],
             namespace=astra_db_credentials["namespace"],
             environment=astra_db_credentials["environment"],
+            metric="cosine",
             pre_delete_collection=True,
         )
         res1 = v_store.similarity_search("[-1,-1]", k=5)
@@ -173,16 +180,17 @@ class TestAstraDBVectorStore:
         self,
         embedding_d2: Embeddings,
         astra_db_credentials: AstraDBCredentials,
-        ephemeral_collection_cleaner_d2: Collection,
+        ephemeral_collection_cleaner_d2: str,
     ) -> None:
         v_store = AstraDBVectorStore(
             embedding=embedding_d2,
             collection_name=EPHEMERAL_COLLECTION_NAME_D2,
-            token=astra_db_credentials["token"],
+            token=StaticTokenProvider(astra_db_credentials["token"]),
             api_endpoint=astra_db_credentials["api_endpoint"],
             namespace=astra_db_credentials["namespace"],
             environment=astra_db_credentials["environment"],
             setup_mode=SetupMode.ASYNC,
+            metric="cosine",
         )
         v_store.add_texts(
             texts=["[1,2]"],
@@ -193,11 +201,12 @@ class TestAstraDBVectorStore:
         v_store = AstraDBVectorStore(
             embedding=embedding_d2,
             collection_name=EPHEMERAL_COLLECTION_NAME_D2,
-            token=astra_db_credentials["token"],
+            token=StaticTokenProvider(astra_db_credentials["token"]),
             api_endpoint=astra_db_credentials["api_endpoint"],
             namespace=astra_db_credentials["namespace"],
             environment=astra_db_credentials["environment"],
             setup_mode=SetupMode.ASYNC,
+            metric="cosine",
             pre_delete_collection=True,
         )
         res1 = await v_store.asimilarity_search("[-1,-1]", k=5)
@@ -302,7 +311,7 @@ class TestAstraDBVectorStore:
             metadatas=[{"m": 1}, {"m": 3}],
             ids=["ft1", "ft3"],
             collection_name=collection.name,
-            token=astra_db_credentials["token"],
+            token=StaticTokenProvider(astra_db_credentials["token"]),
             api_endpoint=astra_db_credentials["api_endpoint"],
             namespace=astra_db_credentials["namespace"],
             environment=astra_db_credentials["environment"],
@@ -327,7 +336,7 @@ class TestAstraDBVectorStore:
                 metadatas=[{"m": 5}, {"m": 7}],
                 ids=["ft5", "ft7"],
                 collection_name=collection.name,
-                token=astra_db_credentials["token"],
+                token=StaticTokenProvider(astra_db_credentials["token"]),
                 api_endpoint=astra_db_credentials["api_endpoint"],
                 namespace=astra_db_credentials["namespace"],
                 environment=astra_db_credentials["environment"],
@@ -351,7 +360,7 @@ class TestAstraDBVectorStore:
             metadatas=[{"m": 9}, {"m": 11}],
             ids=["ft9", "ft11"],
             collection_name=collection.name,
-            token=astra_db_credentials["token"],
+            token=StaticTokenProvider(astra_db_credentials["token"]),
             api_endpoint=astra_db_credentials["api_endpoint"],
             namespace=astra_db_credentials["namespace"],
             environment=astra_db_credentials["environment"],
@@ -406,7 +415,7 @@ class TestAstraDBVectorStore:
                 Document(page_content=pc2, metadata={"m": 3}),
             ],
             collection_name=collection.name,
-            token=astra_db_credentials["token"],
+            token=StaticTokenProvider(astra_db_credentials["token"]),
             api_endpoint=astra_db_credentials["api_endpoint"],
             namespace=astra_db_credentials["namespace"],
             environment=astra_db_credentials["environment"],
@@ -428,7 +437,7 @@ class TestAstraDBVectorStore:
                 ],
                 ids=["idx1", "idx3"],
                 collection_name=collection.name,
-                token=astra_db_credentials["token"],
+                token=StaticTokenProvider(astra_db_credentials["token"]),
                 api_endpoint=astra_db_credentials["api_endpoint"],
                 namespace=astra_db_credentials["namespace"],
                 environment=astra_db_credentials["environment"],
@@ -453,7 +462,7 @@ class TestAstraDBVectorStore:
                 Document(page_content=pc2, metadata={"m": 3}, id="idx3"),
             ],
             collection_name=collection.name,
-            token=astra_db_credentials["token"],
+            token=StaticTokenProvider(astra_db_credentials["token"]),
             api_endpoint=astra_db_credentials["api_endpoint"],
             namespace=astra_db_credentials["namespace"],
             environment=astra_db_credentials["environment"],
@@ -476,7 +485,7 @@ class TestAstraDBVectorStore:
                 ],
                 ids=["idx1", "idx3"],
                 collection_name=collection.name,
-                token=astra_db_credentials["token"],
+                token=StaticTokenProvider(astra_db_credentials["token"]),
                 api_endpoint=astra_db_credentials["api_endpoint"],
                 namespace=astra_db_credentials["namespace"],
                 environment=astra_db_credentials["environment"],
@@ -545,7 +554,7 @@ class TestAstraDBVectorStore:
             metadatas=[{"m": 1}, {"m": 3}],
             ids=["ft1", "ft3"],
             collection_name=collection.name,
-            token=astra_db_credentials["token"],
+            token=StaticTokenProvider(astra_db_credentials["token"]),
             api_endpoint=astra_db_credentials["api_endpoint"],
             namespace=astra_db_credentials["namespace"],
             environment=astra_db_credentials["environment"],
@@ -570,7 +579,7 @@ class TestAstraDBVectorStore:
                 metadatas=[{"m": 5}, {"m": 7}],
                 ids=["ft5", "ft7"],
                 collection_name=collection.name,
-                token=astra_db_credentials["token"],
+                token=StaticTokenProvider(astra_db_credentials["token"]),
                 api_endpoint=astra_db_credentials["api_endpoint"],
                 namespace=astra_db_credentials["namespace"],
                 environment=astra_db_credentials["environment"],
@@ -594,7 +603,7 @@ class TestAstraDBVectorStore:
             metadatas=[{"m": 9}, {"m": 11}],
             ids=["ft9", "ft11"],
             collection_name=collection.name,
-            token=astra_db_credentials["token"],
+            token=StaticTokenProvider(astra_db_credentials["token"]),
             api_endpoint=astra_db_credentials["api_endpoint"],
             namespace=astra_db_credentials["namespace"],
             environment=astra_db_credentials["environment"],
@@ -652,7 +661,7 @@ class TestAstraDBVectorStore:
                 Document(page_content=pc2, metadata={"m": 3}),
             ],
             collection_name=collection.name,
-            token=astra_db_credentials["token"],
+            token=StaticTokenProvider(astra_db_credentials["token"]),
             api_endpoint=astra_db_credentials["api_endpoint"],
             namespace=astra_db_credentials["namespace"],
             environment=astra_db_credentials["environment"],
@@ -674,7 +683,7 @@ class TestAstraDBVectorStore:
                 ],
                 ids=["idx1", "idx3"],
                 collection_name=collection.name,
-                token=astra_db_credentials["token"],
+                token=StaticTokenProvider(astra_db_credentials["token"]),
                 api_endpoint=astra_db_credentials["api_endpoint"],
                 namespace=astra_db_credentials["namespace"],
                 environment=astra_db_credentials["environment"],
@@ -699,7 +708,7 @@ class TestAstraDBVectorStore:
                 Document(page_content=pc2, metadata={"m": 3}, id="idx3"),
             ],
             collection_name=collection.name,
-            token=astra_db_credentials["token"],
+            token=StaticTokenProvider(astra_db_credentials["token"]),
             api_endpoint=astra_db_credentials["api_endpoint"],
             namespace=astra_db_credentials["namespace"],
             environment=astra_db_credentials["environment"],
@@ -722,7 +731,7 @@ class TestAstraDBVectorStore:
                 ],
                 ids=["idx1", "idx3"],
                 collection_name=collection.name,
-                token=astra_db_credentials["token"],
+                token=StaticTokenProvider(astra_db_credentials["token"]),
                 api_endpoint=astra_db_credentials["api_endpoint"],
                 namespace=astra_db_credentials["namespace"],
                 environment=astra_db_credentials["environment"],
@@ -758,7 +767,7 @@ class TestAstraDBVectorStore:
         res0 = vstore.similarity_search("[-1,-1]", k=2)
         assert res0 == []
         # write and check again
-        vstore.add_texts(
+        added_ids = vstore.add_texts(
             texts=["[1,2]", "[3,4]", "[5,6]"],
             metadatas=[
                 {"k": "a", "ord": 0},
@@ -767,10 +776,17 @@ class TestAstraDBVectorStore:
             ],
             ids=["a", "b", "c"],
         )
+        # not requiring ordered match (elsewhere it may be overwriting some)
+        assert set(added_ids) == {"a", "b", "c"}
         res1 = vstore.similarity_search("[-1,-1]", k=5)
         assert {doc.page_content for doc in res1} == {"[1,2]", "[3,4]", "[5,6]"}
+        res2 = vstore.similarity_search("[3,4]", k=1)
+        assert len(res2) == 1
+        assert res2[0].page_content == "[3,4]"
+        assert res2[0].metadata == {"k": "b", "ord": 1}
+        assert res2[0].id == "b"
         # partial overwrite and count total entries
-        vstore.add_texts(
+        added_ids_1 = vstore.add_texts(
             texts=["[5,6]", "[7,8]"],
             metadatas=[
                 {"k": "c_new", "ord": 102},
@@ -778,6 +794,8 @@ class TestAstraDBVectorStore:
             ],
             ids=["c", "d"],
         )
+        # not requiring ordered match (elsewhere it may be overwriting some)
+        assert set(added_ids_1) == {"c", "d"}
         res2 = vstore.similarity_search("[-1,-1]", k=10)
         assert len(res2) == 4
         # pick one that was just updated and check its metadata
@@ -808,24 +826,39 @@ class TestAstraDBVectorStore:
         assert len(vstore.similarity_search("[-1,-1]", k=10)) == 2
         res4 = vstore.similarity_search("[11,12]", k=1, filter={"k": "w"})
         assert res4[0].metadata["ord"] == 205
+        assert res4[0].id == "w"
+        # add_texts with "ids" arg passthrough
+        vstore.add_texts(
+            texts=["[13,14]", "[15,16]"],
+            metadatas=[{"k": "r", "ord": 306}, {"k": "s", "ord": 307}],
+            ids=["r", "s"],
+        )
+        assert len(vstore.similarity_search("[-1,-1]", k=10)) == 4
+        res4 = vstore.similarity_search("[-1,-1]", k=1, filter={"k": "s"})
+        assert res4[0].metadata["ord"] == 307
+        assert res4[0].id == "s"
+        # delete_by_document_id
+        vstore.delete_by_document_id("s")
+        assert len(vstore.similarity_search("[-1,-1]", k=10)) == 3
 
     @pytest.mark.parametrize(
         "vector_store",
         [
             "vector_store_d2",
+            "vector_store_d2_stringtoken",
             "vector_store_vz",
         ],
     )
     async def test_astradb_vectorstore_crud_async(
         self, vector_store: str, request: pytest.FixtureRequest
     ) -> None:
-        """Basic add/delete/update behaviour."""
+        """Add/delete/update behaviour, async version."""
         vstore: AstraDBVectorStore = request.getfixturevalue(vector_store)
 
         res0 = await vstore.asimilarity_search("[-1,-1]", k=2)
         assert res0 == []
         # write and check again
-        await vstore.aadd_texts(
+        added_ids = await vstore.aadd_texts(
             texts=["[1,2]", "[3,4]", "[5,6]"],
             metadatas=[
                 {"k": "a", "ord": 0},
@@ -834,32 +867,41 @@ class TestAstraDBVectorStore:
             ],
             ids=["a", "b", "c"],
         )
+        # not requiring ordered match (elsewhere it may be overwriting some)
+        assert set(added_ids) == {"a", "b", "c"}
         res1 = await vstore.asimilarity_search("[-1,-1]", k=5)
         assert {doc.page_content for doc in res1} == {"[1,2]", "[3,4]", "[5,6]"}
+        res2 = await vstore.asimilarity_search("[3,4]", k=1)
+        assert len(res2) == 1
+        assert res2[0].page_content == "[3,4]"
+        assert res2[0].metadata == {"k": "b", "ord": 1}
+        assert res2[0].id == "b"
         # partial overwrite and count total entries
-        await vstore.aadd_texts(
-            texts=["[7,8]", "[9,10]"],
+        added_ids_1 = await vstore.aadd_texts(
+            texts=["[5,6]", "[7,8]"],
             metadatas=[
                 {"k": "c_new", "ord": 102},
                 {"k": "d_new", "ord": 103},
             ],
             ids=["c", "d"],
         )
+        # not requiring ordered match (elsewhere it may be overwriting some)
+        assert set(added_ids_1) == {"c", "d"}
         res2 = await vstore.asimilarity_search("[-1,-1]", k=10)
         assert len(res2) == 4
         # pick one that was just updated and check its metadata
         res3 = await vstore.asimilarity_search_with_score_id(
-            query="[7,8]", k=1, filter={"k": "c_new"}
+            query="[5,6]", k=1, filter={"k": "c_new"}
         )
         doc3, _, id3 = res3[0]
-        assert doc3.page_content == "[7,8]"
+        assert doc3.page_content == "[5,6]"
         assert doc3.metadata == {"k": "c_new", "ord": 102}
         assert id3 == "c"
         # delete and count again
         del1_res = await vstore.adelete(["b"])
         assert del1_res is True
         del2_res = await vstore.adelete(["a", "c", "Z!"])
-        assert del2_res is False  # a non-existing ID was supplied
+        assert del2_res is True  # a non-existing ID was supplied
         assert len(await vstore.asimilarity_search("[-1,-1]", k=10)) == 1
         # clear store
         await vstore.aclear()
@@ -875,6 +917,20 @@ class TestAstraDBVectorStore:
         assert len(await vstore.asimilarity_search("[-1,-1]", k=10)) == 2
         res4 = await vstore.asimilarity_search("[11,12]", k=1, filter={"k": "w"})
         assert res4[0].metadata["ord"] == 205
+        assert res4[0].id == "w"
+        # add_texts with "ids" arg passthrough
+        await vstore.aadd_texts(
+            texts=["[13,14]", "[15,16]"],
+            metadatas=[{"k": "r", "ord": 306}, {"k": "s", "ord": 307}],
+            ids=["r", "s"],
+        )
+        assert len(await vstore.asimilarity_search("[-1,-1]", k=10)) == 4
+        res4 = await vstore.asimilarity_search("[-1,-1]", k=1, filter={"k": "s"})
+        assert res4[0].metadata["ord"] == 307
+        assert res4[0].id == "s"
+        # delete_by_document_id
+        await vstore.adelete_by_document_id("s")
+        assert len(await vstore.asimilarity_search("[-1,-1]", k=10)) == 3
 
     def test_astradb_vectorstore_massive_insert_replace_sync(
         self,
@@ -925,7 +981,10 @@ class TestAstraDBVectorStore:
         self,
         vector_store_d2: AstraDBVectorStore,
     ) -> None:
-        """Testing the insert-many-and-replace-some patterns thoroughly."""
+        """
+        Testing the insert-many-and-replace-some patterns thoroughly.
+        Async version.
+        """
         full_size = 300
         first_group_size = 150
         second_group_slicer = [30, 100, 2]
@@ -996,6 +1055,7 @@ class TestAstraDBVectorStore:
         """MMR testing. We work on the unit circle with angle multiples
         of 2*pi/20 and prepare a store with known vectors for a controlled
         MMR outcome.
+        Async version.
         """
 
         def _v_from_i(i: int, n: int) -> str:
@@ -1127,7 +1187,13 @@ class TestAstraDBVectorStore:
         )
         assert {doc.metadata["letter"] for doc in res4} == {"q", "r"}
 
-    @pytest.mark.parametrize("vector_store", ["vector_store_d2"])
+    @pytest.mark.parametrize(
+        "vector_store",
+        [
+            "vector_store_d2",
+            "vector_store_vz",
+        ],
+    )
     def test_astradb_vectorstore_similarity_scale_sync(
         self, vector_store: str, request: pytest.FixtureRequest
     ) -> None:
@@ -1146,15 +1212,21 @@ class TestAstraDBVectorStore:
         )
         scores = [sco for _, sco in res1]
         sco_near, sco_far = scores
-        assert abs(1 - sco_near) < MATCH_EPSILON
+        assert abs(sco_far) < EUCLIDEAN_MIN_SIM_UNIT_VECTORS + MATCH_EPSILON
         assert abs(sco_far) < 0.21
         assert abs(sco_far) >= 0
 
-    @pytest.mark.parametrize("vector_store", ["vector_store_d2"])
+    @pytest.mark.parametrize(
+        "vector_store",
+        [
+            "vector_store_d2",
+            "vector_store_vz",
+        ],
+    )
     async def test_astradb_vectorstore_similarity_scale_async(
         self, vector_store: str, request: pytest.FixtureRequest
     ) -> None:
-        """Scale of the similarity scores."""
+        """Scale of the similarity scores, async version."""
         vstore: AstraDBVectorStore = request.getfixturevalue(vector_store)
         await vstore.aadd_texts(
             texts=[
@@ -1170,7 +1242,7 @@ class TestAstraDBVectorStore:
         scores = [sco for _, sco in res1]
         sco_near, sco_far = scores
         assert abs(1 - sco_near) < MATCH_EPSILON
-        assert abs(sco_far) < 0.21
+        assert abs(sco_far) < EUCLIDEAN_MIN_SIM_UNIT_VECTORS + MATCH_EPSILON
         assert abs(sco_far) >= 0
 
     @pytest.mark.parametrize(
@@ -1200,123 +1272,80 @@ class TestAstraDBVectorStore:
         # nothing left
         assert vstore.similarity_search("[-1,-1]", k=2 * m) == []
 
-    def test_astradb_vectorstore_delete_collection(
-        self, astra_db_credentials: AstraDBCredentials
-    ) -> None:
-        """Behaviour of 'delete_collection'."""
-        collection_name = COLLECTION_NAME_DIM2
-        emb = ParserEmbeddings(dimension=2)
-        v_store = AstraDBVectorStore(
-            embedding=emb,
-            collection_name=collection_name,
-            token=astra_db_credentials["token"],
-            api_endpoint=astra_db_credentials["api_endpoint"],
-            namespace=astra_db_credentials["namespace"],
-            environment=astra_db_credentials["environment"],
-        )
-        v_store.add_texts(["[1,2]"])
-        assert len(v_store.similarity_search("[-1,-1]", k=10)) == 1
-        # another instance pointing to the same collection on DB
-        v_store_kenny = AstraDBVectorStore(
-            embedding=emb,
-            collection_name=collection_name,
-            token=astra_db_credentials["token"],
-            api_endpoint=astra_db_credentials["api_endpoint"],
-            namespace=astra_db_credentials["namespace"],
-            environment=astra_db_credentials["environment"],
-        )
-        v_store_kenny.delete_collection()
-        # dropped on DB, but 'v_store' should have no clue:
-        with pytest.raises(ValueError, match="Collection does not exist"):
-            _ = v_store.similarity_search("[-1,-1]", k=10)
-
     def test_astradb_vectorstore_custom_params_sync(
-        self, astra_db_credentials: AstraDBCredentials
+        self,
+        embedding_d2: Embeddings,
+        astra_db_credentials: AstraDBCredentials,
     ) -> None:
         """Custom batch size and concurrency params."""
-        emb = ParserEmbeddings(dimension=2)
-        # prepare empty collection
-        AstraDBVectorStore(
-            embedding=emb,
-            collection_name=COLLECTION_NAME_DIM2,
-            token=astra_db_credentials["token"],
-            api_endpoint=astra_db_credentials["api_endpoint"],
-            namespace=astra_db_credentials["namespace"],
-            environment=astra_db_credentials["environment"],
-        ).clear()
         v_store = AstraDBVectorStore(
-            embedding=emb,
-            collection_name=COLLECTION_NAME_DIM2,
-            token=astra_db_credentials["token"],
+            embedding=embedding_d2,
+            collection_name=collection.name,
+            token=StaticTokenProvider(astra_db_credentials["token"]),
             api_endpoint=astra_db_credentials["api_endpoint"],
             namespace=astra_db_credentials["namespace"],
             environment=astra_db_credentials["environment"],
+            setup_mode=SetupMode.OFF,
             batch_size=17,
             bulk_insert_batch_concurrency=13,
             bulk_insert_overwrite_concurrency=7,
             bulk_delete_concurrency=19,
         )
-        try:
-            # add_texts
-            n = 120
-            texts = [f"[0,{i + 1 / 7.0}]" for i in range(n)]
-            ids = ["doc_%i" % i for i in range(n)]
-            v_store.add_texts(texts=texts, ids=ids)
-            v_store.add_texts(
-                texts=texts,
-                ids=ids,
-                batch_size=19,
-                batch_concurrency=7,
-                overwrite_concurrency=13,
-            )
-            _ = v_store.delete(ids[: n // 2])
-            _ = v_store.delete(ids[n // 2 :], concurrency=23)
-        finally:
-            if not SKIP_COLLECTION_DELETE:
-                v_store.delete_collection()
-            else:
-                v_store.clear()
+        # add_texts and delete some
+        n = 120
+        texts = [f"[0,{i + 1 / 7.0}]" for i in range(n)]
+        ids = ["doc_%i" % i for i in range(n)]
+        v_store.add_texts(texts=texts, ids=ids)
+        v_store.add_texts(
+            texts=texts,
+            ids=ids,
+            batch_size=19,
+            batch_concurrency=7,
+            overwrite_concurrency=13,
+        )
+        v_store.delete(ids[: n // 2])
+        v_store.delete(ids[n // 2 :], concurrency=23)
 
-    async def test_astradb_vectorstore_custom_params_async(
-        self, astra_db_credentials: AstraDBCredentials
+    async def test_astradb_vectorstore_custom_params_sync(
+        self,
+        embedding_d2: Embeddings,
+        astra_db_credentials: AstraDBCredentials,
     ) -> None:
-        """Custom batch size and concurrency params."""
-        emb = ParserEmbeddings(dimension=2)
+        """Custom batch size and concurrency params, async version"""
         v_store = AstraDBVectorStore(
-            embedding=emb,
-            collection_name="lc_test_c_async",
+            embedding=embedding_d2,
+            collection_name=collection.name,
+            token=StaticTokenProvider(astra_db_credentials["token"]),
+            api_endpoint=astra_db_credentials["api_endpoint"],
+            namespace=astra_db_credentials["namespace"],
+            environment=astra_db_credentials["environment"],
+            setup_mode=SetupMode.OFF,
             batch_size=17,
             bulk_insert_batch_concurrency=13,
             bulk_insert_overwrite_concurrency=7,
             bulk_delete_concurrency=19,
-            token=astra_db_credentials["token"],
-            api_endpoint=astra_db_credentials["api_endpoint"],
-            namespace=astra_db_credentials["namespace"],
-            environment=astra_db_credentials["environment"],
         )
-        try:
-            # add_texts
-            n = 120
-            texts = [f"[0,{i + 1 / 7.0}]" for i in range(n)]
-            ids = ["doc_%i" % i for i in range(n)]
-            await v_store.aadd_texts(texts=texts, ids=ids)
-            await v_store.aadd_texts(
-                texts=texts,
-                ids=ids,
-                batch_size=19,
-                batch_concurrency=7,
-                overwrite_concurrency=13,
-            )
-            await v_store.adelete(ids[: n // 2])
-            await v_store.adelete(ids[n // 2 :], concurrency=23)
-        finally:
-            if not SKIP_COLLECTION_DELETE:
-                await v_store.adelete_collection()
-            else:
-                await v_store.aclear()
+        # add_texts and delete some
+        n = 120
+        texts = [f"[0,{i + 1 / 7.0}]" for i in range(n)]
+        ids = ["doc_%i" % i for i in range(n)]
+        await v_store.aadd_texts(texts=texts, ids=ids)
+        await v_store.aadd_texts(
+            texts=texts,
+            ids=ids,
+            batch_size=19,
+            batch_concurrency=7,
+            overwrite_concurrency=13,
+        )
+        await v_store.adelete(ids[: n // 2])
+        await v_store.adelete(ids[n // 2 :], concurrency=23)
 
     def test_astradb_vectorstore_metrics(
-        self, astra_db_credentials: AstraDBCredentials
+        self,
+        embedding_d2: Embeddings,
+        vector_store_d2: AstraDBVectorStore,
+        astra_db_credentials: AstraDBCredentials,
+        ephemeral_collection_cleaner_d2: str,
     ) -> None:
         """Different choices of similarity metric.
         Both stores (with "cosine" and "euclidea" metrics) contain these two:
@@ -1324,7 +1353,8 @@ class TestAstraDBVectorStore:
             - a vector which is a long multiple of query vector
         so, which one is "the closest one" depends on the metric.
         """
-        emb = ParserEmbeddings(dimension=2)
+        euclidean_store = vector_store_d2
+
         isq2 = 0.5**0.5
         isa = 0.7
         isb = (1.0 - isa * isa) ** 0.5
@@ -1332,93 +1362,44 @@ class TestAstraDBVectorStore:
             json.dumps([isa, isb]),
             json.dumps([10 * isq2, 10 * isq2]),
         ]
-        ids = [
-            "rotated",
-            "scaled",
-        ]
+        ids = ["rotated", "scaled"]
         query_text = json.dumps([isq2, isq2])
 
         # prepare empty collections
-        AstraDBVectorStore(
-            embedding=emb,
-            collection_name=COLLECTION_NAME_DIM2,
-            token=astra_db_credentials["token"],
-            api_endpoint=astra_db_credentials["api_endpoint"],
-            namespace=astra_db_credentials["namespace"],
-            environment=astra_db_credentials["environment"],
-        ).clear()
-        AstraDBVectorStore(
-            embedding=emb,
-            collection_name=COLLECTION_NAME_DIM2_EUCLIDEAN,
-            metric="euclidean",
-            token=astra_db_credentials["token"],
-            api_endpoint=astra_db_credentials["api_endpoint"],
-            namespace=astra_db_credentials["namespace"],
-            environment=astra_db_credentials["environment"],
-        ).clear()
-
-        # creation, population, query - cosine
-        vstore_cos = AstraDBVectorStore(
-            embedding=emb,
-            collection_name=COLLECTION_NAME_DIM2,
+        cosine_store = AstraDBVectorStore(
+            embedding=embedding_d2,
+            collection_name=EPHEMERAL_COLLECTION_NAME_D2,
             metric="cosine",
-            token=astra_db_credentials["token"],
+            token=StaticTokenProvider(astra_db_credentials["token"]),
             api_endpoint=astra_db_credentials["api_endpoint"],
             namespace=astra_db_credentials["namespace"],
             environment=astra_db_credentials["environment"],
         )
-        try:
-            vstore_cos.add_texts(
-                texts=texts,
-                ids=ids,
-            )
-            _, _, id_from_cos = vstore_cos.similarity_search_with_score_id(
-                query_text,
-                k=1,
-            )[0]
-            assert id_from_cos == "scaled"
-        finally:
-            if not SKIP_COLLECTION_DELETE:
-                vstore_cos.delete_collection()
-            else:
-                vstore_cos.clear()
-        # creation, population, query - euclidean
 
-        vstore_euc = AstraDBVectorStore(
-            embedding=emb,
-            collection_name=COLLECTION_NAME_DIM2_EUCLIDEAN,
-            metric="euclidean",
-            token=astra_db_credentials["token"],
-            api_endpoint=astra_db_credentials["api_endpoint"],
-            namespace=astra_db_credentials["namespace"],
-            environment=astra_db_credentials["environment"],
+        cosine_store.add_texts(texts=texts, ids=ids)
+        euclidean_store.add_texts(texts=texts, ids=ids)
+
+        cosine_triples = cosine_store.similarity_search_with_score_id(
+            query_text,
+            k=1,
         )
-        try:
-            vstore_euc.add_texts(
-                texts=texts,
-                ids=ids,
-            )
-            _, _, id_from_euc = vstore_euc.similarity_search_with_score_id(
-                query_text,
-                k=1,
-            )[0]
-            assert id_from_euc == "rotated"
-        finally:
-            if not SKIP_COLLECTION_DELETE:
-                vstore_euc.delete_collection()
-            else:
-                vstore_euc.clear()
+        euclidean_triples = euclidean_store.similarity_search_with_score_id(
+            query_text,
+            k=1,
+        )
+        assert len(cosine_triples) == 1
+        assert len(euclidean_triples) == 1
+        assert cosine_triples[0][2] == "scaled"
+        assert euclidean_triples[0][2] == "rotated"
 
     def test_astradb_vectorstore_indexing_sync(
         self,
         astra_db_credentials: dict[str, str | None],
         database: Database,
     ) -> None:
-        """Test that the right errors/warnings are issued depending
+        """
+        Test that the right errors/warnings are issued depending
         on the compatibility of on-DB indexing settings and the requested ones.
-
-        We do NOT check for substrings in the warning messages: that would
-        be too brittle a test.
         """
         embe = ParserEmbeddings(dimension=2)
 
@@ -1427,7 +1408,7 @@ class TestAstraDBVectorStore:
         AstraDBVectorStore(
             collection_name="lc_default_idx",
             embedding=embe,
-            token=astra_db_credentials["token"],
+            token=StaticTokenProvider(astra_db_credentials["token"]),
             api_endpoint=astra_db_credentials["api_endpoint"],
             namespace=astra_db_credentials["namespace"],
             environment=astra_db_credentials["environment"],
@@ -1435,7 +1416,7 @@ class TestAstraDBVectorStore:
         AstraDBVectorStore(
             collection_name="lc_custom_idx",
             embedding=embe,
-            token=astra_db_credentials["token"],
+            token=StaticTokenProvider(astra_db_credentials["token"]),
             api_endpoint=astra_db_credentials["api_endpoint"],
             namespace=astra_db_credentials["namespace"],
             environment=astra_db_credentials["environment"],
@@ -1448,7 +1429,7 @@ class TestAstraDBVectorStore:
             AstraDBVectorStore(
                 collection_name="lc_default_idx",
                 embedding=embe,
-                token=astra_db_credentials["token"],
+                token=StaticTokenProvider(astra_db_credentials["token"]),
                 api_endpoint=astra_db_credentials["api_endpoint"],
                 namespace=astra_db_credentials["namespace"],
                 environment=astra_db_credentials["environment"],
@@ -1456,7 +1437,7 @@ class TestAstraDBVectorStore:
             AstraDBVectorStore(
                 collection_name="lc_custom_idx",
                 embedding=embe,
-                token=astra_db_credentials["token"],
+                token=StaticTokenProvider(astra_db_credentials["token"]),
                 api_endpoint=astra_db_credentials["api_endpoint"],
                 namespace=astra_db_credentials["namespace"],
                 environment=astra_db_credentials["environment"],
@@ -1468,7 +1449,7 @@ class TestAstraDBVectorStore:
             AstraDBVectorStore(
                 collection_name="lc_default_idx",
                 embedding=embe,
-                token=astra_db_credentials["token"],
+                token=StaticTokenProvider(astra_db_credentials["token"]),
                 api_endpoint=astra_db_credentials["api_endpoint"],
                 namespace=astra_db_credentials["namespace"],
                 environment=astra_db_credentials["environment"],
@@ -1479,7 +1460,7 @@ class TestAstraDBVectorStore:
             AstraDBVectorStore(
                 collection_name="lc_custom_idx",
                 embedding=embe,
-                token=astra_db_credentials["token"],
+                token=StaticTokenProvider(astra_db_credentials["token"]),
                 api_endpoint=astra_db_credentials["api_endpoint"],
                 namespace=astra_db_credentials["namespace"],
                 environment=astra_db_credentials["environment"],
@@ -1490,7 +1471,7 @@ class TestAstraDBVectorStore:
             AstraDBVectorStore(
                 collection_name="lc_custom_idx",
                 embedding=embe,
-                token=astra_db_credentials["token"],
+                token=StaticTokenProvider(astra_db_credentials["token"]),
                 api_endpoint=astra_db_credentials["api_endpoint"],
                 namespace=astra_db_credentials["namespace"],
                 environment=astra_db_credentials["environment"],
@@ -1504,7 +1485,7 @@ class TestAstraDBVectorStore:
             AstraDBVectorStore(
                 collection_name="lc_legacy_coll",
                 embedding=embe,
-                token=astra_db_credentials["token"],
+                token=StaticTokenProvider(astra_db_credentials["token"]),
                 api_endpoint=astra_db_credentials["api_endpoint"],
                 namespace=astra_db_credentials["namespace"],
                 environment=astra_db_credentials["environment"],
@@ -1516,7 +1497,7 @@ class TestAstraDBVectorStore:
             AstraDBVectorStore(
                 collection_name="lc_legacy_coll",
                 embedding=embe,
-                token=astra_db_credentials["token"],
+                token=StaticTokenProvider(astra_db_credentials["token"]),
                 api_endpoint=astra_db_credentials["api_endpoint"],
                 namespace=astra_db_credentials["namespace"],
                 environment=astra_db_credentials["environment"],
@@ -1546,7 +1527,7 @@ class TestAstraDBVectorStore:
         await AstraDBVectorStore(
             collection_name="lc_default_idx",
             embedding=embe,
-            token=astra_db_credentials["token"],
+            token=StaticTokenProvider(astra_db_credentials["token"]),
             api_endpoint=astra_db_credentials["api_endpoint"],
             namespace=astra_db_credentials["namespace"],
             environment=astra_db_credentials["environment"],
@@ -1555,7 +1536,7 @@ class TestAstraDBVectorStore:
         await AstraDBVectorStore(
             collection_name="lc_custom_idx",
             embedding=embe,
-            token=astra_db_credentials["token"],
+            token=StaticTokenProvider(astra_db_credentials["token"]),
             api_endpoint=astra_db_credentials["api_endpoint"],
             namespace=astra_db_credentials["namespace"],
             environment=astra_db_credentials["environment"],
@@ -1569,7 +1550,7 @@ class TestAstraDBVectorStore:
             def_store = AstraDBVectorStore(
                 collection_name="lc_default_idx",
                 embedding=embe,
-                token=astra_db_credentials["token"],
+                token=StaticTokenProvider(astra_db_credentials["token"]),
                 api_endpoint=astra_db_credentials["api_endpoint"],
                 namespace=astra_db_credentials["namespace"],
                 environment=astra_db_credentials["environment"],
@@ -1579,7 +1560,7 @@ class TestAstraDBVectorStore:
             cus_store = AstraDBVectorStore(
                 collection_name="lc_custom_idx",
                 embedding=embe,
-                token=astra_db_credentials["token"],
+                token=StaticTokenProvider(astra_db_credentials["token"]),
                 api_endpoint=astra_db_credentials["api_endpoint"],
                 namespace=astra_db_credentials["namespace"],
                 environment=astra_db_credentials["environment"],
@@ -1592,7 +1573,7 @@ class TestAstraDBVectorStore:
         def_store = AstraDBVectorStore(
             collection_name="lc_default_idx",
             embedding=embe,
-            token=astra_db_credentials["token"],
+            token=StaticTokenProvider(astra_db_credentials["token"]),
             api_endpoint=astra_db_credentials["api_endpoint"],
             namespace=astra_db_credentials["namespace"],
             environment=astra_db_credentials["environment"],
@@ -1605,7 +1586,7 @@ class TestAstraDBVectorStore:
         cus_store = AstraDBVectorStore(
             collection_name="lc_custom_idx",
             embedding=embe,
-            token=astra_db_credentials["token"],
+            token=StaticTokenProvider(astra_db_credentials["token"]),
             api_endpoint=astra_db_credentials["api_endpoint"],
             namespace=astra_db_credentials["namespace"],
             environment=astra_db_credentials["environment"],
@@ -1618,7 +1599,7 @@ class TestAstraDBVectorStore:
         cus_store = AstraDBVectorStore(
             collection_name="lc_custom_idx",
             embedding=embe,
-            token=astra_db_credentials["token"],
+            token=StaticTokenProvider(astra_db_credentials["token"]),
             api_endpoint=astra_db_credentials["api_endpoint"],
             namespace=astra_db_credentials["namespace"],
             environment=astra_db_credentials["environment"],
@@ -1630,7 +1611,7 @@ class TestAstraDBVectorStore:
         leg_store = AstraDBVectorStore(
             collection_name="lc_legacy_coll",
             embedding=embe,
-            token=astra_db_credentials["token"],
+            token=StaticTokenProvider(astra_db_credentials["token"]),
             api_endpoint=astra_db_credentials["api_endpoint"],
             namespace=astra_db_credentials["namespace"],
             environment=astra_db_credentials["environment"],
@@ -1649,7 +1630,7 @@ class TestAstraDBVectorStore:
             leg_store = AstraDBVectorStore(
                 collection_name="lc_legacy_coll",
                 embedding=embe,
-                token=astra_db_credentials["token"],
+                token=StaticTokenProvider(astra_db_credentials["token"]),
                 api_endpoint=astra_db_credentials["api_endpoint"],
                 namespace=astra_db_credentials["namespace"],
                 environment=astra_db_credentials["environment"],
@@ -1683,7 +1664,7 @@ class TestAstraDBVectorStore:
             v_store_init_ok = AstraDBVectorStore(
                 embedding=emb,
                 collection_name=collection_name,
-                token=astra_db_credentials["token"],
+                token=StaticTokenProvider(astra_db_credentials["token"]),
                 api_endpoint=astra_db_credentials["api_endpoint"],
                 namespace=astra_db_credentials["namespace"],
             )
@@ -1729,7 +1710,7 @@ class TestAstraDBVectorStore:
             v_store_init_ok = AstraDBVectorStore(
                 embedding=emb,
                 collection_name=collection_name,
-                token=astra_db_credentials["token"],
+                token=StaticTokenProvider(astra_db_credentials["token"]),
                 api_endpoint=astra_db_credentials["api_endpoint"],
                 namespace=astra_db_credentials["namespace"],
                 setup_mode=SetupMode.ASYNC,

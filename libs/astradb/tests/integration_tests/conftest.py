@@ -27,15 +27,18 @@ PROJECT_DIR = Path(ABS_PATH).parent.parent
 
 # Long-lasting collection names
 COLLECTION_NAME_D2 = "lc_test_d2_euclidean"
-COLLECTION_NAME_VZ = "lc_test_vz"
+COLLECTION_NAME_VZ = "lc_test_vz_euclidean"
 # Function-lived collection names
-EPHEMERAL_COLLECTION_NAME_D2 = "lc_test_d2_euclidean_short"
-EPHEMERAL_COLLECTION_NAME_VZ = "lc_test_vz_short"
+EPHEMERAL_COLLECTION_NAME_D2 = "lc_test_d2_cosine_short"
+EPHEMERAL_COLLECTION_NAME_VZ = "lc_test_vz_cosine_short"
 # autodetect assets
 CUSTOM_CONTENT_KEY = "xcontent"
 LONG_TEXT = "This is the textual content field in the doc."
 # vectorstore-related utilities/constants
 INCOMPATIBLE_INDEXING_MSG = "is detected as having the following indexing policy"
+# similarity threshold definitions
+EUCLIDEAN_MIN_SIM_UNIT_VECTORS = 0.2
+MATCH_EPSILON = 0.0001
 
 
 # Loading the .env file if it exists
@@ -180,11 +183,14 @@ def vector_store_d2_stringtoken(
 @pytest.fixture
 def ephemeral_collection_cleaner_d2(
     database: Database,
-) -> Iterable[Collection]:
+) -> Iterable[str]:
     """
     A nominal fixture to ensure the ephemeral collection is deleted
     after the test function has finished.
     """
+
+    yield EPHEMERAL_COLLECTION_NAME_D2
+
     if EPHEMERAL_COLLECTION_NAME_D2 in database.list_collection_names():
         database.drop_collection(EPHEMERAL_COLLECTION_NAME_D2)
 
@@ -235,10 +241,13 @@ def vector_store_vz(
 @pytest.fixture
 def ephemeral_collection_cleaner_vz(
     database: Database,
-) -> Iterable[Collection]:
+) -> Iterable[str]:
     """
     A nominal fixture to ensure the ephemeral vectorize collection is deleted
     after the test function has finished.
     """
+
+    yield EPHEMERAL_COLLECTION_NAME_VZ
+
     if EPHEMERAL_COLLECTION_NAME_VZ in database.list_collection_names():
         database.drop_collection(EPHEMERAL_COLLECTION_NAME_VZ)
