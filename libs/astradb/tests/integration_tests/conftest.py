@@ -126,6 +126,8 @@ def collection_d2(
     )
     yield collection
 
+    collection.drop()
+
 
 @pytest.fixture
 def empty_collection_d2(
@@ -200,6 +202,8 @@ def collection_vz(
         service=OPENAI_VECTORIZE_OPTIONS,
     )
     yield collection
+
+    collection.drop()
 
 
 @pytest.fixture
