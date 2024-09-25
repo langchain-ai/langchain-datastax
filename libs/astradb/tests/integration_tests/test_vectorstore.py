@@ -37,7 +37,7 @@ from .conftest import (
     MATCH_EPSILON,
     OPENAI_API_KEY,
     OPENAI_VECTORIZE_OPTIONS_HEADER,
-    _has_env_vars,
+    astra_db_env_vars_available,
 )
 
 if TYPE_CHECKING:
@@ -48,7 +48,9 @@ if TYPE_CHECKING:
     from .conftest import AstraDBCredentials
 
 
-@pytest.mark.skipif(not _has_env_vars(), reason="Missing Astra DB env. vars")
+@pytest.mark.skipif(
+    not astra_db_env_vars_available(), reason="Missing Astra DB env. vars"
+)
 class TestAstraDBVectorStore:
     @pytest.mark.parametrize(
         ("is_vectorize", "page_contents", "collection_fixture_name"),

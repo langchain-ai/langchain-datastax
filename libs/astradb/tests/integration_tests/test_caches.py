@@ -25,7 +25,7 @@ from typing_extensions import override
 from langchain_astradb import AstraDBCache, AstraDBSemanticCache
 from langchain_astradb.utils.astradb import SetupMode
 
-from .conftest import AstraDBCredentials, _has_env_vars
+from .conftest import AstraDBCredentials, astra_db_env_vars_available
 
 if TYPE_CHECKING:
     from astrapy.db import AstraDB
@@ -170,7 +170,9 @@ async def async_astradb_semantic_cache(
     sem_cache.collection.drop()
 
 
-@pytest.mark.skipif(not _has_env_vars(), reason="Missing Astra DB env. vars")
+@pytest.mark.skipif(
+    not astra_db_env_vars_available(), reason="Missing Astra DB env. vars"
+)
 class TestAstraDBCaches:
     def test_astradb_cache_sync(self, astradb_cache: AstraDBCache) -> None:
         self.do_cache_test(FakeLLM(), astradb_cache, "foo")

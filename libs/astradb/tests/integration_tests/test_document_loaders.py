@@ -21,7 +21,7 @@ import pytest
 
 from langchain_astradb import AstraDBLoader
 
-from .conftest import AstraDBCredentials, _has_env_vars
+from .conftest import AstraDBCredentials, astra_db_env_vars_available
 
 if TYPE_CHECKING:
     from astrapy import AsyncCollection, Collection, Database
@@ -58,7 +58,9 @@ async def async_collection(database: Database) -> AsyncIterator[AsyncCollection]
 
 
 @pytest.mark.requires("astrapy")
-@pytest.mark.skipif(not _has_env_vars(), reason="Missing Astra DB env. vars")
+@pytest.mark.skipif(
+    not astra_db_env_vars_available(), reason="Missing Astra DB env. vars"
+)
 class TestAstraDB:
     def test_astradb_loader_prefetched_sync(
         self,

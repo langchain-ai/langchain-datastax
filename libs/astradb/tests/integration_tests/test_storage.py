@@ -10,7 +10,7 @@ import pytest
 from langchain_astradb.storage import AstraDBByteStore, AstraDBStore
 from langchain_astradb.utils.astradb import SetupMode
 
-from .conftest import _has_env_vars
+from .conftest import astra_db_env_vars_available
 
 if TYPE_CHECKING:
     from astrapy import Database
@@ -62,7 +62,9 @@ async def init_async_store(
     return store
 
 
-@pytest.mark.skipif(not _has_env_vars(), reason="Missing Astra DB env. vars")
+@pytest.mark.skipif(
+    not astra_db_env_vars_available(), reason="Missing Astra DB env. vars"
+)
 class TestAstraDBStore:
     def test_mget(
         self,

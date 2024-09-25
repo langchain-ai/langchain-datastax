@@ -27,7 +27,7 @@ from .conftest import (
     OPENAI_API_KEY,
     OPENAI_VECTORIZE_OPTIONS_HEADER,
     OPENAI_VECTORIZE_OPTIONS_KMS,
-    _has_env_vars,
+    astra_db_env_vars_available,
 )
 
 if TYPE_CHECKING:
@@ -37,7 +37,9 @@ if TYPE_CHECKING:
     from .conftest import AstraDBCredentials
 
 
-@pytest.mark.skipif(not _has_env_vars(), reason="Missing Astra DB env. vars")
+@pytest.mark.skipif(
+    not astra_db_env_vars_available(), reason="Missing Astra DB env. vars"
+)
 class TestAstraDBVectorStoreDDLs:
     def test_astradb_vectorstore_create_delete_sync(
         self,
@@ -239,6 +241,7 @@ class TestAstraDBVectorStoreDDLs:
         astra_db_credentials: AstraDBCredentials,
         database: Database,  # noqa: ARG002
         embedding_d2: Embeddings,
+        ephemeral_indexing_collections_cleaner: str,  # noqa: ARG002
     ) -> None:
         """
         Test of the vector store behaviour for various indexing settings,
@@ -281,6 +284,7 @@ class TestAstraDBVectorStoreDDLs:
         astra_db_credentials: AstraDBCredentials,
         database: Database,  # noqa: ARG002
         embedding_d2: Embeddings,
+        ephemeral_indexing_collections_cleaner: str,  # noqa: ARG002
     ) -> None:
         """
         Test of the vector store behaviour for various indexing settings,
@@ -382,6 +386,7 @@ class TestAstraDBVectorStoreDDLs:
         astra_db_credentials: AstraDBCredentials,
         database: Database,  # noqa: ARG002
         embedding_d2: Embeddings,
+        ephemeral_indexing_collections_cleaner: str,  # noqa: ARG002
     ) -> None:
         """
         Test of the vector store behaviour for various indexing settings,
@@ -427,6 +432,7 @@ class TestAstraDBVectorStoreDDLs:
         astra_db_credentials: AstraDBCredentials,
         database: Database,  # noqa: ARG002
         embedding_d2: Embeddings,
+        ephemeral_indexing_collections_cleaner: str,  # noqa: ARG002
     ) -> None:
         """
         Test of the vector store behaviour for various indexing settings,

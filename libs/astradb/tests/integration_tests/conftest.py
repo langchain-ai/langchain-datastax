@@ -25,19 +25,25 @@ ABS_PATH = (Path(__file__)).parent
 # Getting the absolute path of the project's root directory
 PROJECT_DIR = Path(ABS_PATH).parent.parent
 
-# Long-lasting collection names
+# Long-lasting collection names (default-indexed for vectorstores)
 COLLECTION_NAME_D2 = "lc_test_d2_euclidean"
 COLLECTION_NAME_VZ = "lc_test_vz_euclidean"
+# (All-indexed) for general-purpose and autodetect
+COLLECTION_NAME_IDXALL_D2 = "lc_test_d2_idxall_euclidean"
+COLLECTION_NAME_IDXALL_VZ = "lc_test_vz_idxall_euclidean"
 # Function-lived collection names:
-# of generic use
+# (all-indexed) for autodetect:
+EPHEMERAL_COLLECTION_NAME_IDXALL_D2 = "lc_test_d2_idxall_euclidean"
+# of generic use for vectorstores
 EPHEMERAL_COLLECTION_NAME_D2 = "lc_test_d2_cosine_short"
 EPHEMERAL_COLLECTION_NAME_VZ = "lc_test_vz_cosine_short"
-# for KMS (aka shared_secret) vectorize setup
+# for KMS (aka shared_secret) vectorize setup (vectorstores)
 EPHEMERAL_COLLECTION_NAME_VZ_KMS = "lc_test_vz_kms_short"
-# indexing-related collection names (function-lived)
+# indexing-related collection names (function-lived) (vectorstores)
 EPHEMERAL_CUSTOM_IDX_NAME_D2 = "lc_test_custom_idx_d2_short"
 EPHEMERAL_DEFAULT_IDX_NAME_D2 = "lc_test_default_idx_d2_short"
 EPHEMERAL_LEGACY_IDX_NAME_D2 = "lc_test_legacy_idx_d2_short"
+
 # autodetect assets
 CUSTOM_CONTENT_KEY = "xcontent"
 LONG_TEXT = "This is the textual content field in the doc."
@@ -58,7 +64,7 @@ def _load_env() -> None:
         load_dotenv(dotenv_path)
 
 
-def _has_env_vars() -> bool:
+def astra_db_env_vars_available() -> bool:
     return all(
         [
             "ASTRA_DB_APPLICATION_TOKEN" in os.environ,
@@ -152,7 +158,7 @@ def core_astra_db(astra_db_credentials: AstraDBCredentials) -> AstraDB:
     )
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="module")
 def collection_d2(
     database: Database,
 ) -> Iterable[Collection]:
@@ -232,7 +238,72 @@ def ephemeral_collection_cleaner_d2(
         database.drop_collection(EPHEMERAL_COLLECTION_NAME_D2)
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="module")
+def collection_idxall_d2(
+    database: Database,
+) -> Iterable[Collection]:
+    """
+    A general-purpose D=2(Euclidean) collection for per-test reuse.
+    This one has default indexing (i.e. all fields are covered).
+    """
+    collection = database.create_collection(
+        COLLECTION_NAME_IDXALL_D2,
+        dimension=2,
+        check_exists=False,
+        metric="euclidean",
+    )
+    yield collection
+
+    collection.drop()
+
+
+@pytest.fixture
+def empty_collection_idxall_d2(
+    collection_idxall_d2: Collection,
+) -> Collection:
+    """
+    A per-test-function empty d=2(Euclidean) collection.
+    This one has default indexing (i.e. all fields are covered).
+    """
+    collection_idxall_d2.delete_many({})
+    return collection_idxall_d2
+
+
+@pytest.fixture
+def vector_store_idxall_d2(
+    empty_collection_idxall_d2: Collection,  # noqa: ARG001
+    astra_db_credentials: AstraDBCredentials,
+    embedding_d2: Embeddings,
+) -> AstraDBVectorStore:
+    """A fresh vector store on a d=2(Euclidean) collection."""
+    return AstraDBVectorStore(
+        embedding=embedding_d2,
+        collection_name=COLLECTION_NAME_IDXALL_D2,
+        token=StaticTokenProvider(astra_db_credentials["token"]),
+        api_endpoint=astra_db_credentials["api_endpoint"],
+        namespace=astra_db_credentials["namespace"],
+        environment=astra_db_credentials["environment"],
+        collection_indexing_policy={"allow": ["*"]},
+        setup_mode=SetupMode.OFF,
+    )
+
+
+@pytest.fixture
+def ephemeral_collection_cleaner_idxall_d2(
+    database: Database,
+) -> Iterable[str]:
+    """
+    A nominal fixture to ensure the ephemeral collection is deleted
+    after the test function has finished.
+    """
+
+    yield EPHEMERAL_COLLECTION_NAME_IDXALL_D2
+
+    if EPHEMERAL_COLLECTION_NAME_IDXALL_D2 in database.list_collection_names():
+        database.drop_collection(EPHEMERAL_COLLECTION_NAME_IDXALL_D2)
+
+
+@pytest.fixture(scope="module")
 def collection_vz(
     database: Database,
 ) -> Iterable[Collection]:
@@ -291,6 +362,58 @@ def ephemeral_collection_cleaner_vz(
 
     if EPHEMERAL_COLLECTION_NAME_VZ in database.list_collection_names():
         database.drop_collection(EPHEMERAL_COLLECTION_NAME_VZ)
+
+
+@pytest.fixture(scope="module")
+def collection_idxall_vz(
+    database: Database,
+) -> Iterable[Collection]:
+    """
+    A general-purpose $vectorize collection for per-test reuse.
+    This one has default indexing (i.e. all fields are covered).
+    """
+    collection = database.create_collection(
+        COLLECTION_NAME_IDXALL_VZ,
+        dimension=16,
+        check_exists=False,
+        metric="euclidean",
+        service=OPENAI_VECTORIZE_OPTIONS_HEADER,
+        embedding_api_key=OPENAI_API_KEY,
+    )
+    yield collection
+
+    collection.drop()
+
+
+@pytest.fixture
+def empty_collection_idxall_vz(
+    collection_idxall_vz: Collection,
+) -> Collection:
+    """
+    A per-test-function empty $vecorize collection.
+    This one has default indexing (i.e. all fields are covered).
+    """
+    collection_idxall_vz.delete_many({})
+    return collection_idxall_vz
+
+
+@pytest.fixture
+def vector_store_idxall_vz(
+    empty_collection_idxall_vz: Collection,  # noqa: ARG001
+    astra_db_credentials: AstraDBCredentials,
+) -> AstraDBVectorStore:
+    """A fresh vector store on a d=2(Euclidean) collection."""
+    return AstraDBVectorStore(
+        collection_name=COLLECTION_NAME_IDXALL_VZ,
+        token=StaticTokenProvider(astra_db_credentials["token"]),
+        api_endpoint=astra_db_credentials["api_endpoint"],
+        namespace=astra_db_credentials["namespace"],
+        environment=astra_db_credentials["environment"],
+        collection_indexing_policy={"allow": ["*"]},
+        setup_mode=SetupMode.OFF,
+        collection_vector_service_options=OPENAI_VECTORIZE_OPTIONS_HEADER,
+        collection_embedding_api_key=OPENAI_API_KEY,
+    )
 
 
 @pytest.fixture

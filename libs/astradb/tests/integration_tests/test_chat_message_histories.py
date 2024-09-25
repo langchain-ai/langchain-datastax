@@ -11,7 +11,7 @@ from langchain_astradb.chat_message_histories import (
 )
 from langchain_astradb.utils.astradb import SetupMode
 
-from .conftest import AstraDBCredentials, _has_env_vars
+from .conftest import AstraDBCredentials, astra_db_env_vars_available
 
 
 @pytest.fixture
@@ -85,7 +85,9 @@ async def async_history2(
     # no deletion here, this is riding on history1
 
 
-@pytest.mark.skipif(not _has_env_vars(), reason="Missing Astra DB env. vars")
+@pytest.mark.skipif(
+    not astra_db_env_vars_available(), reason="Missing Astra DB env. vars"
+)
 class TestAstraDBChatMessageHistories:
     def test_memory_with_message_store(
         self, history1: AstraDBChatMessageHistory

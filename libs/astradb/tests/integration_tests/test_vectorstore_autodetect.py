@@ -5,7 +5,7 @@ Refer to `test_vectorstores.py` for the requirements to run.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 import pytest
 from astrapy.authentication import StaticTokenProvider
@@ -14,11 +14,11 @@ from langchain_core.documents import Document
 from langchain_astradb.vectorstores import AstraDBVectorStore
 
 from .conftest import (
-    COLLECTION_NAME_D2,
-    COLLECTION_NAME_VZ,
+    COLLECTION_NAME_IDXALL_D2,
+    COLLECTION_NAME_IDXALL_VZ,
     CUSTOM_CONTENT_KEY,
     OPENAI_API_KEY,
-    _has_env_vars,
+    astra_db_env_vars_available,
 )
 
 if TYPE_CHECKING:
@@ -28,16 +28,18 @@ if TYPE_CHECKING:
     from .conftest import AstraDBCredentials
 
 
-@pytest.mark.skipif(not _has_env_vars(), reason="Missing Astra DB env. vars")
-class TestVectorStoreAutodetect:
+@pytest.mark.skipif(
+    not astra_db_env_vars_available(), reason="Missing Astra DB env. vars"
+)
+class TestAstraDBVectorStoreAutodetect:
     def test_autodetect_flat_novectorize_crud(
         self,
         astra_db_credentials: AstraDBCredentials,
-        empty_collection_d2: Collection,
+        empty_collection_idxall_d2: Collection,
         embedding_d2: Embeddings,
     ) -> None:
         """Test autodetect on a populated flat collection, checking all codecs."""
-        empty_collection_d2.insert_many(
+        empty_collection_idxall_d2.insert_many(
             [
                 {
                     "_id": "1",
@@ -64,7 +66,7 @@ class TestVectorStoreAutodetect:
         )
         ad_store = AstraDBVectorStore(
             embedding=embedding_d2,
-            collection_name=COLLECTION_NAME_D2,
+            collection_name=COLLECTION_NAME_IDXALL_D2,
             token=StaticTokenProvider(astra_db_credentials["token"]),
             api_endpoint=astra_db_credentials["api_endpoint"],
             namespace=astra_db_credentials["namespace"],
@@ -96,12 +98,12 @@ class TestVectorStoreAutodetect:
     def test_autodetect_default_novectorize_crud(
         self,
         astra_db_credentials: AstraDBCredentials,
-        empty_collection_d2: Collection,  # noqa: ARG002
+        empty_collection_idxall_d2: Collection,  # noqa: ARG002
         embedding_d2: Embeddings,
-        vector_store_d2: AstraDBVectorStore,
+        vector_store_idxall_d2: AstraDBVectorStore,
     ) -> None:
         """Test autodetect on a VS-made collection, checking all codecs."""
-        vector_store_d2.add_texts(
+        vector_store_idxall_d2.add_texts(
             texts=[
                 "[1,2]",
                 "[3,4]",
@@ -121,7 +123,7 @@ class TestVectorStoreAutodetect:
         # now with the autodetect
         ad_store = AstraDBVectorStore(
             embedding=embedding_d2,
-            collection_name=COLLECTION_NAME_D2,
+            collection_name=COLLECTION_NAME_IDXALL_D2,
             token=StaticTokenProvider(astra_db_credentials["token"]),
             api_endpoint=astra_db_credentials["api_endpoint"],
             namespace=astra_db_credentials["namespace"],
@@ -153,10 +155,10 @@ class TestVectorStoreAutodetect:
     def test_autodetect_flat_vectorize_crud(
         self,
         astra_db_credentials: AstraDBCredentials,
-        empty_collection_vz: Collection,
+        empty_collection_idxall_vz: Collection,
     ) -> None:
         """Test autodetect on a populated flat collection, checking all codecs."""
-        empty_collection_vz.insert_many(
+        empty_collection_idxall_vz.insert_many(
             [
                 {
                     "_id": "1",
@@ -179,7 +181,7 @@ class TestVectorStoreAutodetect:
             ]
         )
         ad_store = AstraDBVectorStore(
-            collection_name=COLLECTION_NAME_VZ,
+            collection_name=COLLECTION_NAME_IDXALL_VZ,
             token=StaticTokenProvider(astra_db_credentials["token"]),
             api_endpoint=astra_db_credentials["api_endpoint"],
             namespace=astra_db_credentials["namespace"],
@@ -213,11 +215,11 @@ class TestVectorStoreAutodetect:
         self,
         *,
         astra_db_credentials: AstraDBCredentials,
-        empty_collection_vz: Collection,  # noqa: ARG002
-        vector_store_vz: AstraDBVectorStore,
+        empty_collection_idxall_vz: Collection,  # noqa: ARG002
+        vector_store_idxall_vz: AstraDBVectorStore,
     ) -> None:
         """Test autodetect on a VS-made collection, checking all codecs."""
-        vector_store_vz.add_texts(
+        vector_store_idxall_vz.add_texts(
             texts=[
                 "Cont1",
                 "Cont2",
@@ -236,7 +238,7 @@ class TestVectorStoreAutodetect:
         )
         # now with the autodetect
         ad_store = AstraDBVectorStore(
-            collection_name=COLLECTION_NAME_VZ,
+            collection_name=COLLECTION_NAME_IDXALL_VZ,
             token=StaticTokenProvider(astra_db_credentials["token"]),
             api_endpoint=astra_db_credentials["api_endpoint"],
             namespace=astra_db_credentials["namespace"],
@@ -269,11 +271,11 @@ class TestVectorStoreAutodetect:
     def test_failed_docs_autodetect_flat_novectorize_crud(
         self,
         astra_db_credentials: AstraDBCredentials,
-        empty_collection_d2: Collection,
+        empty_collection_idxall_d2: Collection,
         embedding_d2: Embeddings,
     ) -> None:
         """Test autodetect + skipping failing documents."""
-        empty_collection_d2.insert_many(
+        empty_collection_idxall_d2.insert_many(
             [
                 {
                     "_id": "1",
@@ -285,7 +287,7 @@ class TestVectorStoreAutodetect:
             ]
         )
         ad_store_e = AstraDBVectorStore(
-            collection_name=COLLECTION_NAME_D2,
+            collection_name=COLLECTION_NAME_IDXALL_D2,
             embedding=embedding_d2,
             token=StaticTokenProvider(astra_db_credentials["token"]),
             api_endpoint=astra_db_credentials["api_endpoint"],
@@ -295,7 +297,7 @@ class TestVectorStoreAutodetect:
             ignore_invalid_documents=False,
         )
         ad_store_w = AstraDBVectorStore(
-            collection_name=COLLECTION_NAME_D2,
+            collection_name=COLLECTION_NAME_IDXALL_D2,
             embedding=embedding_d2,
             token=StaticTokenProvider(astra_db_credentials["token"]),
             api_endpoint=astra_db_credentials["api_endpoint"],
@@ -311,7 +313,7 @@ class TestVectorStoreAutodetect:
         results_w = ad_store_w.similarity_search("[-1,-1]", k=3)
         assert len(results_w) == 1
 
-        empty_collection_d2.insert_one(
+        empty_collection_idxall_d2.insert_one(
             {
                 "_id": "2",
                 "$vector": [3, 4],
@@ -323,5 +325,11 @@ class TestVectorStoreAutodetect:
         with pytest.raises(KeyError):
             ad_store_e.similarity_search("[7,8]", k=3)
 
-        results_w_post = ad_store_w.similarity_search("[7,8]", k=3)
+        # one case should result in just a warning:
+        with pytest.warns(UserWarning) as rec_warnings:
+            results_w_post = ad_store_w.similarity_search("[7,8]", k=3)
+            f_rec_warnings = [
+                wrn for wrn in rec_warnings if issubclass(wrn.category, UserWarning)
+            ]
+            assert len(f_rec_warnings) == 1
         assert len(results_w_post) == 1

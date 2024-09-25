@@ -21,12 +21,13 @@ from langchain_astradb.utils.astradb import SetupMode
 from .conftest import (
     COLLECTION_NAME_D2,
     CUSTOM_CONTENT_KEY,
+    EPHEMERAL_COLLECTION_NAME_IDXALL_D2,
     LONG_TEXT,
-    _has_env_vars,
+    astra_db_env_vars_available,
 )
 
 if TYPE_CHECKING:
-    from astrapy import Collection
+    from astrapy import Collection, Database
     from langchain_core.embeddings import Embeddings
 
     from .conftest import AstraDBCredentials
@@ -125,16 +126,23 @@ def populated_graph_vector_store_d2(
 @pytest.fixture
 def autodetect_populated_graph_vector_store_d2(
     astra_db_credentials: AstraDBCredentials,
-    empty_collection_d2: Collection,
+    database: Database,
     embedding_d2: Embeddings,
     graph_vector_store_docs: list[Document],
+    ephemeral_collection_cleaner_idxall_d2: str,  # noqa: ARG001
 ) -> AstraDBGraphVectorStore:
     """
     Pre-populate the collection and have (VectorStore)autodetect work on it,
     then create and return a GraphVectorStore, additionally filled with
     the same (graph-)entries as for `populated_graph_vector_store_d2`.
     """
-    empty_collection_d2.insert_many(
+    empty_collection_d2_idxall = database.create_collection(
+        EPHEMERAL_COLLECTION_NAME_IDXALL_D2,
+        dimension=2,
+        check_exists=False,
+        metric="euclidean",
+    )
+    empty_collection_d2_idxall.insert_many(
         [
             {
                 CUSTOM_CONTENT_KEY: LONG_TEXT,
@@ -158,7 +166,7 @@ def autodetect_populated_graph_vector_store_d2(
     )
     gstore = AstraDBGraphVectorStore(
         embedding=embedding_d2,
-        collection_name=COLLECTION_NAME_D2,
+        collection_name=EPHEMERAL_COLLECTION_NAME_IDXALL_D2,
         link_to_metadata_key="x_link_to_x",
         link_from_metadata_key="x_link_from_x",
         token=StaticTokenProvider(astra_db_credentials["token"]),
@@ -184,7 +192,9 @@ def assert_all_flat_docs(collection: Collection) -> None:
         assert isinstance(doc["$vector"], list)
 
 
-@pytest.mark.skipif(not _has_env_vars(), reason="Missing Astra DB env. vars")
+@pytest.mark.skipif(
+    not astra_db_env_vars_available(), reason="Missing Astra DB env. vars"
+)
 class TestAstraDBGraphVectorStore:
     @pytest.mark.parametrize(
         ("store_name", "is_autodetected"),
