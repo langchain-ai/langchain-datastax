@@ -210,6 +210,7 @@ class TestVectorStoreAutodetect:
     def test_autodetect_default_vectorize_crud(
         self,
         astra_db_credentials: AstraDBCredentials,
+        is_astra_db: bool,
         empty_collection_vz: Collection,  # noqa: ARG002
         vector_store_vz: AstraDBVectorStore,
     ) -> None:
@@ -232,6 +233,9 @@ class TestVectorStoreAutodetect:
             ],
         )
         # now with the autodetect
+        ad_key_kwargs = (
+            {} if is_astra_db else {"collection_embedding_api_key": OPENAI_API_KEY}
+        )
         ad_store = AstraDBVectorStore(
             collection_name=COLLECTION_NAME_VZ,
             token=StaticTokenProvider(astra_db_credentials["token"]),
@@ -239,6 +243,7 @@ class TestVectorStoreAutodetect:
             namespace=astra_db_credentials["namespace"],
             environment=astra_db_credentials["environment"],
             autodetect_collection=True,
+            **ad_key_kwargs,
         )
 
         # ANN and the metadata

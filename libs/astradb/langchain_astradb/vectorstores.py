@@ -460,8 +460,6 @@ class AstraDBVectorStore(VectorStore):
                 This is useful when the service is configured for the collection,
                 but no corresponding secret is stored within
                 Astra's key management system.
-                This parameter cannot be provided without
-                specifying ``collection_vector_service_options``.
             content_field: name of the field containing the textual content
                 in the documents when saved on Astra DB. For vectorize collections,
                 this cannot be specified; for non-vectorize collection, defaults

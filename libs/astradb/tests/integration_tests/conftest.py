@@ -113,13 +113,33 @@ def astra_db_credentials() -> AstraDBCredentials:
 
 
 @pytest.fixture(scope="session")
-def database(astra_db_credentials: AstraDBCredentials) -> Database:
+def is_astra_db(astra_db_credentials: AstraDBCredentials) -> bool:
+    environment = astra_db_credentials["environment"]
+    return environment is not None and environment.lower() not in {
+        "prod",
+        "test",
+        "dev",
+    }
+
+
+@pytest.fixture(scope="session")
+def database(
+    is_astra_db: bool,
+    astra_db_credentials: AstraDBCredentials,
+) -> Database:
     client = DataAPIClient(environment=astra_db_credentials["environment"])
-    return client.get_database(
+    db = client.get_database(
         astra_db_credentials["api_endpoint"],
         token=StaticTokenProvider(astra_db_credentials["token"]),
         namespace=astra_db_credentials["namespace"],
     )
+    if not is_astra_db:
+        if astra_db_credentials["namespace"] is None:
+            msg = "Cannot test on non-Astra without a namespace set."
+            raise ValueError(msg)
+        db.get_database_admin().create_namespace(astra_db_credentials["namespace"])
+
+    return db
 
 
 @pytest.fixture(scope="session")
