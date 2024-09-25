@@ -824,11 +824,10 @@ class AstraDBVectorStore(VectorStore):
             raise ValueError(msg)
 
         _max_workers = concurrency or self.bulk_delete_concurrency
-        return all(
-            await gather_with_concurrency(
-                _max_workers, *[self.adelete_by_document_id(doc_id) for doc_id in ids]
-            )
+        await gather_with_concurrency(
+            _max_workers, *[self.adelete_by_document_id(doc_id) for doc_id in ids]
         )
+        return True
 
     def delete_collection(self) -> None:
         """Completely delete the collection from the database.

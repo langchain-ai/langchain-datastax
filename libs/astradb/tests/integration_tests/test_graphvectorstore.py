@@ -98,8 +98,8 @@ def graph_vector_store_docs() -> list[Document]:
 
 @pytest.fixture
 def graph_vector_store_d2(
-    empty_collection_d2: Collection,  # noqa: ARG001
     astra_db_credentials: AstraDBCredentials,
+    empty_collection_d2: Collection,  # noqa: ARG001
     embedding_d2: Embeddings,
 ) -> AstraDBGraphVectorStore:
     return AstraDBGraphVectorStore(

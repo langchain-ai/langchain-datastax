@@ -31,8 +31,8 @@ if TYPE_CHECKING:
 class TestVectorStoreAutodetect:
     def test_autodetect_flat_novectorize_crud(
         self,
-        empty_collection_d2: Collection,
         astra_db_credentials: AstraDBCredentials,
+        empty_collection_d2: Collection,
         embedding_d2: Embeddings,
     ) -> None:
         """Test autodetect on a populated flat collection, checking all codecs."""
@@ -94,8 +94,8 @@ class TestVectorStoreAutodetect:
 
     def test_autodetect_default_novectorize_crud(
         self,
-        empty_collection_d2: Collection,  # noqa: ARG002
         astra_db_credentials: AstraDBCredentials,
+        empty_collection_d2: Collection,  # noqa: ARG002
         embedding_d2: Embeddings,
         vector_store_d2: AstraDBVectorStore,
     ) -> None:
@@ -151,8 +151,8 @@ class TestVectorStoreAutodetect:
 
     def test_autodetect_flat_vectorize_crud(
         self,
-        empty_collection_vz: Collection,
         astra_db_credentials: AstraDBCredentials,
+        empty_collection_vz: Collection,
     ) -> None:
         """Test autodetect on a populated flat collection, checking all codecs."""
         empty_collection_vz.insert_many(
@@ -209,8 +209,8 @@ class TestVectorStoreAutodetect:
 
     def test_autodetect_default_vectorize_crud(
         self,
-        empty_collection_vz: Collection,  # noqa: ARG002
         astra_db_credentials: AstraDBCredentials,
+        empty_collection_vz: Collection,  # noqa: ARG002
         vector_store_vz: AstraDBVectorStore,
     ) -> None:
         """Test autodetect on a VS-made collection, checking all codecs."""
@@ -264,8 +264,8 @@ class TestVectorStoreAutodetect:
 
     def test_failed_docs_autodetect_flat_novectorize_crud(
         self,
-        empty_collection_d2: Collection,
         astra_db_credentials: AstraDBCredentials,
+        empty_collection_d2: Collection,
         embedding_d2: Embeddings,
     ) -> None:
         """Test autodetect + skipping failing documents."""
