@@ -43,6 +43,8 @@ EPHEMERAL_COLLECTION_NAME_VZ_KMS = "lc_test_vz_kms_short"
 EPHEMERAL_CUSTOM_IDX_NAME_D2 = "lc_test_custom_idx_d2_short"
 EPHEMERAL_DEFAULT_IDX_NAME_D2 = "lc_test_default_idx_d2_short"
 EPHEMERAL_LEGACY_IDX_NAME_D2 = "lc_test_legacy_idx_d2_short"
+# non-vector all-indexed collection
+COLLECTION_NAME_IDXALL = "lc_test_idxall"
 
 # autodetect assets
 CUSTOM_CONTENT_KEY = "xcontent"
@@ -236,6 +238,35 @@ def ephemeral_collection_cleaner_d2(
 
     if EPHEMERAL_COLLECTION_NAME_D2 in database.list_collection_names():
         database.drop_collection(EPHEMERAL_COLLECTION_NAME_D2)
+
+
+@pytest.fixture(scope="module")
+def collection_idxall(
+    database: Database,
+) -> Iterable[Collection]:
+    """
+    A general-purpose D=2(Euclidean) collection for per-test reuse.
+    This one has default indexing (i.e. all fields are covered).
+    """
+    collection = database.create_collection(
+        COLLECTION_NAME_IDXALL,
+        check_exists=False,
+    )
+    yield collection
+
+    collection.drop()
+
+
+@pytest.fixture
+def empty_collection_idxall(
+    collection_idxall: Collection,
+) -> Collection:
+    """
+    A per-test-function empty d=2(Euclidean) collection.
+    This one has default indexing (i.e. all fields are covered).
+    """
+    collection_idxall.delete_many({})
+    return collection_idxall
 
 
 @pytest.fixture(scope="module")
