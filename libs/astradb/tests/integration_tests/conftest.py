@@ -94,7 +94,7 @@ class AstraDBCredentials(TypedDict):
     token: str
     api_endpoint: str
     namespace: str | None
-    environment: str | None
+    environment: str
 
 
 @pytest.fixture(scope="session")
@@ -108,14 +108,13 @@ def astra_db_credentials() -> AstraDBCredentials:
         "token": os.environ["ASTRA_DB_APPLICATION_TOKEN"],
         "api_endpoint": os.environ["ASTRA_DB_API_ENDPOINT"],
         "namespace": os.environ.get("ASTRA_DB_KEYSPACE"),
-        "environment": os.environ.get("ASTRA_DB_ENVIRONMENT"),
+        "environment": os.environ.get("ASTRA_DB_ENVIRONMENT", "prod"),
     }
 
 
 @pytest.fixture(scope="session")
 def is_astra_db(astra_db_credentials: AstraDBCredentials) -> bool:
-    environment = astra_db_credentials["environment"]
-    return environment is not None and environment.lower() not in {
+    return astra_db_credentials["environment"].lower() in {
         "prod",
         "test",
         "dev",
@@ -124,6 +123,7 @@ def is_astra_db(astra_db_credentials: AstraDBCredentials) -> bool:
 
 @pytest.fixture(scope="session")
 def database(
+    *,
     is_astra_db: bool,
     astra_db_credentials: AstraDBCredentials,
 ) -> Database:
@@ -244,6 +244,7 @@ def collection_vz(
         indexing=DEFAULT_INDEXING_OPTIONS,
         metric="euclidean",
         service=OPENAI_VECTORIZE_OPTIONS_HEADER,
+        embedding_api_key=OPENAI_API_KEY,
     )
     yield collection
 

@@ -5,7 +5,7 @@ Refer to `test_vectorstores.py` for the requirements to run.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import pytest
 from astrapy.authentication import StaticTokenProvider
@@ -17,6 +17,7 @@ from .conftest import (
     COLLECTION_NAME_D2,
     COLLECTION_NAME_VZ,
     CUSTOM_CONTENT_KEY,
+    OPENAI_API_KEY,
     _has_env_vars,
 )
 
@@ -184,6 +185,7 @@ class TestVectorStoreAutodetect:
             namespace=astra_db_credentials["namespace"],
             environment=astra_db_credentials["environment"],
             autodetect_collection=True,
+            collection_embedding_api_key=OPENAI_API_KEY,
         )
 
         # ANN and the metadata
@@ -209,8 +211,8 @@ class TestVectorStoreAutodetect:
 
     def test_autodetect_default_vectorize_crud(
         self,
+        *,
         astra_db_credentials: AstraDBCredentials,
-        is_astra_db: bool,
         empty_collection_vz: Collection,  # noqa: ARG002
         vector_store_vz: AstraDBVectorStore,
     ) -> None:
@@ -233,9 +235,6 @@ class TestVectorStoreAutodetect:
             ],
         )
         # now with the autodetect
-        ad_key_kwargs = (
-            {} if is_astra_db else {"collection_embedding_api_key": OPENAI_API_KEY}
-        )
         ad_store = AstraDBVectorStore(
             collection_name=COLLECTION_NAME_VZ,
             token=StaticTokenProvider(astra_db_credentials["token"]),
@@ -243,7 +242,7 @@ class TestVectorStoreAutodetect:
             namespace=astra_db_credentials["namespace"],
             environment=astra_db_credentials["environment"],
             autodetect_collection=True,
-            **ad_key_kwargs,
+            collection_embedding_api_key=OPENAI_API_KEY,
         )
 
         # ANN and the metadata
