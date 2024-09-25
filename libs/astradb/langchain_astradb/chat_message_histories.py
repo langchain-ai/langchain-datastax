@@ -40,6 +40,7 @@ class AstraDBChatMessageHistory(BaseChatMessageHistory):
         namespace: str | None = None,
         setup_mode: SetupMode = SetupMode.SYNC,
         pre_delete_collection: bool = False,
+        caller_name: str = "langchain/chat_message_history",
     ) -> None:
         """Chat message history that stores history in Astra DB.
 
@@ -73,6 +74,7 @@ class AstraDBChatMessageHistory(BaseChatMessageHistory):
             setup_mode: mode used to create the Astra DB collection (SYNC, ASYNC or
                 OFF).
             pre_delete_collection: whether to delete the collection.
+            caller_name: a name used to identify API calls in the User-Agent header.
         """
         self.astra_env = _AstraDBCollectionEnvironment(
             collection_name=collection_name,
@@ -84,6 +86,7 @@ class AstraDBChatMessageHistory(BaseChatMessageHistory):
             namespace=namespace,
             setup_mode=setup_mode,
             pre_delete_collection=pre_delete_collection,
+            caller_name=caller_name,
         )
 
         self.collection = self.astra_env.collection

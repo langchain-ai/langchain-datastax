@@ -109,6 +109,7 @@ class AstraDBCache(BaseCache):
         namespace: str | None = None,
         pre_delete_collection: bool = False,
         setup_mode: SetupMode = SetupMode.SYNC,
+        caller_name: str = "langchain/cache",
     ):
         """Cache that uses Astra DB as a backend.
 
@@ -148,6 +149,7 @@ class AstraDBCache(BaseCache):
             pre_delete_collection: whether to delete the collection
                 before creating it. If False and the collection already exists,
                 the collection will be used as is.
+            caller_name: a name used to identify API calls in the User-Agent header.
         """
         self.astra_env = _AstraDBCollectionEnvironment(
             collection_name=collection_name,
@@ -159,6 +161,7 @@ class AstraDBCache(BaseCache):
             namespace=namespace,
             setup_mode=setup_mode,
             pre_delete_collection=pre_delete_collection,
+            caller_name=caller_name,
         )
         self.collection = self.astra_env.collection
         self.async_collection = self.astra_env.async_collection
@@ -326,6 +329,7 @@ class AstraDBSemanticCache(BaseCache):
         embedding: Embeddings,
         metric: str | None = None,
         similarity_threshold: float = ASTRA_DB_SEMANTIC_CACHE_DEFAULT_THRESHOLD,
+        caller_name: str = "langchain/semantic_cache",
     ):
         """Astra DB semantic cache.
 
@@ -375,6 +379,7 @@ class AstraDBSemanticCache(BaseCache):
                 Defaults to 'cosine' (alternatives: 'euclidean', 'dot_product')
             similarity_threshold: the minimum similarity for accepting a
                 (semantic-search) match.
+            caller_name: a name used to identify API calls in the User-Agent header.
         """
         self.embedding = embedding
         self.metric = metric
@@ -416,6 +421,7 @@ class AstraDBSemanticCache(BaseCache):
             pre_delete_collection=pre_delete_collection,
             embedding_dimension=embedding_dimension,
             metric=metric,
+            caller_name=caller_name,
         )
         self.collection = self.astra_env.collection
         self.async_collection = self.astra_env.async_collection

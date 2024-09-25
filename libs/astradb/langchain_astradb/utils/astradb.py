@@ -94,6 +94,7 @@ class _AstraDBEnvironment:
         astra_db_client: AstraDB | None = None,
         async_astra_db_client: AsyncAstraDB | None = None,
         namespace: str | None = None,
+        caller_name: str = "langchain",
     ) -> None:
         self.token: str | TokenProvider | None
         self.api_endpoint: str | None
@@ -221,7 +222,6 @@ class _AstraDBEnvironment:
             raise ValueError(msg)
 
         # create the clients
-        caller_name = "langchain"
         caller_version = getattr(langchain_core, "__version__", None)
 
         self.data_api_client = DataAPIClient(
@@ -256,6 +256,7 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
         default_indexing_policy: dict[str, Any] | None = None,
         collection_vector_service_options: CollectionVectorServiceOptions | None = None,
         collection_embedding_api_key: str | EmbeddingHeadersProvider | None = None,
+        caller_name: str = "langchain",
     ) -> None:
         super().__init__(
             token=token,
@@ -264,6 +265,7 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
             astra_db_client=astra_db_client,
             async_astra_db_client=async_astra_db_client,
             namespace=namespace,
+            caller_name=caller_name,
         )
         self.collection_name = collection_name
         self.collection = self.database.get_collection(

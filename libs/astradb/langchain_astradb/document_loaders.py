@@ -49,6 +49,7 @@ class AstraDBLoader(BaseLoader):
         nb_prefetched: int = _NOT_SET,  # type: ignore[assignment]
         page_content_mapper: Callable[[dict], str] = json.dumps,
         metadata_mapper: Callable[[dict], dict[str, Any]] | None = None,
+        caller_name: str = "langchain/document_loader",
     ) -> None:
         """Load DataStax Astra DB documents.
 
@@ -91,6 +92,7 @@ class AstraDBLoader(BaseLoader):
             metadata_mapper: Function applied to collection documents to create the
                 `metadata` of the LangChain Document. Defaults to returning the
                  namespace, API endpoint and collection name.
+            caller_name: a name used to identify API calls in the User-Agent header.
         """
         astra_db_env = _AstraDBCollectionEnvironment(
             collection_name=collection_name,
@@ -101,6 +103,7 @@ class AstraDBLoader(BaseLoader):
             async_astra_db_client=async_astra_db_client,
             namespace=namespace,
             setup_mode=SetupMode.OFF,
+            caller_name=caller_name,
         )
         self.astra_db_env = astra_db_env
         self.filter = filter_criteria

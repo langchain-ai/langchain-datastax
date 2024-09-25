@@ -389,6 +389,7 @@ class AstraDBVectorStore(VectorStore):
         content_field: str | None = None,
         ignore_invalid_documents: bool = False,
         autodetect_collection: bool = False,
+        caller_name: str = "langchain/vectorstore",
     ) -> None:
         """Wrapper around DataStax Astra DB for vector-store workloads.
 
@@ -497,6 +498,7 @@ class AstraDBVectorStore(VectorStore):
                 ``metric``, ``setup_mode``, ``metadata_indexing_include``,
                 ``metadata_indexing_exclude``, ``collection_indexing_policy``,
                 ``collection_vector_service_options``.
+            caller_name: a name used to identify API calls in the User-Agent header.
 
         Note:
             For concurrency in synchronous :meth:`~add_texts`:, as a rule of thumb,
@@ -664,6 +666,7 @@ class AstraDBVectorStore(VectorStore):
             default_indexing_policy=DEFAULT_INDEXING_OPTIONS,
             collection_vector_service_options=self.collection_vector_service_options,
             collection_embedding_api_key=self.collection_embedding_api_key,
+            caller_name=caller_name,
         )
 
     def _get_safe_embedding(self) -> Embeddings:

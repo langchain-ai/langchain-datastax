@@ -54,6 +54,7 @@ class AstraDBGraphVectorStore(GraphVectorStore):
         metadata_indexing_include: Iterable[str] | None = None,
         metadata_indexing_exclude: Iterable[str] | None = None,
         collection_indexing_policy: dict[str, Any] | None = None,
+        caller_name: str = "langchain/graph_vectorstore",
         **kwargs: Any,
     ):
         """Create a new Graph Vector Store backed by AstraDB."""
@@ -68,6 +69,7 @@ class AstraDBGraphVectorStore(GraphVectorStore):
             metadata_indexing_include=metadata_indexing_include,
             metadata_indexing_exclude=metadata_indexing_exclude,
             collection_indexing_policy=collection_indexing_policy,
+            caller_name=caller_name,
             **kwargs,
         )
 
