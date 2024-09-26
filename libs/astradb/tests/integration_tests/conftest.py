@@ -15,6 +15,8 @@ Required to run this test:
         export SHARED_SECRET_NAME_OPENAI="the_api_key_name_in_Astra_KMS"
     - an OpenAI key for the vectorize test (in HEADER mode):
         export OPENAI_API_KEY="..."
+
+Please refer to testing.env.sample.
 """
 
 from __future__ import annotations
