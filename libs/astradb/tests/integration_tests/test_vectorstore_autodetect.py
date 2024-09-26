@@ -17,7 +17,6 @@ from .conftest import (
     COLLECTION_NAME_IDXALL_D2,
     COLLECTION_NAME_IDXALL_VZ,
     CUSTOM_CONTENT_KEY,
-    OPENAI_API_KEY,
     astra_db_env_vars_available,
 )
 
@@ -155,6 +154,7 @@ class TestAstraDBVectorStoreAutodetect:
     def test_autodetect_flat_vectorize_crud(
         self,
         astra_db_credentials: AstraDBCredentials,
+        openai_api_key: str,
         empty_collection_idxall_vz: Collection,
     ) -> None:
         """Test autodetect on a populated flat collection, checking all codecs."""
@@ -187,7 +187,7 @@ class TestAstraDBVectorStoreAutodetect:
             namespace=astra_db_credentials["namespace"],
             environment=astra_db_credentials["environment"],
             autodetect_collection=True,
-            collection_embedding_api_key=OPENAI_API_KEY,
+            collection_embedding_api_key=openai_api_key,
         )
 
         # ANN and the metadata
@@ -215,6 +215,7 @@ class TestAstraDBVectorStoreAutodetect:
         self,
         *,
         astra_db_credentials: AstraDBCredentials,
+        openai_api_key: str,
         empty_collection_idxall_vz: Collection,  # noqa: ARG002
         vector_store_idxall_vz: AstraDBVectorStore,
     ) -> None:
@@ -244,7 +245,7 @@ class TestAstraDBVectorStoreAutodetect:
             namespace=astra_db_credentials["namespace"],
             environment=astra_db_credentials["environment"],
             autodetect_collection=True,
-            collection_embedding_api_key=OPENAI_API_KEY,
+            collection_embedding_api_key=openai_api_key,
         )
 
         # ANN and the metadata

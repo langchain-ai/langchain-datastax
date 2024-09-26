@@ -103,7 +103,6 @@ def astra_db_env_vars_available() -> bool:
 _load_env()
 
 
-OPENAI_API_KEY = os.environ["OPENAI_API_KEY"]
 OPENAI_VECTORIZE_OPTIONS_HEADER = CollectionVectorServiceOptions(
     provider="openai",
     model_name="text-embedding-3-small",
@@ -128,6 +127,11 @@ class AstraDBCredentials(TypedDict):
     api_endpoint: str
     namespace: str | None
     environment: str
+
+
+@pytest.fixture(scope="session")
+def openai_api_key() -> str:
+    return os.environ["OPENAI_API_KEY"]
 
 
 @pytest.fixture(scope="session")
@@ -384,6 +388,7 @@ def ephemeral_collection_cleaner_idxall_d2(
 
 @pytest.fixture(scope="module")
 def collection_vz(
+    openai_api_key: str,
     database: Database,
 ) -> Iterable[Collection]:
     """A general-purpose $vectorize collection for per-test reuse."""
@@ -394,7 +399,7 @@ def collection_vz(
         indexing=DEFAULT_INDEXING_OPTIONS,
         metric="euclidean",
         service=OPENAI_VECTORIZE_OPTIONS_HEADER,
-        embedding_api_key=OPENAI_API_KEY,
+        embedding_api_key=openai_api_key,
     )
     yield collection
 
@@ -412,8 +417,9 @@ def empty_collection_vz(
 
 @pytest.fixture
 def vector_store_vz(
-    empty_collection_vz: Collection,  # noqa: ARG001
     astra_db_credentials: AstraDBCredentials,
+    openai_api_key: str,
+    empty_collection_vz: Collection,  # noqa: ARG001
 ) -> AstraDBVectorStore:
     """A fresh vector store on a $vectorize collection."""
     return AstraDBVectorStore(
@@ -424,7 +430,7 @@ def vector_store_vz(
         environment=astra_db_credentials["environment"],
         setup_mode=SetupMode.OFF,
         collection_vector_service_options=OPENAI_VECTORIZE_OPTIONS_HEADER,
-        collection_embedding_api_key=OPENAI_API_KEY,
+        collection_embedding_api_key=openai_api_key,
     )
 
 
@@ -445,6 +451,7 @@ def ephemeral_collection_cleaner_vz(
 
 @pytest.fixture(scope="module")
 def collection_idxall_vz(
+    openai_api_key: str,
     database: Database,
 ) -> Iterable[Collection]:
     """
@@ -457,7 +464,7 @@ def collection_idxall_vz(
         check_exists=False,
         metric="euclidean",
         service=OPENAI_VECTORIZE_OPTIONS_HEADER,
-        embedding_api_key=OPENAI_API_KEY,
+        embedding_api_key=openai_api_key,
     )
     yield collection
 
@@ -478,6 +485,7 @@ def empty_collection_idxall_vz(
 
 @pytest.fixture
 def vector_store_idxall_vz(
+    openai_api_key: str,
     empty_collection_idxall_vz: Collection,  # noqa: ARG001
     astra_db_credentials: AstraDBCredentials,
 ) -> AstraDBVectorStore:
@@ -491,7 +499,7 @@ def vector_store_idxall_vz(
         collection_indexing_policy={"allow": ["*"]},
         setup_mode=SetupMode.OFF,
         collection_vector_service_options=OPENAI_VECTORIZE_OPTIONS_HEADER,
-        collection_embedding_api_key=OPENAI_API_KEY,
+        collection_embedding_api_key=openai_api_key,
     )
 
 

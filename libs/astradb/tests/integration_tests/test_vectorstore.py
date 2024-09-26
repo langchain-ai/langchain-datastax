@@ -19,7 +19,6 @@ from .conftest import (
     EPHEMERAL_COLLECTION_NAME_D2,
     EUCLIDEAN_MIN_SIM_UNIT_VECTORS,
     MATCH_EPSILON,
-    OPENAI_API_KEY,
     OPENAI_VECTORIZE_OPTIONS_HEADER,
     astra_db_env_vars_available,
 )
@@ -70,6 +69,7 @@ class TestAstraDBVectorStore:
         self,
         *,
         astra_db_credentials: AstraDBCredentials,
+        openai_api_key: str,
         embedding_d2: Embeddings,
         is_vectorize: bool,
         page_contents: list[str],
@@ -82,7 +82,7 @@ class TestAstraDBVectorStore:
         if is_vectorize:
             init_kwargs = {
                 "collection_vector_service_options": OPENAI_VECTORIZE_OPTIONS_HEADER,
-                "collection_embedding_api_key": OPENAI_API_KEY,
+                "collection_embedding_api_key": openai_api_key,
             }
         else:
             init_kwargs = {"embedding": embedding_d2}
@@ -176,6 +176,7 @@ class TestAstraDBVectorStore:
         self,
         *,
         astra_db_credentials: AstraDBCredentials,
+        openai_api_key: str,
         embedding_d2: Embeddings,
         is_vectorize: bool,
         page_contents: list[str],
@@ -189,7 +190,7 @@ class TestAstraDBVectorStore:
         if is_vectorize:
             init_kwargs = {
                 "collection_vector_service_options": OPENAI_VECTORIZE_OPTIONS_HEADER,
-                "collection_embedding_api_key": OPENAI_API_KEY,
+                "collection_embedding_api_key": openai_api_key,
             }
         else:
             init_kwargs = {"embedding": embedding_d2}
@@ -321,6 +322,7 @@ class TestAstraDBVectorStore:
         self,
         *,
         astra_db_credentials: AstraDBCredentials,
+        openai_api_key: str,
         embedding_d2: Embeddings,
         is_vectorize: bool,
         page_contents: list[str],
@@ -333,7 +335,7 @@ class TestAstraDBVectorStore:
         if is_vectorize:
             init_kwargs = {
                 "collection_vector_service_options": OPENAI_VECTORIZE_OPTIONS_HEADER,
-                "collection_embedding_api_key": OPENAI_API_KEY,
+                "collection_embedding_api_key": openai_api_key,
             }
         else:
             init_kwargs = {"embedding": embedding_d2}
@@ -427,6 +429,7 @@ class TestAstraDBVectorStore:
         self,
         *,
         astra_db_credentials: AstraDBCredentials,
+        openai_api_key: str,
         embedding_d2: Embeddings,
         is_vectorize: bool,
         page_contents: list[str],
@@ -443,7 +446,7 @@ class TestAstraDBVectorStore:
         if is_vectorize:
             init_kwargs = {
                 "collection_vector_service_options": OPENAI_VECTORIZE_OPTIONS_HEADER,
-                "collection_embedding_api_key": OPENAI_API_KEY,
+                "collection_embedding_api_key": openai_api_key,
             }
         else:
             init_kwargs = {"embedding": embedding_d2}

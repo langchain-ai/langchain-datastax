@@ -24,7 +24,6 @@ from .conftest import (
     EPHEMERAL_LEGACY_IDX_NAME_D2,
     INCOMPATIBLE_INDEXING_MSG,
     LEGACY_INDEXING_MSG,
-    OPENAI_API_KEY,
     OPENAI_VECTORIZE_OPTIONS_HEADER,
     OPENAI_VECTORIZE_OPTIONS_KMS,
     astra_db_env_vars_available,
@@ -65,6 +64,7 @@ class TestAstraDBVectorStoreDDLs:
     def test_astradb_vectorstore_create_delete_vectorize_sync(
         self,
         astra_db_credentials: AstraDBCredentials,
+        openai_api_key: str,
         database: Database,
         ephemeral_collection_cleaner_vz: str,  # noqa: ARG002
     ) -> None:
@@ -77,7 +77,7 @@ class TestAstraDBVectorStoreDDLs:
             environment=astra_db_credentials["environment"],
             metric="cosine",
             collection_vector_service_options=OPENAI_VECTORIZE_OPTIONS_HEADER,
-            collection_embedding_api_key=OPENAI_API_KEY,
+            collection_embedding_api_key=openai_api_key,
         )
         v_store.add_texts(["This is text"])
         v_store.delete_collection()
@@ -107,6 +107,7 @@ class TestAstraDBVectorStoreDDLs:
     async def test_astradb_vectorstore_create_delete_vectorize_async(
         self,
         astra_db_credentials: AstraDBCredentials,
+        openai_api_key: str,
         database: Database,
         ephemeral_collection_cleaner_vz: str,  # noqa: ARG002
     ) -> None:
@@ -119,7 +120,7 @@ class TestAstraDBVectorStoreDDLs:
             environment=astra_db_credentials["environment"],
             metric="cosine",
             collection_vector_service_options=OPENAI_VECTORIZE_OPTIONS_HEADER,
-            collection_embedding_api_key=OPENAI_API_KEY,
+            collection_embedding_api_key=openai_api_key,
         )
         await v_store.aadd_texts(["[1,2]"])
         await v_store.adelete_collection()
