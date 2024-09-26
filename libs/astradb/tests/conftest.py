@@ -5,8 +5,14 @@
 from __future__ import annotations
 
 import json
+from typing import TYPE_CHECKING, Any
 
 from langchain_core.embeddings import Embeddings
+from langchain_core.language_models import LLM
+from typing_extensions import override
+
+if TYPE_CHECKING:
+    from langchain_core.callbacks import CallbackManagerForLLMRun
 
 
 class ParserEmbeddings(Embeddings):
@@ -35,3 +41,30 @@ class ParserEmbeddings(Embeddings):
 
     async def aembed_query(self, text: str) -> list[float]:
         return self.embed_query(text)
+
+
+class IdentityLLM(LLM):
+    num_calls: int = 0
+
+    @property
+    @override
+    def _llm_type(self) -> str:
+        return "fake"
+
+    @override
+    def _call(
+        self,
+        prompt: str,
+        stop: list[str] | None = None,
+        run_manager: CallbackManagerForLLMRun | None = None,
+        **kwargs: Any,
+    ) -> str:
+        self.num_calls += 1
+        if stop is not None:
+            return f"STOP<{prompt.upper()}>"
+        return prompt
+
+    @property
+    @override
+    def _identifying_params(self) -> dict[str, Any]:
+        return {}

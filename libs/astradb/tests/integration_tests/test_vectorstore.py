@@ -1,20 +1,4 @@
-"""Test of Astra DB vector store class `AstraDBVectorStore`
-
-Required to run this test:
-    - a recent `astrapy` Python package available
-    - an Astra DB instance;
-    - the two environment variables set:
-        export ASTRA_DB_API_ENDPOINT="https://<DB-ID>-us-east1.apps.astra.datastax.com"
-        export ASTRA_DB_APPLICATION_TOKEN="AstraCS:........."
-    - optionally this as well (otherwise defaults are used):
-        export ASTRA_DB_KEYSPACE="my_keyspace"
-    - optionally (if not on prod)
-        export ASTRA_DB_ENVIRONMENT="dev"  # or similar
-    - an openai key name on KMS for SHARED_SECRET vectorize mode, associated to the DB:
-        export SHARED_SECRET_NAME_OPENAI="the_api_key_name_in_Astra_KMS"
-    - an OpenAI key for the vectorize test (in HEADER mode):
-        export OPENAI_API_KEY="..."
-"""
+"""Test of Astra DB vector store class `AstraDBVectorStore`."""
 
 from __future__ import annotations
 
