@@ -286,7 +286,10 @@ class TestAstraDB:
         core_astra_db: AstraDB,
         document_loader_collection: Collection,  # noqa: ARG002
     ) -> None:
-        """A deprecation warning from passing a (core) AstraDB, but it works."""
+        """
+        A deprecation warning from passing a (core) AstraDB, but it works.
+        Note there is no sync/async here: this class always has SetupMode.OFF.
+        """
         loader_init_ok = AstraDBLoader(
             collection_name=COLLECTION_NAME_IDXALL,
             token=StaticTokenProvider(astra_db_credentials["token"]),
