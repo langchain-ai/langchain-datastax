@@ -70,7 +70,7 @@ class TestAstraDB:
         docs = loader.load()
         assert len(docs) == 22
 
-    def test_astradb_loader_sync(
+    def test_astradb_loader_base_sync(
         self,
         astra_db_credentials: AstraDBCredentials,
         database: Database,
@@ -87,8 +87,8 @@ class TestAstraDB:
             filter_criteria={"foo": "bar"},
         )
         docs = loader.load()
-
         assert len(docs) == 22
+
         ids = set()
         for doc in docs:
             content = json.loads(doc.page_content)
@@ -101,6 +101,19 @@ class TestAstraDB:
                 "api_endpoint": astra_db_credentials["api_endpoint"],
                 "collection": COLLECTION_NAME_IDXALL,
             }
+
+        loader2 = AstraDBLoader(
+            COLLECTION_NAME_IDXALL,
+            token=StaticTokenProvider(astra_db_credentials["token"]),
+            api_endpoint=astra_db_credentials["api_endpoint"],
+            namespace=astra_db_credentials["namespace"],
+            environment=astra_db_credentials["environment"],
+            projection={"foo": 1},
+            limit=22,
+            filter_criteria={"foo": "bar2"},
+        )
+        docs2 = loader2.load()
+        assert len(docs2) == 4
 
     def test_page_content_mapper_sync(
         self,
@@ -145,6 +158,7 @@ class TestAstraDB:
     async def test_astradb_loader_prefetched_async(
         self,
         astra_db_credentials: AstraDBCredentials,
+        database: Database,
         async_document_loader_collection: AsyncCollection,  # noqa: ARG002
     ) -> None:
         """Using 'prefetched' should give a warning but work nonetheless."""
@@ -165,11 +179,36 @@ class TestAstraDB:
                 wrn for wrn in rec_warnings if issubclass(wrn.category, UserWarning)
             ]
             assert len(f_rec_warnings) == 1
-
         docs = await loader.aload()
         assert len(docs) == 22
 
-    async def test_astradb_loader_async(
+        ids = set()
+        for doc in docs:
+            content = json.loads(doc.page_content)
+            assert content["foo"] == "bar"
+            assert "baz" not in content
+            assert content["_id"] not in ids
+            ids.add(content["_id"])
+            assert doc.metadata == {
+                "namespace": database.namespace,
+                "api_endpoint": astra_db_credentials["api_endpoint"],
+                "collection": COLLECTION_NAME_IDXALL,
+            }
+
+        loader2 = AstraDBLoader(
+            COLLECTION_NAME_IDXALL,
+            token=StaticTokenProvider(astra_db_credentials["token"]),
+            api_endpoint=astra_db_credentials["api_endpoint"],
+            namespace=astra_db_credentials["namespace"],
+            environment=astra_db_credentials["environment"],
+            projection={"foo": 1},
+            limit=22,
+            filter_criteria={"foo": "bar2"},
+        )
+        docs2 = await loader2.aload()
+        assert len(docs2) == 4
+
+    async def test_astradb_loader_base_async(
         self,
         astra_db_credentials: AstraDBCredentials,
         database: Database,
