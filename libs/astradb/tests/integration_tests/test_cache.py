@@ -183,7 +183,6 @@ class TestAstraDBCache:
     def test_cache_coreclients_init_sync(
         self,
         core_astra_db: AstraDB,
-        empty_collection_idxall: Collection,  # noqa: ARG002
         astradb_cache: AstraDBCache,
     ) -> None:
         """A deprecation warning from passing a (core) AstraDB, but it works."""
@@ -208,7 +207,6 @@ class TestAstraDBCache:
     async def test_cache_coreclients_init_async(
         self,
         core_astra_db: AstraDB,
-        empty_collection_idxall: Collection,  # noqa: ARG002
         astradb_cache_async: AstraDBCache,
     ) -> None:
         """

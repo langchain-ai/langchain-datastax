@@ -239,7 +239,6 @@ class TestAstraDBVectorStoreDDLs:
     def test_astradb_vectorstore_indexing_default_sync(
         self,
         astra_db_credentials: AstraDBCredentials,
-        database: Database,  # noqa: ARG002
         embedding_d2: Embeddings,
         ephemeral_indexing_collections_cleaner: str,  # noqa: ARG002
     ) -> None:
@@ -282,7 +281,6 @@ class TestAstraDBVectorStoreDDLs:
     def test_astradb_vectorstore_indexing_custom_sync(
         self,
         astra_db_credentials: AstraDBCredentials,
-        database: Database,  # noqa: ARG002
         embedding_d2: Embeddings,
         ephemeral_indexing_collections_cleaner: str,  # noqa: ARG002
     ) -> None:
@@ -384,7 +382,6 @@ class TestAstraDBVectorStoreDDLs:
     async def test_astradb_vectorstore_indexing_default_async(
         self,
         astra_db_credentials: AstraDBCredentials,
-        database: Database,  # noqa: ARG002
         embedding_d2: Embeddings,
         ephemeral_indexing_collections_cleaner: str,  # noqa: ARG002
     ) -> None:
@@ -430,7 +427,6 @@ class TestAstraDBVectorStoreDDLs:
     async def test_astradb_vectorstore_indexing_custom_async(
         self,
         astra_db_credentials: AstraDBCredentials,
-        database: Database,  # noqa: ARG002
         embedding_d2: Embeddings,
         ephemeral_indexing_collections_cleaner: str,  # noqa: ARG002
     ) -> None:

@@ -51,6 +51,10 @@ COLLECTION_NAME_VZ = "lc_test_vz_euclidean"
 # (All-indexed) for general-purpose and autodetect
 COLLECTION_NAME_IDXALL_D2 = "lc_test_d2_idxall_euclidean"
 COLLECTION_NAME_IDXALL_VZ = "lc_test_vz_idxall_euclidean"
+# non-vector all-indexed collection
+COLLECTION_NAME_IDXALL = "lc_test_idxall"
+# non-vector store-like-indexed collection
+COLLECTION_NAME_IDXID = "lc_test_idxid"
 # Function-lived collection names:
 # (all-indexed) for autodetect:
 EPHEMERAL_COLLECTION_NAME_IDXALL_D2 = "lc_test_d2_idxall_euclidean"
@@ -63,8 +67,9 @@ EPHEMERAL_COLLECTION_NAME_VZ_KMS = "lc_test_vz_kms_short"
 EPHEMERAL_CUSTOM_IDX_NAME_D2 = "lc_test_custom_idx_d2_short"
 EPHEMERAL_DEFAULT_IDX_NAME_D2 = "lc_test_default_idx_d2_short"
 EPHEMERAL_LEGACY_IDX_NAME_D2 = "lc_test_legacy_idx_d2_short"
-# non-vector all-indexed collection
-COLLECTION_NAME_IDXALL = "lc_test_idxall"
+# indexing-related collection names (function-lived) (storage)
+EPHEMERAL_CUSTOM_IDX_NAME = "lc_test_custom_idx_short"
+EPHEMERAL_LEGACY_IDX_NAME = "lc_test_legacy_idx_short"
 
 # autodetect assets
 CUSTOM_CONTENT_KEY = "xcontent"
@@ -270,7 +275,7 @@ def collection_idxall(
     database: Database,
 ) -> Iterable[Collection]:
     """
-    A general-purpose D=2(Euclidean) collection for per-test reuse.
+    A general-purpose collection for per-test reuse.
     This one has default indexing (i.e. all fields are covered).
     """
     collection = database.create_collection(
@@ -287,11 +292,29 @@ def empty_collection_idxall(
     collection_idxall: Collection,
 ) -> Collection:
     """
-    A per-test-function empty d=2(Euclidean) collection.
+    A per-test-function empty collection.
     This one has default indexing (i.e. all fields are covered).
     """
     collection_idxall.delete_many({})
     return collection_idxall
+
+
+@pytest.fixture(scope="module")
+def collection_idxid(
+    database: Database,
+) -> Iterable[Collection]:
+    """
+    A general-purpose collection for per-test reuse.
+    This one has id-only indexing (i.e. for Storage classes).
+    """
+    collection = database.create_collection(
+        COLLECTION_NAME_IDXID,
+        indexing={"allow": ["_id"]},
+        check_exists=False,
+    )
+    yield collection
+
+    collection.drop()
 
 
 @pytest.fixture(scope="module")
@@ -485,6 +508,8 @@ def ephemeral_indexing_collections_cleaner(
         EPHEMERAL_CUSTOM_IDX_NAME_D2,
         EPHEMERAL_DEFAULT_IDX_NAME_D2,
         EPHEMERAL_LEGACY_IDX_NAME_D2,
+        EPHEMERAL_CUSTOM_IDX_NAME,
+        EPHEMERAL_LEGACY_IDX_NAME,
     ]
     yield collection_names
 
