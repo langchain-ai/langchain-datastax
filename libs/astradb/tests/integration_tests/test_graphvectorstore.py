@@ -11,9 +11,9 @@ from typing import TYPE_CHECKING
 
 import pytest
 from astrapy.authentication import StaticTokenProvider
+from langchain_community.graph_vectorstores.base import Node
+from langchain_community.graph_vectorstores.links import Link, add_links
 from langchain_core.documents import Document
-from langchain_core.graph_vectorstores.base import Node
-from langchain_core.graph_vectorstores.links import Link, add_links
 
 from langchain_astradb.graph_vectorstores import AstraDBGraphVectorStore
 from langchain_astradb.utils.astradb import SetupMode

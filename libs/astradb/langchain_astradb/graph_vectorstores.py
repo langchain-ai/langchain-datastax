@@ -14,11 +14,11 @@ from typing import (
     Sequence,
 )
 
-from langchain_core.documents import Document
-from langchain_core.graph_vectorstores.base import (
+from langchain_community.graph_vectorstores.base import (
     GraphVectorStore,
     Node,
 )
+from langchain_core.documents import Document
 from typing_extensions import override
 
 from langchain_astradb import AstraDBVectorStore
