@@ -14,7 +14,6 @@ license = "MIT"
 python = ">=3.9,<4.0"
 langchain-community = ">=0.3.1"
 astrapy = "^1.5"
-# Resolve numpy version for 3.8 to 3.12+
 numpy = "^1.26.0"
 
 [tool.poetry.group.test]

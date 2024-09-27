@@ -19,8 +19,8 @@ jobs:
     strategy:
       matrix:
         python-version:
-          # - "3.8"
-          - "3.11"
+          # - "3.9"
+          - "3.12"
     name: "make integration_tests #${{ matrix.python-version }}"
     steps:
       - uses: actions/checkout@v4
