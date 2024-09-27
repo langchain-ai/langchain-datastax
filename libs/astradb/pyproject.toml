@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "langchain-astradb"
-version = "0.4.2"
+version = "0.5.0"
 description = "An integration package connecting Astra DB and LangChain"
 authors = []
 readme = "README.md"
@@ -12,8 +12,8 @@ license = "MIT"
 
 [tool.poetry.dependencies]
 python = ">=3.9,<4.0"
-langchain-core = ">=0.1.31,<0.4"
-astrapy = "^1.4"
+langchain-community = ">=0.3.1"
+astrapy = "^1.5"
 # Resolve numpy version for 3.8 to 3.12+
 numpy = "^1.26.0"
 
@@ -31,6 +31,7 @@ pytest-asyncio = "^0.21.1"
 langchain = { git = "https://github.com/langchain-ai/langchain.git", subdirectory = "libs/langchain" }
 langchain-text-splitters = { git = "https://github.com/langchain-ai/langchain.git", subdirectory = "libs/text-splitters" }
 langchain-core = { git = "https://github.com/langchain-ai/langchain.git", subdirectory = "libs/core" }
+langchain-community = { git = "https://github.com/langchain-ai/langchain.git", subdirectory = "libs/community" }
 
 [tool.poetry.group.codespell]
 optional = true

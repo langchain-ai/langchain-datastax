@@ -232,7 +232,7 @@ class _AstraDBEnvironment:
         self.database = self.data_api_client.get_database(
             api_endpoint=self.api_endpoint,
             token=self.token,
-            namespace=self.namespace,
+            keyspace=self.namespace,
         )
         self.async_database = self.database.to_async()
 
@@ -296,7 +296,7 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
             try:
                 self.database.create_collection(
                     name=collection_name,
-                    dimension=embedding_dimension,
+                    dimension=embedding_dimension,  # type: ignore[arg-type]
                     metric=metric,
                     indexing=requested_indexing_policy,
                     # Used for enabling $vectorize on the collection
