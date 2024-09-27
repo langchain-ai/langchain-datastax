@@ -983,10 +983,7 @@ class AstraDBVectorStore(VectorStore):
             inserted_ids = insert_many_result.inserted_ids
         except InsertManyException as err:
             # check that the error is solely due to already-existing documents
-            error_codes = {
-                getattr(err_desc, "error_code", None)
-                for err_desc in err.error_descriptors
-            }
+            error_codes = {err_desc.error_code for err_desc in err.error_descriptors}
             if error_codes == {DOCUMENT_ALREADY_EXISTS_API_ERROR_CODE}:
                 inserted_ids = err.partial_result.inserted_ids
                 inserted_ids_set = set(inserted_ids)
@@ -1115,10 +1112,7 @@ class AstraDBVectorStore(VectorStore):
             inserted_ids = insert_many_result.inserted_ids
         except InsertManyException as err:
             # check that the error is solely due to already-existing documents
-            error_codes = {
-                getattr(err_desc, "error_code", None)
-                for err_desc in err.error_descriptors
-            }
+            error_codes = {err_desc.error_code for err_desc in err.error_descriptors}
             if error_codes == {DOCUMENT_ALREADY_EXISTS_API_ERROR_CODE}:
                 inserted_ids = err.partial_result.inserted_ids
                 inserted_ids_set = set(inserted_ids)

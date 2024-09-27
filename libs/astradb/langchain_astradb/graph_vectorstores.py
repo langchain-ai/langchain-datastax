@@ -1,8 +1,5 @@
 """Astra DB graph vector store integration."""
 
-# Leave TODO's alone
-# ruff: noqa: FIX002 TD002 TD003
-
 from __future__ import annotations
 
 import secrets
@@ -21,8 +18,8 @@ from langchain_community.graph_vectorstores.base import (
 from langchain_core.documents import Document
 from typing_extensions import override
 
-from langchain_astradb import AstraDBVectorStore
 from langchain_astradb.utils.mmr_traversal import MmrHelper
+from langchain_astradb.vectorstores import AstraDBVectorStore
 
 if TYPE_CHECKING:
     from langchain_core.embeddings import Embeddings
