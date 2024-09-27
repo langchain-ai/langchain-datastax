@@ -460,8 +460,6 @@ class AstraDBVectorStore(VectorStore):
                 This is useful when the service is configured for the collection,
                 but no corresponding secret is stored within
                 Astra's key management system.
-                This parameter cannot be provided without
-                specifying ``collection_vector_service_options``.
             content_field: name of the field containing the textual content
                 in the documents when saved on Astra DB. For vectorize collections,
                 this cannot be specified; for non-vectorize collection, defaults
@@ -473,7 +471,7 @@ class AstraDBVectorStore(VectorStore):
                 Please understand the limitations of this method and get some
                 understanding of your data before passing ``"*"`` for this parameter.
             ignore_invalid_documents: if False (default), exceptions are raised
-                when a document is found on the Astra DB collectin that does
+                when a document is found on the Astra DB collection that does
                 not have the expected shape. If set to True, such results
                 from the database are ignored and a warning is issued. Note
                 that in this case a similarity search may end up returning fewer
@@ -824,11 +822,10 @@ class AstraDBVectorStore(VectorStore):
             raise ValueError(msg)
 
         _max_workers = concurrency or self.bulk_delete_concurrency
-        return all(
-            await gather_with_concurrency(
-                _max_workers, *[self.adelete_by_document_id(doc_id) for doc_id in ids]
-            )
+        await gather_with_concurrency(
+            _max_workers, *[self.adelete_by_document_id(doc_id) for doc_id in ids]
         )
+        return True
 
     def delete_collection(self) -> None:
         """Completely delete the collection from the database.

@@ -117,7 +117,7 @@ class MmrHelper:
 
         # List of the candidates.
         self.candidates = []
-        # ND array of the candidate embeddings.
+        # numpy n-dimensional array of the candidate embeddings.
         self.candidate_embeddings = np.ndarray((0, self.dimensions), dtype=np.float32)
 
         self.best_score = NEG_INF

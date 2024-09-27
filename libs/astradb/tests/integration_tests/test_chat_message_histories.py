@@ -1,7 +1,7 @@
 import os
-from typing import AsyncIterable, Iterable
 
 import pytest
+from astrapy import Collection
 from astrapy.db import AstraDB
 from langchain.memory import ConversationBufferMemory
 from langchain_core.messages import AIMessage, HumanMessage
@@ -11,33 +11,36 @@ from langchain_astradb.chat_message_histories import (
 )
 from langchain_astradb.utils.astradb import SetupMode
 
-from .conftest import AstraDBCredentials, _has_env_vars
+from .conftest import (
+    COLLECTION_NAME_IDXALL,
+    AstraDBCredentials,
+    astra_db_env_vars_available,
+)
 
 
 @pytest.fixture
 def history1(
     astra_db_credentials: AstraDBCredentials,
-) -> Iterable[AstraDBChatMessageHistory]:
-    history1 = AstraDBChatMessageHistory(
+    empty_collection_idxall: Collection,  # noqa: ARG001
+) -> AstraDBChatMessageHistory:
+    return AstraDBChatMessageHistory(
         session_id="session-test-1",
-        collection_name="langchain_cmh_test",
+        collection_name=COLLECTION_NAME_IDXALL,
         token=astra_db_credentials["token"],
         api_endpoint=astra_db_credentials["api_endpoint"],
         namespace=astra_db_credentials["namespace"],
         environment=astra_db_credentials["environment"],
     )
-    yield history1
-    history1.collection.drop()
 
 
 @pytest.fixture
 def history2(
-    history1: AstraDBChatMessageHistory,
     astra_db_credentials: AstraDBCredentials,
+    history1: AstraDBChatMessageHistory,  # noqa: ARG001
 ) -> AstraDBChatMessageHistory:
     return AstraDBChatMessageHistory(
         session_id="session-test-2",
-        collection_name=history1.collection_name,
+        collection_name=COLLECTION_NAME_IDXALL,
         token=astra_db_credentials["token"],
         api_endpoint=astra_db_credentials["api_endpoint"],
         namespace=astra_db_credentials["namespace"],
@@ -46,34 +49,32 @@ def history2(
         # no two createCollection calls at once are issued:
         setup_mode=SetupMode.OFF,
     )
-    # no deletion here, this is riding on history1
 
 
 @pytest.fixture
 async def async_history1(
     astra_db_credentials: AstraDBCredentials,
-) -> AsyncIterable[AstraDBChatMessageHistory]:
-    history1 = AstraDBChatMessageHistory(
+    history1: AstraDBChatMessageHistory,  # noqa: ARG001
+) -> AstraDBChatMessageHistory:
+    return AstraDBChatMessageHistory(
         session_id="async-session-test-1",
-        collection_name="langchain_cmh_test",
+        collection_name=COLLECTION_NAME_IDXALL,
         token=astra_db_credentials["token"],
         api_endpoint=astra_db_credentials["api_endpoint"],
         namespace=astra_db_credentials["namespace"],
         environment=astra_db_credentials["environment"],
-        setup_mode=SetupMode.ASYNC,
+        setup_mode=SetupMode.OFF,
     )
-    yield history1
-    await history1.async_collection.drop()
 
 
 @pytest.fixture
 async def async_history2(
-    history1: AstraDBChatMessageHistory,
     astra_db_credentials: AstraDBCredentials,
+    history1: AstraDBChatMessageHistory,  # noqa: ARG001
 ) -> AstraDBChatMessageHistory:
     return AstraDBChatMessageHistory(
         session_id="async-session-test-2",
-        collection_name=history1.collection_name,
+        collection_name=COLLECTION_NAME_IDXALL,
         token=astra_db_credentials["token"],
         api_endpoint=astra_db_credentials["api_endpoint"],
         namespace=astra_db_credentials["namespace"],
@@ -82,10 +83,11 @@ async def async_history2(
         # no two createCollection calls at once are issued:
         setup_mode=SetupMode.OFF,
     )
-    # no deletion here, this is riding on history1
 
 
-@pytest.mark.skipif(not _has_env_vars(), reason="Missing Astra DB env. vars")
+@pytest.mark.skipif(
+    not astra_db_env_vars_available(), reason="Missing Astra DB env. vars"
+)
 class TestAstraDBChatMessageHistories:
     def test_memory_with_message_store(
         self, history1: AstraDBChatMessageHistory
@@ -200,79 +202,70 @@ class TestAstraDBChatMessageHistories:
 
     @pytest.mark.skipif(
         os.environ.get("ASTRA_DB_ENVIRONMENT", "prod").upper() != "PROD",
-        reason="Can run on Astra DB prod only",
+        reason="Can run on Astra DB production environment only",
     )
-    def test_chatms_coreclients_init_sync(
+    def test_chatmsh_coreclients_init_sync(
         self,
         astra_db_credentials: AstraDBCredentials,
         core_astra_db: AstraDB,
+        empty_collection_idxall: Collection,  # noqa: ARG002
     ) -> None:
         """A deprecation warning from passing a (core) AstraDB, but it works."""
-        collection_name = "lc_test_cmh_coreclsync"
         test_messages = [AIMessage(content="Meow.")]
-        try:
-            chatmh_init_ok = AstraDBChatMessageHistory(
+        chatmh_init_ok = AstraDBChatMessageHistory(
+            session_id="gattini",
+            collection_name=COLLECTION_NAME_IDXALL,
+            token=astra_db_credentials["token"],
+            api_endpoint=astra_db_credentials["api_endpoint"],
+            namespace=astra_db_credentials["namespace"],
+            setup_mode=SetupMode.OFF,
+        )
+        chatmh_init_ok.add_messages(test_messages)
+        # create an equivalent cache with core AstraDB in init
+        with pytest.warns(DeprecationWarning) as rec_warnings:
+            chatmh_init_core = AstraDBChatMessageHistory(
+                collection_name=COLLECTION_NAME_IDXALL,
                 session_id="gattini",
-                collection_name=collection_name,
-                token=astra_db_credentials["token"],
-                api_endpoint=astra_db_credentials["api_endpoint"],
-                namespace=astra_db_credentials["namespace"],
+                astra_db_client=core_astra_db,
             )
-            chatmh_init_ok.add_messages(test_messages)
-            # create an equivalent cache with core AstraDB in init
-            with pytest.warns(DeprecationWarning) as rec_warnings:
-                chatmh_init_core = AstraDBChatMessageHistory(
-                    collection_name=collection_name,
-                    session_id="gattini",
-                    astra_db_client=core_astra_db,
-                )
-            f_rec_warnings = [
-                wrn
-                for wrn in rec_warnings
-                if issubclass(wrn.category, DeprecationWarning)
-            ]
-            assert len(f_rec_warnings) == 1
-            assert chatmh_init_core.messages == test_messages
-        finally:
-            chatmh_init_ok.astra_env.collection.drop()
+        f_rec_warnings = [
+            wrn for wrn in rec_warnings if issubclass(wrn.category, DeprecationWarning)
+        ]
+        assert len(f_rec_warnings) == 1
+        assert chatmh_init_core.messages == test_messages
 
     @pytest.mark.skipif(
         os.environ.get("ASTRA_DB_ENVIRONMENT", "prod").upper() != "PROD",
-        reason="Can run on Astra DB prod only",
+        reason="Can run on Astra DB production environment only",
     )
-    async def test_chatms_coreclients_init_async(
+    async def test_chatmsh_coreclients_init_async(
         self,
         astra_db_credentials: AstraDBCredentials,
         core_astra_db: AstraDB,
+        empty_collection_idxall: Collection,  # noqa: ARG002
     ) -> None:
         """A deprecation warning from passing a (core) AstraDB, but it works."""
-        collection_name = "lc_test_cmh_coreclasync"
         test_messages = [AIMessage(content="Ameow.")]
-        try:
-            chatmh_init_ok = AstraDBChatMessageHistory(
+        chatmh_init_ok = AstraDBChatMessageHistory(
+            session_id="gattini",
+            collection_name=COLLECTION_NAME_IDXALL,
+            token=astra_db_credentials["token"],
+            api_endpoint=astra_db_credentials["api_endpoint"],
+            namespace=astra_db_credentials["namespace"],
+            setup_mode=SetupMode.OFF,
+        )
+        await chatmh_init_ok.aadd_messages(test_messages)
+        # create an equivalent cache with core AstraDB in init
+        with pytest.warns(DeprecationWarning) as rec_warnings:
+            chatmh_init_core = AstraDBChatMessageHistory(
+                collection_name=COLLECTION_NAME_IDXALL,
                 session_id="gattini",
-                collection_name=collection_name,
-                token=astra_db_credentials["token"],
-                api_endpoint=astra_db_credentials["api_endpoint"],
-                namespace=astra_db_credentials["namespace"],
+                astra_db_client=core_astra_db,
                 setup_mode=SetupMode.ASYNC,
             )
-            await chatmh_init_ok.aadd_messages(test_messages)
-            # create an equivalent cache with core AstraDB in init
-            with pytest.warns(DeprecationWarning) as rec_warnings:
-                chatmh_init_core = AstraDBChatMessageHistory(
-                    collection_name=collection_name,
-                    session_id="gattini",
-                    astra_db_client=core_astra_db,
-                    setup_mode=SetupMode.ASYNC,
-                )
-            # cleaning out 'spurious' "unclosed socket/transport..." warnings
-            f_rec_warnings = [
-                wrn
-                for wrn in rec_warnings
-                if issubclass(wrn.category, DeprecationWarning)
-            ]
-            assert len(f_rec_warnings) == 1
-            assert await chatmh_init_core.aget_messages() == test_messages
-        finally:
-            await chatmh_init_ok.astra_env.async_collection.drop()
+        # cleaning out 'spurious' "unclosed socket/transport..." warnings
+        f_rec_warnings = [
+            wrn for wrn in rec_warnings if issubclass(wrn.category, DeprecationWarning)
+        ]
+        assert len(f_rec_warnings) == 1
+        assert await chatmh_init_core.aget_messages() == test_messages
