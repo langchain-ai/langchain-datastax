@@ -498,11 +498,12 @@ class TestAstraDBVectorStoreDDLs:
             api_endpoint=astra_db_credentials["api_endpoint"],
             namespace=astra_db_credentials["namespace"],
             environment=astra_db_credentials["environment"],
-            setup_mode=SetupMode.OFF,
             collection_vector_service_options=OPENAI_VECTORIZE_OPTIONS_KMS,
             collection_embedding_api_key="verywrong",
         )
-        with pytest.raises(InsertManyException):
+        # More specific messages are provider-specific, such as OpenAI returning:
+        # "... Incorrect API key provided: verywrong ..."
+        with pytest.raises(InsertManyException, match="Embedding Provider returned"):
             v_store.add_texts(["Failing"])
 
     @pytest.mark.skipif(
@@ -525,9 +526,10 @@ class TestAstraDBVectorStoreDDLs:
             api_endpoint=astra_db_credentials["api_endpoint"],
             namespace=astra_db_credentials["namespace"],
             environment=astra_db_credentials["environment"],
-            setup_mode=SetupMode.OFF,
             collection_vector_service_options=OPENAI_VECTORIZE_OPTIONS_KMS,
             collection_embedding_api_key=EmbeddingAPIKeyHeaderProvider("verywrong"),
         )
-        with pytest.raises(InsertManyException):
+        # More specific messages are provider-specific, such as OpenAI returning:
+        # "... Incorrect API key provided: verywrong ..."
+        with pytest.raises(InsertManyException, match="Embedding Provider returned"):
             v_store.add_texts(["Failing"])
