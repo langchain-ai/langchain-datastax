@@ -16,9 +16,6 @@ from langchain_astradb.utils.astradb import SetupMode
 from langchain_astradb.vectorstores import AstraDBVectorStore
 
 from .conftest import (
-    EPHEMERAL_COLLECTION_NAME_D2,
-    EPHEMERAL_COLLECTION_NAME_VZ,
-    EPHEMERAL_COLLECTION_NAME_VZ_KMS,
     EPHEMERAL_CUSTOM_IDX_NAME_D2,
     EPHEMERAL_DEFAULT_IDX_NAME_D2,
     EPHEMERAL_LEGACY_IDX_NAME_D2,
@@ -30,7 +27,7 @@ from .conftest import (
 )
 
 if TYPE_CHECKING:
-    from astrapy import Collection, Database
+    from astrapy import Database
     from langchain_core.embeddings import Embeddings
 
     from .conftest import AstraDBCredentials
@@ -45,12 +42,12 @@ class TestAstraDBVectorStoreDDLs:
         astra_db_credentials: AstraDBCredentials,
         database: Database,
         embedding_d2: Embeddings,
-        ephemeral_collection_cleaner_d2: str,  # noqa: ARG002
+        ephemeral_collection_cleaner_d2: str,
     ) -> None:
         """Create and delete."""
         v_store = AstraDBVectorStore(
             embedding=embedding_d2,
-            collection_name=EPHEMERAL_COLLECTION_NAME_D2,
+            collection_name=ephemeral_collection_cleaner_d2,
             token=StaticTokenProvider(astra_db_credentials["token"]),
             api_endpoint=astra_db_credentials["api_endpoint"],
             namespace=astra_db_credentials["namespace"],
@@ -59,18 +56,18 @@ class TestAstraDBVectorStoreDDLs:
         )
         v_store.add_texts(["[1,2]"])
         v_store.delete_collection()
-        assert EPHEMERAL_COLLECTION_NAME_D2 not in database.list_collection_names()
+        assert ephemeral_collection_cleaner_d2 not in database.list_collection_names()
 
     def test_astradb_vectorstore_create_delete_vectorize_sync(
         self,
         astra_db_credentials: AstraDBCredentials,
         openai_api_key: str,
         database: Database,
-        ephemeral_collection_cleaner_vz: str,  # noqa: ARG002
+        ephemeral_collection_cleaner_vz: str,
     ) -> None:
         """Create and delete with vectorize option."""
         v_store = AstraDBVectorStore(
-            collection_name=EPHEMERAL_COLLECTION_NAME_VZ,
+            collection_name=ephemeral_collection_cleaner_vz,
             token=StaticTokenProvider(astra_db_credentials["token"]),
             api_endpoint=astra_db_credentials["api_endpoint"],
             namespace=astra_db_credentials["namespace"],
@@ -81,19 +78,19 @@ class TestAstraDBVectorStoreDDLs:
         )
         v_store.add_texts(["This is text"])
         v_store.delete_collection()
-        assert EPHEMERAL_COLLECTION_NAME_VZ not in database.list_collection_names()
+        assert ephemeral_collection_cleaner_vz not in database.list_collection_names()
 
     async def test_astradb_vectorstore_create_delete_async(
         self,
         astra_db_credentials: AstraDBCredentials,
         database: Database,
         embedding_d2: Embeddings,
-        ephemeral_collection_cleaner_d2: str,  # noqa: ARG002
+        ephemeral_collection_cleaner_d2: str,
     ) -> None:
         """Create and delete, async."""
         v_store = AstraDBVectorStore(
             embedding=embedding_d2,
-            collection_name=EPHEMERAL_COLLECTION_NAME_D2,
+            collection_name=ephemeral_collection_cleaner_d2,
             token=StaticTokenProvider(astra_db_credentials["token"]),
             api_endpoint=astra_db_credentials["api_endpoint"],
             namespace=astra_db_credentials["namespace"],
@@ -102,18 +99,18 @@ class TestAstraDBVectorStoreDDLs:
         )
         await v_store.aadd_texts(["[1,2]"])
         await v_store.adelete_collection()
-        assert EPHEMERAL_COLLECTION_NAME_D2 not in database.list_collection_names()
+        assert ephemeral_collection_cleaner_d2 not in database.list_collection_names()
 
     async def test_astradb_vectorstore_create_delete_vectorize_async(
         self,
         astra_db_credentials: AstraDBCredentials,
         openai_api_key: str,
         database: Database,
-        ephemeral_collection_cleaner_vz: str,  # noqa: ARG002
+        ephemeral_collection_cleaner_vz: str,
     ) -> None:
         """Create and delete with vectorize option, async."""
         v_store = AstraDBVectorStore(
-            collection_name=EPHEMERAL_COLLECTION_NAME_VZ,
+            collection_name=ephemeral_collection_cleaner_vz,
             token=StaticTokenProvider(astra_db_credentials["token"]),
             api_endpoint=astra_db_credentials["api_endpoint"],
             namespace=astra_db_credentials["namespace"],
@@ -124,18 +121,18 @@ class TestAstraDBVectorStoreDDLs:
         )
         await v_store.aadd_texts(["[1,2]"])
         await v_store.adelete_collection()
-        assert EPHEMERAL_COLLECTION_NAME_VZ not in database.list_collection_names()
+        assert ephemeral_collection_cleaner_vz not in database.list_collection_names()
 
     def test_astradb_vectorstore_pre_delete_collection_sync(
         self,
         astra_db_credentials: AstraDBCredentials,
         embedding_d2: Embeddings,
-        ephemeral_collection_cleaner_d2: str,  # noqa: ARG002
+        ephemeral_collection_cleaner_d2: str,
     ) -> None:
         """Use of the pre_delete_collection flag."""
         v_store = AstraDBVectorStore(
             embedding=embedding_d2,
-            collection_name=EPHEMERAL_COLLECTION_NAME_D2,
+            collection_name=ephemeral_collection_cleaner_d2,
             token=StaticTokenProvider(astra_db_credentials["token"]),
             api_endpoint=astra_db_credentials["api_endpoint"],
             namespace=astra_db_credentials["namespace"],
@@ -147,7 +144,7 @@ class TestAstraDBVectorStoreDDLs:
         assert len(res1) == 1
         v_store = AstraDBVectorStore(
             embedding=embedding_d2,
-            collection_name=EPHEMERAL_COLLECTION_NAME_D2,
+            collection_name=ephemeral_collection_cleaner_d2,
             token=StaticTokenProvider(astra_db_credentials["token"]),
             api_endpoint=astra_db_credentials["api_endpoint"],
             namespace=astra_db_credentials["namespace"],
@@ -162,11 +159,11 @@ class TestAstraDBVectorStoreDDLs:
         self,
         astra_db_credentials: AstraDBCredentials,
         embedding_d2: Embeddings,
-        ephemeral_collection_cleaner_d2: str,  # noqa: ARG002
+        ephemeral_collection_cleaner_d2: str,
     ) -> None:
         v_store = AstraDBVectorStore(
             embedding=embedding_d2,
-            collection_name=EPHEMERAL_COLLECTION_NAME_D2,
+            collection_name=ephemeral_collection_cleaner_d2,
             token=StaticTokenProvider(astra_db_credentials["token"]),
             api_endpoint=astra_db_credentials["api_endpoint"],
             namespace=astra_db_credentials["namespace"],
@@ -179,7 +176,7 @@ class TestAstraDBVectorStoreDDLs:
         assert len(res1) == 1
         v_store = AstraDBVectorStore(
             embedding=embedding_d2,
-            collection_name=EPHEMERAL_COLLECTION_NAME_D2,
+            collection_name=ephemeral_collection_cleaner_d2,
             token=StaticTokenProvider(astra_db_credentials["token"]),
             api_endpoint=astra_db_credentials["api_endpoint"],
             namespace=astra_db_credentials["namespace"],
@@ -191,12 +188,12 @@ class TestAstraDBVectorStoreDDLs:
         res1 = await v_store.asimilarity_search("[-1,-1]", k=5)
         assert len(res1) == 0
 
+    @pytest.mark.usefixtures("ephemeral_indexing_collections_cleaner")
     def test_astradb_vectorstore_indexing_legacy_sync(
         self,
         astra_db_credentials: AstraDBCredentials,
         database: Database,
         embedding_d2: Embeddings,
-        ephemeral_indexing_collections_cleaner: list[str],  # noqa: ARG002
     ) -> None:
         """
         Test of the vector store behaviour for various indexing settings,
@@ -237,11 +234,11 @@ class TestAstraDBVectorStoreDDLs:
             ]
             assert len(f_rec_warnings) == 1
 
+    @pytest.mark.usefixtures("ephemeral_indexing_collections_cleaner")
     def test_astradb_vectorstore_indexing_default_sync(
         self,
         astra_db_credentials: AstraDBCredentials,
         embedding_d2: Embeddings,
-        ephemeral_indexing_collections_cleaner: str,  # noqa: ARG002
     ) -> None:
         """
         Test of the vector store behaviour for various indexing settings,
@@ -279,11 +276,11 @@ class TestAstraDBVectorStoreDDLs:
                 metadata_indexing_exclude={"long_summary", "the_divine_comedy"},
             )
 
+    @pytest.mark.usefixtures("ephemeral_indexing_collections_cleaner")
     def test_astradb_vectorstore_indexing_custom_sync(
         self,
         astra_db_credentials: AstraDBCredentials,
         embedding_d2: Embeddings,
-        ephemeral_indexing_collections_cleaner: str,  # noqa: ARG002
     ) -> None:
         """
         Test of the vector store behaviour for various indexing settings,
@@ -332,12 +329,12 @@ class TestAstraDBVectorStoreDDLs:
                 environment=astra_db_credentials["environment"],
             )
 
+    @pytest.mark.usefixtures("ephemeral_indexing_collections_cleaner")
     async def test_astradb_vectorstore_indexing_legacy_async(
         self,
         astra_db_credentials: AstraDBCredentials,
         database: Database,
         embedding_d2: Embeddings,
-        ephemeral_indexing_collections_cleaner: list[str],  # noqa: ARG002
     ) -> None:
         """
         Test of the vector store behaviour for various indexing settings,
@@ -380,11 +377,11 @@ class TestAstraDBVectorStoreDDLs:
             ]
             assert len(f_rec_warnings) == 1
 
+    @pytest.mark.usefixtures("ephemeral_indexing_collections_cleaner")
     async def test_astradb_vectorstore_indexing_default_async(
         self,
         astra_db_credentials: AstraDBCredentials,
         embedding_d2: Embeddings,
-        ephemeral_indexing_collections_cleaner: str,  # noqa: ARG002
     ) -> None:
         """
         Test of the vector store behaviour for various indexing settings,
@@ -425,11 +422,11 @@ class TestAstraDBVectorStoreDDLs:
                 metadata_indexing_exclude={"long_summary", "the_divine_comedy"},
             ).aadd_texts(["[4,13]"])
 
+    @pytest.mark.usefixtures("ephemeral_indexing_collections_cleaner")
     async def test_astradb_vectorstore_indexing_custom_async(
         self,
         astra_db_credentials: AstraDBCredentials,
         embedding_d2: Embeddings,
-        ephemeral_indexing_collections_cleaner: str,  # noqa: ARG002
     ) -> None:
         """
         Test of the vector store behaviour for various indexing settings,
@@ -489,24 +486,24 @@ class TestAstraDBVectorStoreDDLs:
     def test_astradb_vectorstore_vectorize_headers_precedence_stringheader(
         self,
         astra_db_credentials: AstraDBCredentials,
-        collection_vz: Collection,  # noqa: ARG002
-        ephemeral_collection_cleaner_vz_kms: str,  # noqa: ARG002
+        ephemeral_collection_cleaner_vz_kms: str,
     ) -> None:
         """
         Test that header, if passed, takes precedence over vectorize setting.
         To do so, a faulty header is passed, expecting the call to fail.
         """
         v_store = AstraDBVectorStore(
-            collection_name=EPHEMERAL_COLLECTION_NAME_VZ_KMS,
+            collection_name=ephemeral_collection_cleaner_vz_kms,
             token=StaticTokenProvider(astra_db_credentials["token"]),
             api_endpoint=astra_db_credentials["api_endpoint"],
             namespace=astra_db_credentials["namespace"],
             environment=astra_db_credentials["environment"],
-            setup_mode=SetupMode.OFF,
             collection_vector_service_options=OPENAI_VECTORIZE_OPTIONS_KMS,
             collection_embedding_api_key="verywrong",
         )
-        with pytest.raises(InsertManyException):
+        # More specific messages are provider-specific, such as OpenAI returning:
+        # "... Incorrect API key provided: verywrong ..."
+        with pytest.raises(InsertManyException, match="Embedding Provider returned"):
             v_store.add_texts(["Failing"])
 
     @pytest.mark.skipif(
@@ -516,8 +513,7 @@ class TestAstraDBVectorStoreDDLs:
     def test_astradb_vectorstore_vectorize_headers_precedence_headerprovider(
         self,
         astra_db_credentials: AstraDBCredentials,
-        collection_vz: Collection,  # noqa: ARG002
-        ephemeral_collection_cleaner_vz_kms: str,  # noqa: ARG002
+        ephemeral_collection_cleaner_vz_kms: str,
     ) -> None:
         """
         Test that header, if passed, takes precedence over vectorize setting.
@@ -525,14 +521,15 @@ class TestAstraDBVectorStoreDDLs:
         This version passes the header through an EmbeddingHeaderProvider
         """
         v_store = AstraDBVectorStore(
-            collection_name=EPHEMERAL_COLLECTION_NAME_VZ_KMS,
+            collection_name=ephemeral_collection_cleaner_vz_kms,
             token=StaticTokenProvider(astra_db_credentials["token"]),
             api_endpoint=astra_db_credentials["api_endpoint"],
             namespace=astra_db_credentials["namespace"],
             environment=astra_db_credentials["environment"],
-            setup_mode=SetupMode.OFF,
             collection_vector_service_options=OPENAI_VECTORIZE_OPTIONS_KMS,
             collection_embedding_api_key=EmbeddingAPIKeyHeaderProvider("verywrong"),
         )
-        with pytest.raises(InsertManyException):
+        # More specific messages are provider-specific, such as OpenAI returning:
+        # "... Incorrect API key provided: verywrong ..."
+        with pytest.raises(InsertManyException, match="Embedding Provider returned"):
             v_store.add_texts(["Failing"])

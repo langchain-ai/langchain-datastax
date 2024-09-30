@@ -12,7 +12,6 @@ from langchain_astradb import AstraDBCache
 from langchain_astradb.utils.astradb import SetupMode
 
 from .conftest import (
-    COLLECTION_NAME_IDXALL,
     AstraDBCredentials,
     astra_db_env_vars_available,
 )
@@ -27,10 +26,10 @@ if TYPE_CHECKING:
 @pytest.fixture
 def astradb_cache(
     astra_db_credentials: AstraDBCredentials,
-    empty_collection_idxall: Collection,  # noqa: ARG001
+    empty_collection_idxall: Collection,
 ) -> AstraDBCache:
     return AstraDBCache(
-        collection_name=COLLECTION_NAME_IDXALL,
+        collection_name=empty_collection_idxall.name,
         token=StaticTokenProvider(astra_db_credentials["token"]),
         api_endpoint=astra_db_credentials["api_endpoint"],
         namespace=astra_db_credentials["namespace"],
@@ -41,10 +40,10 @@ def astradb_cache(
 @pytest.fixture
 async def astradb_cache_async(
     astra_db_credentials: AstraDBCredentials,
-    empty_collection_idxall: Collection,  # noqa: ARG001
+    empty_collection_idxall: Collection,
 ) -> AstraDBCache:
     return AstraDBCache(
-        collection_name=COLLECTION_NAME_IDXALL,
+        collection_name=empty_collection_idxall.name,
         token=StaticTokenProvider(astra_db_credentials["token"]),
         api_endpoint=astra_db_credentials["api_endpoint"],
         namespace=astra_db_credentials["namespace"],
@@ -191,7 +190,7 @@ class TestAstraDBCache:
         # create an equivalent cache with core AstraDB in init
         with pytest.warns(DeprecationWarning) as rec_warnings:
             cache_init_core = AstraDBCache(
-                collection_name=COLLECTION_NAME_IDXALL,
+                collection_name=astradb_cache.collection.name,
                 astra_db_client=core_astra_db,
             )
         f_rec_warnings = [
@@ -218,7 +217,7 @@ class TestAstraDBCache:
         # create an equivalent cache with core AstraDB in init
         with pytest.warns(DeprecationWarning) as rec_warnings:
             cache_init_core = AstraDBCache(
-                collection_name=COLLECTION_NAME_IDXALL,
+                collection_name=astradb_cache_async.async_collection.name,
                 astra_db_client=core_astra_db,
                 setup_mode=SetupMode.ASYNC,
             )

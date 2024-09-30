@@ -12,7 +12,6 @@ from langchain_astradb.storage import AstraDBByteStore, AstraDBStore
 from langchain_astradb.utils.astradb import SetupMode
 
 from .conftest import (
-    COLLECTION_NAME_IDXID,
     EPHEMERAL_CUSTOM_IDX_NAME,
     EPHEMERAL_LEGACY_IDX_NAME,
     AstraDBCredentials,
@@ -31,7 +30,7 @@ def astra_db_empty_store(
 ) -> AstraDBStore:
     collection_idxid.delete_many({})
     return AstraDBStore(
-        collection_name=COLLECTION_NAME_IDXID,
+        collection_name=collection_idxid.name,
         token=StaticTokenProvider(astra_db_credentials["token"]),
         api_endpoint=astra_db_credentials["api_endpoint"],
         namespace=astra_db_credentials["namespace"],
@@ -47,7 +46,7 @@ async def astra_db_empty_store_async(
 ) -> AstraDBStore:
     collection_idxid.delete_many({})
     return AstraDBStore(
-        collection_name=COLLECTION_NAME_IDXID,
+        collection_name=collection_idxid.name,
         token=StaticTokenProvider(astra_db_credentials["token"]),
         api_endpoint=astra_db_credentials["api_endpoint"],
         namespace=astra_db_credentials["namespace"],
@@ -63,7 +62,7 @@ def astra_db_empty_byte_store(
 ) -> AstraDBByteStore:
     collection_idxid.delete_many({})
     return AstraDBByteStore(
-        collection_name=COLLECTION_NAME_IDXID,
+        collection_name=collection_idxid.name,
         token=StaticTokenProvider(astra_db_credentials["token"]),
         api_endpoint=astra_db_credentials["api_endpoint"],
         namespace=astra_db_credentials["namespace"],
@@ -260,7 +259,7 @@ class TestAstraDBStore:
         # create an equivalent store with core AstraDB in init
         with pytest.warns(DeprecationWarning) as rec_warnings:
             store_init_core = AstraDBStore(
-                collection_name=COLLECTION_NAME_IDXID,
+                collection_name=astra_db_empty_store.collection.name,
                 astra_db_client=core_astra_db,
             )
         f_rec_warnings = [
@@ -286,7 +285,7 @@ class TestAstraDBStore:
         # create an equivalent store with core AstraDB in init
         with pytest.warns(DeprecationWarning) as rec_warnings:
             store_init_core = AstraDBStore(
-                collection_name=COLLECTION_NAME_IDXID,
+                collection_name=astra_db_empty_store_async.async_collection.name,
                 astra_db_client=core_astra_db,
                 setup_mode=SetupMode.ASYNC,
             )
@@ -296,30 +295,30 @@ class TestAstraDBStore:
         assert len(f_rec_warnings) == 1
         assert await store_init_core.amget(["key"]) == ["val123"]
 
+    @pytest.mark.usefixtures("ephemeral_indexing_collections_cleaner")
     def test_store_indexing_default_sync(
         self,
         astra_db_credentials: AstraDBCredentials,
-        astra_db_empty_store: AstraDBStore,  # noqa: ARG002
-        ephemeral_indexing_collections_cleaner: list[str],  # noqa: ARG002
+        astra_db_empty_store: AstraDBStore,
     ) -> None:
         """Test of default-indexing re-instantiation."""
         AstraDBStore(
-            collection_name=COLLECTION_NAME_IDXID,
+            collection_name=astra_db_empty_store.collection.name,
             token=StaticTokenProvider(astra_db_credentials["token"]),
             api_endpoint=astra_db_credentials["api_endpoint"],
             namespace=astra_db_credentials["namespace"],
             environment=astra_db_credentials["environment"],
         )
 
+    @pytest.mark.usefixtures("ephemeral_indexing_collections_cleaner")
     async def test_store_indexing_default_async(
         self,
         astra_db_credentials: AstraDBCredentials,
-        astra_db_empty_store_async: AstraDBStore,  # noqa: ARG002
-        ephemeral_indexing_collections_cleaner: list[str],  # noqa: ARG002
+        astra_db_empty_store_async: AstraDBStore,
     ) -> None:
         """Test of default-indexing re-instantiation, async version"""
         await AstraDBStore(
-            collection_name=COLLECTION_NAME_IDXID,
+            collection_name=astra_db_empty_store_async.async_collection.name,
             token=StaticTokenProvider(astra_db_credentials["token"]),
             api_endpoint=astra_db_credentials["api_endpoint"],
             namespace=astra_db_credentials["namespace"],
@@ -327,11 +326,11 @@ class TestAstraDBStore:
             setup_mode=SetupMode.ASYNC,
         ).amget(["some_key"])
 
+    @pytest.mark.usefixtures("ephemeral_indexing_collections_cleaner")
     def test_store_indexing_on_legacy_sync(
         self,
         astra_db_credentials: AstraDBCredentials,
         database: Database,
-        ephemeral_indexing_collections_cleaner: list[str],  # noqa: ARG002
     ) -> None:
         """Test of instantiation against a legacy collection."""
         database.create_collection(
@@ -352,11 +351,11 @@ class TestAstraDBStore:
             ]
             assert len(f_rec_warnings) == 1
 
+    @pytest.mark.usefixtures("ephemeral_indexing_collections_cleaner")
     async def test_store_indexing_on_legacy_async(
         self,
         astra_db_credentials: AstraDBCredentials,
         database: Database,
-        ephemeral_indexing_collections_cleaner: list[str],  # noqa: ARG002
     ) -> None:
         """Test of instantiation against a legacy collection, async version."""
         database.create_collection(
@@ -378,11 +377,11 @@ class TestAstraDBStore:
             ]
             assert len(f_rec_warnings) == 1
 
+    @pytest.mark.usefixtures("ephemeral_indexing_collections_cleaner")
     def test_store_indexing_on_custom_sync(
         self,
         astra_db_credentials: AstraDBCredentials,
         database: Database,
-        ephemeral_indexing_collections_cleaner: list[str],  # noqa: ARG002
     ) -> None:
         """Test of instantiation against a legacy collection."""
         database.create_collection(
@@ -401,11 +400,11 @@ class TestAstraDBStore:
                 environment=astra_db_credentials["environment"],
             )
 
+    @pytest.mark.usefixtures("ephemeral_indexing_collections_cleaner")
     async def test_store_indexing_on_custom_async(
         self,
         astra_db_credentials: AstraDBCredentials,
         database: Database,
-        ephemeral_indexing_collections_cleaner: list[str],  # noqa: ARG002
     ) -> None:
         """Test of instantiation against a legacy collection, async version."""
         database.create_collection(

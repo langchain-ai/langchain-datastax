@@ -12,7 +12,6 @@ from langchain_astradb import AstraDBSemanticCache
 from langchain_astradb.utils.astradb import SetupMode
 
 from .conftest import (
-    COLLECTION_NAME_IDXALL_D2,
     AstraDBCredentials,
     astra_db_env_vars_available,
 )
@@ -28,11 +27,11 @@ if TYPE_CHECKING:
 @pytest.fixture
 def astradb_semantic_cache(
     astra_db_credentials: AstraDBCredentials,
-    empty_collection_idxall_d2: Collection,  # noqa: ARG001
+    empty_collection_idxall_d2: Collection,
     embedding_d2: Embeddings,
 ) -> AstraDBSemanticCache:
     return AstraDBSemanticCache(
-        collection_name=COLLECTION_NAME_IDXALL_D2,
+        collection_name=empty_collection_idxall_d2.name,
         token=StaticTokenProvider(astra_db_credentials["token"]),
         api_endpoint=astra_db_credentials["api_endpoint"],
         namespace=astra_db_credentials["namespace"],
@@ -45,11 +44,11 @@ def astradb_semantic_cache(
 @pytest.fixture
 async def astradb_semantic_cache_async(
     astra_db_credentials: AstraDBCredentials,
-    empty_collection_idxall_d2: Collection,  # noqa: ARG001
+    empty_collection_idxall_d2: Collection,
     embedding_d2: Embeddings,
 ) -> AstraDBSemanticCache:
     return AstraDBSemanticCache(
-        collection_name=COLLECTION_NAME_IDXALL_D2,
+        collection_name=empty_collection_idxall_d2.name,
         token=StaticTokenProvider(astra_db_credentials["token"]),
         api_endpoint=astra_db_credentials["api_endpoint"],
         namespace=astra_db_credentials["namespace"],
@@ -218,7 +217,7 @@ class TestAstraDBSemanticCache:
         # create an equivalent cache with core AstraDB in init
         with pytest.warns(DeprecationWarning) as rec_warnings:
             semantic_cache_init_core = AstraDBSemanticCache(
-                collection_name=COLLECTION_NAME_IDXALL_D2,
+                collection_name=astradb_semantic_cache.collection_name,
                 astra_db_client=core_astra_db,
                 embedding=embedding_d2,
                 metric="euclidean",
@@ -250,7 +249,7 @@ class TestAstraDBSemanticCache:
         # create an equivalent cache with core AstraDB in init
         with pytest.warns(DeprecationWarning) as rec_warnings:
             semantic_cache_init_core = AstraDBSemanticCache(
-                collection_name=COLLECTION_NAME_IDXALL_D2,
+                collection_name=astradb_semantic_cache_async.collection_name,
                 astra_db_client=core_astra_db,
                 embedding=embedding_d2,
                 metric="euclidean",

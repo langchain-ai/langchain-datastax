@@ -14,8 +14,6 @@ from langchain_core.documents import Document
 from langchain_astradb.vectorstores import AstraDBVectorStore
 
 from .conftest import (
-    COLLECTION_NAME_IDXALL_D2,
-    COLLECTION_NAME_IDXALL_VZ,
     CUSTOM_CONTENT_KEY,
     astra_db_env_vars_available,
 )
@@ -65,7 +63,7 @@ class TestAstraDBVectorStoreAutodetect:
         )
         ad_store = AstraDBVectorStore(
             embedding=embedding_d2,
-            collection_name=COLLECTION_NAME_IDXALL_D2,
+            collection_name=empty_collection_idxall_d2.name,
             token=StaticTokenProvider(astra_db_credentials["token"]),
             api_endpoint=astra_db_credentials["api_endpoint"],
             namespace=astra_db_credentials["namespace"],
@@ -97,7 +95,6 @@ class TestAstraDBVectorStoreAutodetect:
     def test_autodetect_default_novectorize_crud(
         self,
         astra_db_credentials: AstraDBCredentials,
-        empty_collection_idxall_d2: Collection,  # noqa: ARG002
         embedding_d2: Embeddings,
         vector_store_idxall_d2: AstraDBVectorStore,
     ) -> None:
@@ -122,7 +119,7 @@ class TestAstraDBVectorStoreAutodetect:
         # now with the autodetect
         ad_store = AstraDBVectorStore(
             embedding=embedding_d2,
-            collection_name=COLLECTION_NAME_IDXALL_D2,
+            collection_name=vector_store_idxall_d2.collection_name,
             token=StaticTokenProvider(astra_db_credentials["token"]),
             api_endpoint=astra_db_credentials["api_endpoint"],
             namespace=astra_db_credentials["namespace"],
@@ -181,7 +178,7 @@ class TestAstraDBVectorStoreAutodetect:
             ]
         )
         ad_store = AstraDBVectorStore(
-            collection_name=COLLECTION_NAME_IDXALL_VZ,
+            collection_name=empty_collection_idxall_vz.name,
             token=StaticTokenProvider(astra_db_credentials["token"]),
             api_endpoint=astra_db_credentials["api_endpoint"],
             namespace=astra_db_credentials["namespace"],
@@ -216,7 +213,7 @@ class TestAstraDBVectorStoreAutodetect:
         *,
         astra_db_credentials: AstraDBCredentials,
         openai_api_key: str,
-        empty_collection_idxall_vz: Collection,  # noqa: ARG002
+        empty_collection_idxall_vz: Collection,
         vector_store_idxall_vz: AstraDBVectorStore,
     ) -> None:
         """Test autodetect on a VS-made collection, checking all codecs."""
@@ -239,7 +236,7 @@ class TestAstraDBVectorStoreAutodetect:
         )
         # now with the autodetect
         ad_store = AstraDBVectorStore(
-            collection_name=COLLECTION_NAME_IDXALL_VZ,
+            collection_name=empty_collection_idxall_vz.name,
             token=StaticTokenProvider(astra_db_credentials["token"]),
             api_endpoint=astra_db_credentials["api_endpoint"],
             namespace=astra_db_credentials["namespace"],
@@ -288,7 +285,7 @@ class TestAstraDBVectorStoreAutodetect:
             ]
         )
         ad_store_e = AstraDBVectorStore(
-            collection_name=COLLECTION_NAME_IDXALL_D2,
+            collection_name=empty_collection_idxall_d2.name,
             embedding=embedding_d2,
             token=StaticTokenProvider(astra_db_credentials["token"]),
             api_endpoint=astra_db_credentials["api_endpoint"],
@@ -298,7 +295,7 @@ class TestAstraDBVectorStoreAutodetect:
             ignore_invalid_documents=False,
         )
         ad_store_w = AstraDBVectorStore(
-            collection_name=COLLECTION_NAME_IDXALL_D2,
+            collection_name=empty_collection_idxall_d2.name,
             embedding=embedding_d2,
             token=StaticTokenProvider(astra_db_credentials["token"]),
             api_endpoint=astra_db_credentials["api_endpoint"],
