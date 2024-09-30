@@ -224,14 +224,14 @@ def empty_collection_d2(
 
 @pytest.fixture
 def vector_store_d2(
-    empty_collection_d2: Collection,  # noqa: ARG001
+    empty_collection_d2: Collection,
     astra_db_credentials: AstraDBCredentials,
     embedding_d2: Embeddings,
 ) -> AstraDBVectorStore:
     """A fresh vector store on a d=2(Euclidean) collection."""
     return AstraDBVectorStore(
         embedding=embedding_d2,
-        collection_name=COLLECTION_NAME_D2,
+        collection_name=empty_collection_d2.name,
         token=StaticTokenProvider(astra_db_credentials["token"]),
         api_endpoint=astra_db_credentials["api_endpoint"],
         namespace=astra_db_credentials["namespace"],
@@ -242,7 +242,7 @@ def vector_store_d2(
 
 @pytest.fixture
 def vector_store_d2_stringtoken(
-    empty_collection_d2: Collection,  # noqa: ARG001
+    empty_collection_d2: Collection,
     astra_db_credentials: AstraDBCredentials,
     embedding_d2: Embeddings,
 ) -> AstraDBVectorStore:
@@ -252,7 +252,7 @@ def vector_store_d2_stringtoken(
     """
     return AstraDBVectorStore(
         embedding=embedding_d2,
-        collection_name=COLLECTION_NAME_D2,
+        collection_name=empty_collection_d2.name,
         token=astra_db_credentials["token"],
         api_endpoint=astra_db_credentials["api_endpoint"],
         namespace=astra_db_credentials["namespace"],
@@ -356,14 +356,14 @@ def empty_collection_idxall_d2(
 
 @pytest.fixture
 def vector_store_idxall_d2(
-    empty_collection_idxall_d2: Collection,  # noqa: ARG001
+    empty_collection_idxall_d2: Collection,
     astra_db_credentials: AstraDBCredentials,
     embedding_d2: Embeddings,
 ) -> AstraDBVectorStore:
     """A fresh vector store on a d=2(Euclidean) collection."""
     return AstraDBVectorStore(
         embedding=embedding_d2,
-        collection_name=COLLECTION_NAME_IDXALL_D2,
+        collection_name=empty_collection_idxall_d2.name,
         token=StaticTokenProvider(astra_db_credentials["token"]),
         api_endpoint=astra_db_credentials["api_endpoint"],
         namespace=astra_db_credentials["namespace"],
@@ -421,11 +421,11 @@ def empty_collection_vz(
 def vector_store_vz(
     astra_db_credentials: AstraDBCredentials,
     openai_api_key: str,
-    empty_collection_vz: Collection,  # noqa: ARG001
+    empty_collection_vz: Collection,
 ) -> AstraDBVectorStore:
     """A fresh vector store on a $vectorize collection."""
     return AstraDBVectorStore(
-        collection_name=COLLECTION_NAME_VZ,
+        collection_name=empty_collection_vz.name,
         token=StaticTokenProvider(astra_db_credentials["token"]),
         api_endpoint=astra_db_credentials["api_endpoint"],
         namespace=astra_db_credentials["namespace"],
@@ -488,12 +488,12 @@ def empty_collection_idxall_vz(
 @pytest.fixture
 def vector_store_idxall_vz(
     openai_api_key: str,
-    empty_collection_idxall_vz: Collection,  # noqa: ARG001
+    empty_collection_idxall_vz: Collection,
     astra_db_credentials: AstraDBCredentials,
 ) -> AstraDBVectorStore:
     """A fresh vector store on a d=2(Euclidean) collection."""
     return AstraDBVectorStore(
-        collection_name=COLLECTION_NAME_IDXALL_VZ,
+        collection_name=empty_collection_idxall_vz.name,
         token=StaticTokenProvider(astra_db_credentials["token"]),
         api_endpoint=astra_db_credentials["api_endpoint"],
         namespace=astra_db_credentials["namespace"],

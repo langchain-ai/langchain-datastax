@@ -17,9 +17,7 @@ from langchain_astradb.graph_vectorstores import AstraDBGraphVectorStore
 from langchain_astradb.utils.astradb import SetupMode
 
 from .conftest import (
-    COLLECTION_NAME_D2,
     CUSTOM_CONTENT_KEY,
-    EPHEMERAL_COLLECTION_NAME_IDXALL_D2,
     LONG_TEXT,
     astra_db_env_vars_available,
 )
@@ -98,12 +96,12 @@ def graph_vector_store_docs() -> list[Document]:
 @pytest.fixture
 def graph_vector_store_d2(
     astra_db_credentials: AstraDBCredentials,
-    empty_collection_d2: Collection,  # noqa: ARG001
+    empty_collection_d2: Collection,
     embedding_d2: Embeddings,
 ) -> AstraDBGraphVectorStore:
     return AstraDBGraphVectorStore(
         embedding=embedding_d2,
-        collection_name=COLLECTION_NAME_D2,
+        collection_name=empty_collection_d2.name,
         token=StaticTokenProvider(astra_db_credentials["token"]),
         api_endpoint=astra_db_credentials["api_endpoint"],
         namespace=astra_db_credentials["namespace"],
@@ -127,7 +125,7 @@ def autodetect_populated_graph_vector_store_d2(
     database: Database,
     embedding_d2: Embeddings,
     graph_vector_store_docs: list[Document],
-    ephemeral_collection_cleaner_idxall_d2: str,  # noqa: ARG001
+    ephemeral_collection_cleaner_idxall_d2: str,
 ) -> AstraDBGraphVectorStore:
     """
     Pre-populate the collection and have (VectorStore)autodetect work on it,
@@ -135,7 +133,7 @@ def autodetect_populated_graph_vector_store_d2(
     the same (graph-)entries as for `populated_graph_vector_store_d2`.
     """
     empty_collection_d2_idxall = database.create_collection(
-        EPHEMERAL_COLLECTION_NAME_IDXALL_D2,
+        ephemeral_collection_cleaner_idxall_d2,
         dimension=2,
         check_exists=False,
         metric="euclidean",
@@ -164,7 +162,7 @@ def autodetect_populated_graph_vector_store_d2(
     )
     gstore = AstraDBGraphVectorStore(
         embedding=embedding_d2,
-        collection_name=EPHEMERAL_COLLECTION_NAME_IDXALL_D2,
+        collection_name=ephemeral_collection_cleaner_idxall_d2,
         link_to_metadata_key="x_link_to_x",
         link_from_metadata_key="x_link_from_x",
         token=StaticTokenProvider(astra_db_credentials["token"]),
@@ -280,7 +278,7 @@ class TestAstraDBGraphVectorStore:
         self,
         *,
         astra_db_credentials: AstraDBCredentials,
-        empty_collection_d2: Collection,  # noqa: ARG002
+        empty_collection_d2: Collection,
         embedding_d2: Embeddings,
     ) -> None:
         g_store = AstraDBGraphVectorStore.from_texts(
@@ -288,7 +286,7 @@ class TestAstraDBGraphVectorStore:
             embedding=embedding_d2,
             metadatas=[{"md": 1}],
             ids=["x_id"],
-            collection_name=COLLECTION_NAME_D2,
+            collection_name=empty_collection_d2.name,
             token=StaticTokenProvider(astra_db_credentials["token"]),
             api_endpoint=astra_db_credentials["api_endpoint"],
             namespace=astra_db_credentials["namespace"],
@@ -307,7 +305,7 @@ class TestAstraDBGraphVectorStore:
         self,
         *,
         astra_db_credentials: AstraDBCredentials,
-        empty_collection_d2: Collection,  # noqa: ARG002
+        empty_collection_d2: Collection,
         embedding_d2: Embeddings,
     ) -> None:
         the_document = Document(
@@ -318,7 +316,7 @@ class TestAstraDBGraphVectorStore:
         g_store = AstraDBGraphVectorStore.from_documents(
             documents=[the_document],
             embedding=embedding_d2,
-            collection_name=COLLECTION_NAME_D2,
+            collection_name=empty_collection_d2.name,
             token=StaticTokenProvider(astra_db_credentials["token"]),
             api_endpoint=astra_db_credentials["api_endpoint"],
             namespace=astra_db_credentials["namespace"],

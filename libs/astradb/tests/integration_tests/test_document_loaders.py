@@ -12,7 +12,6 @@ from astrapy.authentication import StaticTokenProvider
 from langchain_astradb import AstraDBLoader
 
 from .conftest import (
-    COLLECTION_NAME_IDXALL,
     AstraDBCredentials,
     astra_db_env_vars_available,
 )
@@ -47,12 +46,12 @@ class TestAstraDB:
     def test_astradb_loader_prefetched_sync(
         self,
         astra_db_credentials: AstraDBCredentials,
-        document_loader_collection: Collection,  # noqa: ARG002
+        document_loader_collection: Collection,
     ) -> None:
         """Using 'prefetched' should give a warning but work nonetheless."""
         with pytest.warns(UserWarning) as rec_warnings:
             loader = AstraDBLoader(
-                COLLECTION_NAME_IDXALL,
+                document_loader_collection.name,
                 token=StaticTokenProvider(astra_db_credentials["token"]),
                 api_endpoint=astra_db_credentials["api_endpoint"],
                 namespace=astra_db_credentials["namespace"],
@@ -74,10 +73,10 @@ class TestAstraDB:
         self,
         astra_db_credentials: AstraDBCredentials,
         database: Database,
-        document_loader_collection: Collection,  # noqa: ARG002
+        document_loader_collection: Collection,
     ) -> None:
         loader = AstraDBLoader(
-            COLLECTION_NAME_IDXALL,
+            document_loader_collection.name,
             token=StaticTokenProvider(astra_db_credentials["token"]),
             api_endpoint=astra_db_credentials["api_endpoint"],
             namespace=astra_db_credentials["namespace"],
@@ -99,11 +98,11 @@ class TestAstraDB:
             assert doc.metadata == {
                 "namespace": database.namespace,
                 "api_endpoint": astra_db_credentials["api_endpoint"],
-                "collection": COLLECTION_NAME_IDXALL,
+                "collection": document_loader_collection.name,
             }
 
         loader2 = AstraDBLoader(
-            COLLECTION_NAME_IDXALL,
+            document_loader_collection.name,
             token=StaticTokenProvider(astra_db_credentials["token"]),
             api_endpoint=astra_db_credentials["api_endpoint"],
             namespace=astra_db_credentials["namespace"],
@@ -118,10 +117,10 @@ class TestAstraDB:
     def test_page_content_mapper_sync(
         self,
         astra_db_credentials: AstraDBCredentials,
-        document_loader_collection: Collection,  # noqa: ARG002
+        document_loader_collection: Collection,
     ) -> None:
         loader = AstraDBLoader(
-            COLLECTION_NAME_IDXALL,
+            document_loader_collection.name,
             token=StaticTokenProvider(astra_db_credentials["token"]),
             api_endpoint=astra_db_credentials["api_endpoint"],
             namespace=astra_db_credentials["namespace"],
@@ -138,10 +137,10 @@ class TestAstraDB:
     def test_metadata_mapper_sync(
         self,
         astra_db_credentials: AstraDBCredentials,
-        document_loader_collection: Collection,  # noqa: ARG002
+        document_loader_collection: Collection,
     ) -> None:
         loader = AstraDBLoader(
-            COLLECTION_NAME_IDXALL,
+            document_loader_collection.name,
             token=StaticTokenProvider(astra_db_credentials["token"]),
             api_endpoint=astra_db_credentials["api_endpoint"],
             namespace=astra_db_credentials["namespace"],
@@ -159,12 +158,12 @@ class TestAstraDB:
         self,
         astra_db_credentials: AstraDBCredentials,
         database: Database,
-        async_document_loader_collection: AsyncCollection,  # noqa: ARG002
+        async_document_loader_collection: AsyncCollection,
     ) -> None:
         """Using 'prefetched' should give a warning but work nonetheless."""
         with pytest.warns(UserWarning) as rec_warnings:
             loader = AstraDBLoader(
-                COLLECTION_NAME_IDXALL,
+                async_document_loader_collection.name,
                 token=StaticTokenProvider(astra_db_credentials["token"]),
                 api_endpoint=astra_db_credentials["api_endpoint"],
                 namespace=astra_db_credentials["namespace"],
@@ -192,11 +191,11 @@ class TestAstraDB:
             assert doc.metadata == {
                 "namespace": database.namespace,
                 "api_endpoint": astra_db_credentials["api_endpoint"],
-                "collection": COLLECTION_NAME_IDXALL,
+                "collection": async_document_loader_collection.name,
             }
 
         loader2 = AstraDBLoader(
-            COLLECTION_NAME_IDXALL,
+            async_document_loader_collection.name,
             token=StaticTokenProvider(astra_db_credentials["token"]),
             api_endpoint=astra_db_credentials["api_endpoint"],
             namespace=astra_db_credentials["namespace"],
@@ -212,10 +211,10 @@ class TestAstraDB:
         self,
         astra_db_credentials: AstraDBCredentials,
         database: Database,
-        async_document_loader_collection: AsyncCollection,  # noqa: ARG002
+        async_document_loader_collection: AsyncCollection,
     ) -> None:
         loader = AstraDBLoader(
-            COLLECTION_NAME_IDXALL,
+            async_document_loader_collection.name,
             token=StaticTokenProvider(astra_db_credentials["token"]),
             api_endpoint=astra_db_credentials["api_endpoint"],
             namespace=astra_db_credentials["namespace"],
@@ -237,16 +236,16 @@ class TestAstraDB:
             assert doc.metadata == {
                 "namespace": database.namespace,
                 "api_endpoint": astra_db_credentials["api_endpoint"],
-                "collection": COLLECTION_NAME_IDXALL,
+                "collection": async_document_loader_collection.name,
             }
 
     async def test_page_content_mapper_async(
         self,
         astra_db_credentials: AstraDBCredentials,
-        async_document_loader_collection: AsyncCollection,  # noqa: ARG002
+        async_document_loader_collection: AsyncCollection,
     ) -> None:
         loader = AstraDBLoader(
-            COLLECTION_NAME_IDXALL,
+            async_document_loader_collection.name,
             token=StaticTokenProvider(astra_db_credentials["token"]),
             api_endpoint=astra_db_credentials["api_endpoint"],
             namespace=astra_db_credentials["namespace"],
@@ -261,10 +260,10 @@ class TestAstraDB:
     async def test_metadata_mapper_async(
         self,
         astra_db_credentials: AstraDBCredentials,
-        async_document_loader_collection: AsyncCollection,  # noqa: ARG002
+        async_document_loader_collection: AsyncCollection,
     ) -> None:
         loader = AstraDBLoader(
-            COLLECTION_NAME_IDXALL,
+            async_document_loader_collection.name,
             token=StaticTokenProvider(astra_db_credentials["token"]),
             api_endpoint=astra_db_credentials["api_endpoint"],
             namespace=astra_db_credentials["namespace"],
@@ -284,14 +283,14 @@ class TestAstraDB:
         self,
         astra_db_credentials: AstraDBCredentials,
         core_astra_db: AstraDB,
-        document_loader_collection: Collection,  # noqa: ARG002
+        document_loader_collection: Collection,
     ) -> None:
         """
         A deprecation warning from passing a (core) AstraDB, but it works.
         Note there is no sync/async here: this class always has SetupMode.OFF.
         """
         loader_init_ok = AstraDBLoader(
-            collection_name=COLLECTION_NAME_IDXALL,
+            collection_name=document_loader_collection.name,
             token=StaticTokenProvider(astra_db_credentials["token"]),
             api_endpoint=astra_db_credentials["api_endpoint"],
             namespace=astra_db_credentials["namespace"],
@@ -301,7 +300,7 @@ class TestAstraDB:
         # create an equivalent loader with core AstraDB in init
         with pytest.warns(DeprecationWarning) as rec_warnings:
             loader_init_core = AstraDBLoader(
-                collection_name=COLLECTION_NAME_IDXALL,
+                collection_name=document_loader_collection.name,
                 astra_db_client=core_astra_db,
                 limit=1,
             )
@@ -314,11 +313,11 @@ class TestAstraDB:
     def test_astradb_loader_findoptions_deprecation(
         self,
         astra_db_credentials: AstraDBCredentials,
-        document_loader_collection: Collection,  # noqa: ARG002
+        document_loader_collection: Collection,
     ) -> None:
         """Test deprecation of 'find_options' and related warnings/errors."""
         loader0 = AstraDBLoader(
-            collection_name=COLLECTION_NAME_IDXALL,
+            collection_name=document_loader_collection.name,
             token=StaticTokenProvider(astra_db_credentials["token"]),
             api_endpoint=astra_db_credentials["api_endpoint"],
             namespace=astra_db_credentials["namespace"],
@@ -329,7 +328,7 @@ class TestAstraDB:
 
         with pytest.warns(DeprecationWarning) as rec_warnings:
             loader_lo = AstraDBLoader(
-                collection_name=COLLECTION_NAME_IDXALL,
+                collection_name=document_loader_collection.name,
                 token=StaticTokenProvider(astra_db_credentials["token"]),
                 api_endpoint=astra_db_credentials["api_endpoint"],
                 namespace=astra_db_credentials["namespace"],
@@ -344,7 +343,7 @@ class TestAstraDB:
 
         with pytest.raises(ValueError, match="Duplicate 'limit' directive supplied."):
             AstraDBLoader(
-                collection_name=COLLECTION_NAME_IDXALL,
+                collection_name=document_loader_collection.name,
                 token=StaticTokenProvider(astra_db_credentials["token"]),
                 api_endpoint=astra_db_credentials["api_endpoint"],
                 namespace=astra_db_credentials["namespace"],
@@ -355,7 +354,7 @@ class TestAstraDB:
 
         with pytest.warns(DeprecationWarning) as rec_warnings:
             loader_uo = AstraDBLoader(
-                collection_name=COLLECTION_NAME_IDXALL,
+                collection_name=document_loader_collection.name,
                 token=StaticTokenProvider(astra_db_credentials["token"]),
                 api_endpoint=astra_db_credentials["api_endpoint"],
                 namespace=astra_db_credentials["namespace"],

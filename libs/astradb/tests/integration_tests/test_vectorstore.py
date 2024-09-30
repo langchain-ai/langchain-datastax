@@ -15,8 +15,6 @@ from langchain_astradb.utils.astradb import SetupMode
 from langchain_astradb.vectorstores import AstraDBVectorStore
 
 from .conftest import (
-    COLLECTION_NAME_D2,
-    EPHEMERAL_COLLECTION_NAME_D2,
     EUCLIDEAN_MIN_SIM_UNIT_VECTORS,
     MATCH_EPSILON,
     OPENAI_VECTORIZE_OPTIONS_HEADER,
@@ -1187,7 +1185,7 @@ class TestAstraDBVectorStore:
         astra_db_credentials: AstraDBCredentials,
         embedding_d2: Embeddings,
         vector_store_d2: AstraDBVectorStore,
-        ephemeral_collection_cleaner_d2: str,  # noqa: ARG002
+        ephemeral_collection_cleaner_d2: str,
     ) -> None:
         """Different choices of similarity metric.
         Both stores (with "cosine" and "euclidea" metrics) contain these two:
@@ -1210,7 +1208,7 @@ class TestAstraDBVectorStore:
         # prepare empty collections
         cosine_store = AstraDBVectorStore(
             embedding=embedding_d2,
-            collection_name=EPHEMERAL_COLLECTION_NAME_D2,
+            collection_name=ephemeral_collection_cleaner_d2,
             metric="cosine",
             token=StaticTokenProvider(astra_db_credentials["token"]),
             api_endpoint=astra_db_credentials["api_endpoint"],
@@ -1253,7 +1251,7 @@ class TestAstraDBVectorStore:
         with pytest.warns(DeprecationWarning) as rec_warnings:
             v_store_init_core = AstraDBVectorStore(
                 embedding=embedding_d2,
-                collection_name=COLLECTION_NAME_D2,
+                collection_name=vector_store_d2.collection_name,
                 astra_db_client=core_astra_db,
                 metric="euclidean",
             )
@@ -1286,7 +1284,7 @@ class TestAstraDBVectorStore:
         with pytest.warns(DeprecationWarning) as rec_warnings:
             v_store_init_core = AstraDBVectorStore(
                 embedding=embedding_d2,
-                collection_name=COLLECTION_NAME_D2,
+                collection_name=vector_store_d2.collection_name,
                 astra_db_client=core_astra_db,
                 metric="euclidean",
                 setup_mode=SetupMode.ASYNC,

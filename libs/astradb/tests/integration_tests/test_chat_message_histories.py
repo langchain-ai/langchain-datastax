@@ -12,7 +12,6 @@ from langchain_astradb.chat_message_histories import (
 from langchain_astradb.utils.astradb import SetupMode
 
 from .conftest import (
-    COLLECTION_NAME_IDXALL,
     AstraDBCredentials,
     astra_db_env_vars_available,
 )
@@ -21,11 +20,11 @@ from .conftest import (
 @pytest.fixture
 def history1(
     astra_db_credentials: AstraDBCredentials,
-    empty_collection_idxall: Collection,  # noqa: ARG001
+    empty_collection_idxall: Collection,
 ) -> AstraDBChatMessageHistory:
     return AstraDBChatMessageHistory(
         session_id="session-test-1",
-        collection_name=COLLECTION_NAME_IDXALL,
+        collection_name=empty_collection_idxall.name,
         token=astra_db_credentials["token"],
         api_endpoint=astra_db_credentials["api_endpoint"],
         namespace=astra_db_credentials["namespace"],
@@ -36,11 +35,11 @@ def history1(
 @pytest.fixture
 def history2(
     astra_db_credentials: AstraDBCredentials,
-    history1: AstraDBChatMessageHistory,  # noqa: ARG001
+    history1: AstraDBChatMessageHistory,
 ) -> AstraDBChatMessageHistory:
     return AstraDBChatMessageHistory(
         session_id="session-test-2",
-        collection_name=COLLECTION_NAME_IDXALL,
+        collection_name=history1.collection_name,
         token=astra_db_credentials["token"],
         api_endpoint=astra_db_credentials["api_endpoint"],
         namespace=astra_db_credentials["namespace"],
@@ -54,11 +53,11 @@ def history2(
 @pytest.fixture
 async def async_history1(
     astra_db_credentials: AstraDBCredentials,
-    history1: AstraDBChatMessageHistory,  # noqa: ARG001
+    history1: AstraDBChatMessageHistory,
 ) -> AstraDBChatMessageHistory:
     return AstraDBChatMessageHistory(
         session_id="async-session-test-1",
-        collection_name=COLLECTION_NAME_IDXALL,
+        collection_name=history1.collection_name,
         token=astra_db_credentials["token"],
         api_endpoint=astra_db_credentials["api_endpoint"],
         namespace=astra_db_credentials["namespace"],
@@ -70,11 +69,11 @@ async def async_history1(
 @pytest.fixture
 async def async_history2(
     astra_db_credentials: AstraDBCredentials,
-    history1: AstraDBChatMessageHistory,  # noqa: ARG001
+    history1: AstraDBChatMessageHistory,
 ) -> AstraDBChatMessageHistory:
     return AstraDBChatMessageHistory(
         session_id="async-session-test-2",
-        collection_name=COLLECTION_NAME_IDXALL,
+        collection_name=history1.collection_name,
         token=astra_db_credentials["token"],
         api_endpoint=astra_db_credentials["api_endpoint"],
         namespace=astra_db_credentials["namespace"],
@@ -208,13 +207,13 @@ class TestAstraDBChatMessageHistories:
         self,
         astra_db_credentials: AstraDBCredentials,
         core_astra_db: AstraDB,
-        empty_collection_idxall: Collection,  # noqa: ARG002
+        empty_collection_idxall: Collection,
     ) -> None:
         """A deprecation warning from passing a (core) AstraDB, but it works."""
         test_messages = [AIMessage(content="Meow.")]
         chatmh_init_ok = AstraDBChatMessageHistory(
             session_id="gattini",
-            collection_name=COLLECTION_NAME_IDXALL,
+            collection_name=empty_collection_idxall.name,
             token=astra_db_credentials["token"],
             api_endpoint=astra_db_credentials["api_endpoint"],
             namespace=astra_db_credentials["namespace"],
@@ -224,7 +223,7 @@ class TestAstraDBChatMessageHistories:
         # create an equivalent cache with core AstraDB in init
         with pytest.warns(DeprecationWarning) as rec_warnings:
             chatmh_init_core = AstraDBChatMessageHistory(
-                collection_name=COLLECTION_NAME_IDXALL,
+                collection_name=empty_collection_idxall.name,
                 session_id="gattini",
                 astra_db_client=core_astra_db,
             )
@@ -242,13 +241,13 @@ class TestAstraDBChatMessageHistories:
         self,
         astra_db_credentials: AstraDBCredentials,
         core_astra_db: AstraDB,
-        empty_collection_idxall: Collection,  # noqa: ARG002
+        empty_collection_idxall: Collection,
     ) -> None:
         """A deprecation warning from passing a (core) AstraDB, but it works."""
         test_messages = [AIMessage(content="Ameow.")]
         chatmh_init_ok = AstraDBChatMessageHistory(
             session_id="gattini",
-            collection_name=COLLECTION_NAME_IDXALL,
+            collection_name=empty_collection_idxall.name,
             token=astra_db_credentials["token"],
             api_endpoint=astra_db_credentials["api_endpoint"],
             namespace=astra_db_credentials["namespace"],
@@ -258,7 +257,7 @@ class TestAstraDBChatMessageHistories:
         # create an equivalent cache with core AstraDB in init
         with pytest.warns(DeprecationWarning) as rec_warnings:
             chatmh_init_core = AstraDBChatMessageHistory(
-                collection_name=COLLECTION_NAME_IDXALL,
+                collection_name=empty_collection_idxall.name,
                 session_id="gattini",
                 astra_db_client=core_astra_db,
                 setup_mode=SetupMode.ASYNC,
