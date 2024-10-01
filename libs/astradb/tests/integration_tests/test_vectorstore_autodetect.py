@@ -99,6 +99,19 @@ class TestAstraDBVectorStoreAutodetect:
         results2n = ad_store.similarity_search("[-1,-1]", k=3, filter={"q2": "Q2"})
         assert results2n == []
 
+        def doc_sorter(doc: Document) -> str:
+            return doc.id or ""
+
+        # update metadata
+        ad_store.update_metadata(
+            {"1": {"m1": "A", "mZ": "Z"}, "2": {"m1": "B", "mZ": "Z"}}
+        )
+        matches_z = ad_store.similarity_search("[-1,-1]", k=3, filter={"mZ": "Z"})
+        assert len(matches_z) == 2
+        s_matches_z = sorted(matches_z, key=doc_sorter)
+        assert s_matches_z[0].metadata == {"m1": "A", "m2": "x", "mZ": "Z"}
+        assert s_matches_z[1].metadata == {"m1": "B", "m2": "y", "mZ": "Z"}
+
     def test_autodetect_default_novectorize_crud(
         self,
         astra_db_credentials: AstraDBCredentials,
@@ -161,6 +174,19 @@ class TestAstraDBVectorStoreAutodetect:
         assert del_by_md == 1
         results2n = ad_store.similarity_search("[-1,-1]", k=3, filter={"q2": "Q2"})
         assert results2n == []
+
+        def doc_sorter(doc: Document) -> str:
+            return doc.id or ""
+
+        # update metadata
+        ad_store.update_metadata(
+            {"1": {"m1": "A", "mZ": "Z"}, "2": {"m1": "B", "mZ": "Z"}}
+        )
+        matches_z = ad_store.similarity_search("[-1,-1]", k=3, filter={"mZ": "Z"})
+        assert len(matches_z) == 2
+        s_matches_z = sorted(matches_z, key=doc_sorter)
+        assert s_matches_z[0].metadata == {"m1": "A", "m2": "x", "mZ": "Z"}
+        assert s_matches_z[1].metadata == {"m1": "B", "m2": "y", "mZ": "Z"}
 
     def test_autodetect_flat_vectorize_crud(
         self,
@@ -229,6 +255,19 @@ class TestAstraDBVectorStoreAutodetect:
         results2n = ad_store.similarity_search("[-1,-1]", k=3, filter={"q2": "Q2"})
         assert results2n == []
 
+        def doc_sorter(doc: Document) -> str:
+            return doc.id or ""
+
+        # update metadata
+        ad_store.update_metadata(
+            {"1": {"m1": "A", "mZ": "Z"}, "2": {"m1": "B", "mZ": "Z"}}
+        )
+        matches_z = ad_store.similarity_search("[-1,-1]", k=3, filter={"mZ": "Z"})
+        assert len(matches_z) == 2
+        s_matches_z = sorted(matches_z, key=doc_sorter)
+        assert s_matches_z[0].metadata == {"m1": "A", "m2": "x", "mZ": "Z"}
+        assert s_matches_z[1].metadata == {"m1": "B", "m2": "y", "mZ": "Z"}
+
     def test_autodetect_default_vectorize_crud(
         self,
         *,
@@ -293,6 +332,19 @@ class TestAstraDBVectorStoreAutodetect:
         assert del_by_md == 1
         results2n = ad_store.similarity_search("[-1,-1]", k=3, filter={"q2": "Q2"})
         assert results2n == []
+
+        def doc_sorter(doc: Document) -> str:
+            return doc.id or ""
+
+        # update metadata
+        ad_store.update_metadata(
+            {"1": {"m1": "A", "mZ": "Z"}, "2": {"m1": "B", "mZ": "Z"}}
+        )
+        matches_z = ad_store.similarity_search("[-1,-1]", k=3, filter={"mZ": "Z"})
+        assert len(matches_z) == 2
+        s_matches_z = sorted(matches_z, key=doc_sorter)
+        assert s_matches_z[0].metadata == {"m1": "A", "m2": "x", "mZ": "Z"}
+        assert s_matches_z[1].metadata == {"m1": "B", "m2": "y", "mZ": "Z"}
 
     def test_failed_docs_autodetect_flat_novectorize_crud(
         self,

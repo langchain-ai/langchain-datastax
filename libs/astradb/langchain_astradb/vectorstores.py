@@ -1222,6 +1222,110 @@ class AstraDBVectorStore(VectorStore):
                 raise ValueError(msg)
         return inserted_ids
 
+    def update_metadata(
+        self,
+        id_to_metadata: dict[str, dict],
+        *,
+        overwrite_concurrency: int | None = None,
+    ) -> int:
+        """Add/overwrite the metadata of existing documents.
+
+        For each document to update, the new metadata dictionary is added
+        to the existing metadata, overwriting individual keys that existed already.
+
+        Args:
+            id_to_metadata: map from the Document IDs to modify to the
+                new metadata for updating. Keys in this dictionary that
+                do not correspond to an existing document will be silently ignored.
+                The values of this map are metadata dictionaries for updating
+                the documents. Any pre-existing metadata will be merged with
+                these entries, which take precedence on a key-by-key basis.
+            overwrite_concurrency: number of threads to process the updates
+                Defaults to the vector-store overall setting if not provided.
+
+        Returns:
+            the number of documents successfully updated (i.e. found to exist,
+            since even an update with `{}` as the new metadata counts as successful.)
+        """
+        self.astra_env.ensure_db_setup()
+
+        _max_workers = overwrite_concurrency or self.bulk_insert_overwrite_concurrency
+        with ThreadPoolExecutor(
+            max_workers=_max_workers,
+        ) as executor:
+
+            def _update_document(
+                id_md_pair: tuple[str, dict],
+            ) -> UpdateResult:
+                document_id, update_metadata = id_md_pair
+                encoded_metadata = self.filter_to_query(update_metadata)
+                return self.astra_env.collection.update_one(
+                    {"_id": document_id},
+                    {"$set": encoded_metadata},
+                )
+
+            update_results = list(
+                executor.map(
+                    _update_document,
+                    id_to_metadata.items(),
+                )
+            )
+
+        return sum(u_res.update_info["n"] for u_res in update_results)
+
+    async def aupdate_metadata(
+        self,
+        id_to_metadata: dict[str, dict],
+        *,
+        overwrite_concurrency: int | None = None,
+    ) -> int:
+        """Add/overwrite the metadata of existing documents.
+
+        For each document to update, the new metadata dictionary is added
+        to the existing metadata, overwriting individual keys that existed already.
+
+        Args:
+            id_to_metadata: map from the Document IDs to modify to the
+                new metadata for updating. Keys in this dictionary that
+                do not correspond to an existing document will be silently ignored.
+                The values of this map are metadata dictionaries for updating
+                the documents. Any pre-existing metadata will be merged with
+                these entries, which take precedence on a key-by-key basis.
+            overwrite_concurrency: number of threads to process the updates
+                Defaults to the vector-store overall setting if not provided.
+
+        Returns:
+            the number of documents successfully updated (i.e. found to exist,
+            since even an update with `{}` as the new metadata counts as successful.)
+        """
+        await self.astra_env.aensure_db_setup()
+
+        sem = asyncio.Semaphore(
+            overwrite_concurrency or self.bulk_insert_overwrite_concurrency,
+        )
+
+        _async_collection = self.astra_env.async_collection
+
+        async def _update_document(
+            id_md_pair: tuple[str, dict],
+        ) -> UpdateResult:
+            document_id, update_metadata = id_md_pair
+            encoded_metadata = self.filter_to_query(update_metadata)
+            async with sem:
+                return await _async_collection.update_one(
+                    {"_id": document_id},
+                    {"$set": encoded_metadata},
+                )
+
+        tasks = [
+            asyncio.create_task(_update_document(id_md_pair))
+            for id_md_pair in id_to_metadata.items()
+        ]
+
+        update_results = await asyncio.gather(*tasks, return_exceptions=False)
+
+        return sum(u_res.update_info["n"] for u_res in update_results)
+
     @override
     def similarity_search(
         self,
