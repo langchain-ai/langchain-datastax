@@ -1,7 +1,5 @@
 """Tools for the Graph Traversal Maximal Marginal Relevance (MMR) reranking."""
 
-# ruff: noqa: EM101 TRY003
-
 from __future__ import annotations
 
 import dataclasses
@@ -117,7 +115,7 @@ class MmrHelper:
 
         # List of the candidates.
         self.candidates = []
-        # ND array of the candidate embeddings.
+        # numpy n-dimensional array of the candidate embeddings.
         self.candidate_embeddings = np.ndarray((0, self.dimensions), dtype=np.float32)
 
         self.best_score = NEG_INF
@@ -141,10 +139,11 @@ class MmrHelper:
         # Get the embedding for the id.
         index = self.candidate_id_to_index.pop(candidate_id)
         if self.candidates[index].id != candidate_id:
-            raise ValueError(
+            msg = (
                 "ID in self.candidate_id_to_index doesn't match the ID of the "
                 "corresponding index in self.candidates"
             )
+            raise ValueError(msg)
         embedding: NDArray[np.float32] = self.candidate_embeddings[index].copy()
 
         # Swap that index with the last index in the candidates and

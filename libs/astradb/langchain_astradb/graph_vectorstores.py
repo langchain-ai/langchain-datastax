@@ -1,8 +1,5 @@
 """Astra DB graph vector store integration."""
 
-# Leave TODO's alone
-# ruff: noqa: FIX002 TD002 TD003
-
 from __future__ import annotations
 
 import secrets
@@ -14,15 +11,15 @@ from typing import (
     Sequence,
 )
 
-from langchain_core.documents import Document
-from langchain_core.graph_vectorstores.base import (
+from langchain_community.graph_vectorstores.base import (
     GraphVectorStore,
     Node,
 )
+from langchain_core.documents import Document
 from typing_extensions import override
 
-from langchain_astradb import AstraDBVectorStore
 from langchain_astradb.utils.mmr_traversal import MmrHelper
+from langchain_astradb.vectorstores import AstraDBVectorStore
 
 if TYPE_CHECKING:
     from langchain_core.embeddings import Embeddings
@@ -325,7 +322,7 @@ class AstraDBGraphVectorStore(GraphVectorStore):
         def get_adjacent(tags: set[str]) -> Iterable[_Edge]:
             targets: dict[str, _Edge] = {}
 
-            # TODO: Would be better parralelized
+            # TODO: Would be better parallelized
             for tag in tags:
                 m_filter = (metadata_filter or {}).copy()
                 m_filter[self.link_from_metadata_key] = tag

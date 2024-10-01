@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "langchain-astradb"
-version = "0.4.2"
+version = "0.5.0"
 description = "An integration package connecting Astra DB and LangChain"
 authors = []
 readme = "README.md"
@@ -12,9 +12,8 @@ license = "MIT"
 
 [tool.poetry.dependencies]
 python = ">=3.9,<4.0"
-langchain-core = ">=0.1.31,<0.4"
-astrapy = "^1.4"
-# Resolve numpy version for 3.8 to 3.12+
+langchain-community = ">=0.3.1"
+astrapy = "^1.5"
 numpy = "^1.26.0"
 
 [tool.poetry.group.test]
@@ -31,6 +30,7 @@ pytest-asyncio = "^0.21.1"
 langchain = { git = "https://github.com/langchain-ai/langchain.git", subdirectory = "libs/langchain" }
 langchain-text-splitters = { git = "https://github.com/langchain-ai/langchain.git", subdirectory = "libs/text-splitters" }
 langchain-core = { git = "https://github.com/langchain-ai/langchain.git", subdirectory = "libs/core" }
+langchain-community = { git = "https://github.com/langchain-ai/langchain.git", subdirectory = "libs/community" }
 
 [tool.poetry.group.codespell]
 optional = true
@@ -69,10 +69,13 @@ flake8-annotations.mypy-init-return = true
 select = ["ALL"]
 ignore = [
     "COM812", # Messes with the formatter
-    "ERA", # Do we want to activate (no commented code) ?
+    "D101", # We prefer using the __init__ docstring to document the class
+    "ERA001", # Do we want to activate (no commented code) ?
+    "FIX002", # Accept TODOs
     "ISC001", # Messes with the formatter
     "PLR09", # TODO: do we enforce these ones (complexity) ?
-    "D101", # We prefer using the __init__ docstring to document the class
+    "TD002", # We have TODOs authors by git
+    "TD003",
 ]
 
 [tool.ruff.lint.per-file-ignores]
