@@ -14,6 +14,8 @@ from typing import TYPE_CHECKING, Any, Awaitable
 
 import langchain_core
 from astrapy import AsyncDatabase, DataAPIClient, Database
+from astrapy.admin import parse_api_endpoint
+from astrapy.constants import Environment
 from astrapy.exceptions import DataAPIException
 
 if TYPE_CHECKING:
@@ -60,7 +62,7 @@ def _survey_collection(
     namespace: str | None = None,
 ) -> tuple[CollectionDescriptor | None, list[dict[str, Any]]]:
     """Return the collection descriptor (if found) and a sample of documents."""
-    _environment = _AstraDBEnvironment(
+    _astra_db_env = _AstraDBEnvironment(
         token=token,
         api_endpoint=api_endpoint,
         environment=environment,
@@ -70,19 +72,41 @@ def _survey_collection(
     )
     descriptors = [
         coll_d
-        for coll_d in _environment.database.list_collections()
+        for coll_d in _astra_db_env.database.list_collections()
         if coll_d.name == collection_name
     ]
     if not descriptors:
         return None, []
     descriptor = descriptors[0]
     # fetch some documents
-    document_ite = _environment.database.get_collection(collection_name).find(
+    document_ite = _astra_db_env.database.get_collection(collection_name).find(
         filter={},
         projection={"*": True},
         limit=SURVEY_NUMBER_OF_DOCUMENTS,
     )
     return (descriptor, list(document_ite))
+
+
+def _normalize_data_api_environment(
+    arg_environment: str | None,
+    api_endpoint: str,
+) -> str:
+    _environment: str
+    if arg_environment is not None:
+        return arg_environment
+    parsed_endpoint = parse_api_endpoint(api_endpoint)
+    if parsed_endpoint is None:
+        logger.info(
+            "Detecting API environment '%s' from supplied endpoint",
+            Environment.OTHER,
+        )
+        return Environment.OTHER
+
+    logger.info(
+        "Detecting API environment '%s' from supplied endpoint",
+        parsed_endpoint.environment,
+    )
+    return parsed_endpoint.environment
 
 
 class _AstraDBEnvironment:
@@ -208,8 +232,6 @@ class _AstraDBEnvironment:
             self.api_endpoint = _api_endpoint
             self.namespace = _namespace
 
-        self.environment = environment
-
         # init parameters are normalized to self.{token, api_endpoint, namespace}.
         # Proceed. Namespace and token can be None (resp. on Astra DB and non-Astra)
         if self.api_endpoint is None:
@@ -219,6 +241,11 @@ class _AstraDBEnvironment:
                 f"or set the {API_ENDPOINT_ENV_VAR} environment variable."
             )
             raise ValueError(msg)
+
+        self.environment = _normalize_data_api_environment(
+            environment,
+            self.api_endpoint,
+        )
 
         # create the clients
         caller_name = "langchain"
