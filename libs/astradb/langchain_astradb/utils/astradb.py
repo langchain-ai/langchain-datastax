@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 
 TOKEN_ENV_VAR = "ASTRA_DB_APPLICATION_TOKEN"  # noqa: S105
 API_ENDPOINT_ENV_VAR = "ASTRA_DB_API_ENDPOINT"
-NAMESPACE_ENV_VAR = "ASTRA_DB_KEYSPACE"
+KEYSPACE_ENV_VAR = "ASTRA_DB_KEYSPACE"
 
 # Default settings for API data operations (concurrency & similar):
 # Chunk size for many-document insertions (None meaning defer to astrapy):
@@ -57,7 +57,7 @@ def _survey_collection(
     environment: str | None = None,
     astra_db_client: AstraDB | None = None,
     async_astra_db_client: AsyncAstraDB | None = None,
-    namespace: str | None = None,
+    keyspace: str | None = None,
 ) -> tuple[CollectionDescriptor | None, list[dict[str, Any]]]:
     """Return the collection descriptor (if found) and a sample of documents."""
     _environment = _AstraDBEnvironment(
@@ -66,7 +66,7 @@ def _survey_collection(
         environment=environment,
         astra_db_client=astra_db_client,
         async_astra_db_client=async_astra_db_client,
-        namespace=namespace,
+        keyspace=keyspace,
     )
     descriptors = [
         coll_d
@@ -93,11 +93,11 @@ class _AstraDBEnvironment:
         environment: str | None = None,
         astra_db_client: AstraDB | None = None,
         async_astra_db_client: AsyncAstraDB | None = None,
-        namespace: str | None = None,
+        keyspace: str | None = None,
     ) -> None:
         self.token: str | TokenProvider | None
         self.api_endpoint: str | None
-        self.namespace: str | None
+        self.keyspace: str | None
         self.environment: str | None
 
         self.data_api_client: DataAPIClient
@@ -147,7 +147,7 @@ class _AstraDBEnvironment:
                     if klient is not None
                 }
             )
-            _namespaces = list(
+            _keyspaces = list(
                 {
                     klient.namespace
                     for klient in [astra_db_client, async_astra_db_client]
@@ -164,21 +164,21 @@ class _AstraDBEnvironment:
             if len(_api_endpoints) != 1:
                 msg = (
                     "Conflicting API endpoints found in the sync and async "
-                    "AstraDB constructor parameters. Please check the tokens "
+                    "AstraDB constructor parameters. Please check the endpoints "
                     "and ensure they match."
                 )
                 raise ValueError(msg)
-            if len(_namespaces) != 1:
+            if len(_keyspaces) != 1:
                 msg = (
-                    "Conflicting namespaces found in the sync and async "
-                    "AstraDB constructor parameters. Please check the tokens "
-                    "and ensure they match."
+                    "Conflicting keyspaces found in the sync and async "
+                    "AstraDB constructor parameters' 'namespace' attributes. "
+                    "Please check the keyspaces and ensure they match."
                 )
                 raise ValueError(msg)
             # all good: these are 1-element lists here
             self.token = _tokens[0]
             self.api_endpoint = _api_endpoints[0]
-            self.namespace = _namespaces[0]
+            self.keyspace = _keyspaces[0]
         else:
             _token: str | TokenProvider | None
             # secrets-based initialization
@@ -199,19 +199,19 @@ class _AstraDBEnvironment:
                 _api_endpoint = os.environ.get(API_ENDPOINT_ENV_VAR)
             else:
                 _api_endpoint = api_endpoint
-            if namespace is None:
-                _namespace = os.environ.get(NAMESPACE_ENV_VAR)
+            if keyspace is None:
+                _keyspace = os.environ.get(KEYSPACE_ENV_VAR)
             else:
-                _namespace = namespace
+                _keyspace = keyspace
 
             self.token = _token
             self.api_endpoint = _api_endpoint
-            self.namespace = _namespace
+            self.keyspace = _keyspace
 
         self.environment = environment
 
-        # init parameters are normalized to self.{token, api_endpoint, namespace}.
-        # Proceed. Namespace and token can be None (resp. on Astra DB and non-Astra)
+        # init parameters are normalized to self.{token, api_endpoint, keyspace}.
+        # Proceed. Keyspace and token can be None (resp. on Astra DB and non-Astra)
         if self.api_endpoint is None:
             msg = (
                 "API endpoint for Data API not provided. "
@@ -232,7 +232,7 @@ class _AstraDBEnvironment:
         self.database = self.data_api_client.get_database(
             api_endpoint=self.api_endpoint,
             token=self.token,
-            keyspace=self.namespace,
+            keyspace=self.keyspace,
         )
         self.async_database = self.database.to_async()
 
@@ -247,7 +247,7 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
         environment: str | None = None,
         astra_db_client: AstraDB | None = None,
         async_astra_db_client: AsyncAstraDB | None = None,
-        namespace: str | None = None,
+        keyspace: str | None = None,
         setup_mode: SetupMode = SetupMode.SYNC,
         pre_delete_collection: bool = False,
         embedding_dimension: int | Awaitable[int] | None = None,
@@ -263,7 +263,7 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
             environment=environment,
             astra_db_client=astra_db_client,
             async_astra_db_client=async_astra_db_client,
-            namespace=namespace,
+            keyspace=keyspace,
         )
         self.collection_name = collection_name
         self.collection = self.database.get_collection(
