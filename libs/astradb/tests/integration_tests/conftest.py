@@ -175,7 +175,7 @@ def database(
     db = client.get_database(
         astra_db_credentials["api_endpoint"],
         token=StaticTokenProvider(astra_db_credentials["token"]),
-        namespace=astra_db_credentials["namespace"],
+        keyspace=astra_db_credentials["namespace"],
     )
     if not is_astra_db:
         if astra_db_credentials["namespace"] is None:

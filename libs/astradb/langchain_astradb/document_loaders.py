@@ -99,7 +99,7 @@ class AstraDBLoader(BaseLoader):
             environment=environment,
             astra_db_client=astra_db_client,
             async_astra_db_client=async_astra_db_client,
-            namespace=namespace,
+            keyspace=namespace,
             setup_mode=SetupMode.OFF,
         )
         self.astra_db_env = astra_db_env
@@ -151,7 +151,7 @@ class AstraDBLoader(BaseLoader):
         self.page_content_mapper = page_content_mapper
         self.metadata_mapper = metadata_mapper or (
             lambda _: {
-                "namespace": self.astra_db_env.database.namespace,
+                "namespace": self.astra_db_env.database.keyspace,
                 "api_endpoint": self.astra_db_env.database.api_endpoint,
                 "collection": collection_name,
             }

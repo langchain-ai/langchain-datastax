@@ -597,7 +597,7 @@ class AstraDBVectorStore(VectorStore):
                 environment=self.environment,
                 astra_db_client=astra_db_client,
                 async_astra_db_client=async_astra_db_client,
-                namespace=self.namespace,
+                keyspace=self.namespace,
             )
             if c_descriptor is None:
                 msg = f"Collection '{self.collection_name}' not found."
@@ -653,7 +653,7 @@ class AstraDBVectorStore(VectorStore):
             environment=self.environment,
             astra_db_client=astra_db_client,
             async_astra_db_client=async_astra_db_client,
-            namespace=self.namespace,
+            keyspace=self.namespace,
             setup_mode=_setup_mode,
             pre_delete_collection=pre_delete_collection,
             embedding_dimension=_embedding_dimension,

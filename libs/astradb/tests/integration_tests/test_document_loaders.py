@@ -96,7 +96,7 @@ class TestAstraDB:
             assert content["_id"] not in ids
             ids.add(content["_id"])
             assert doc.metadata == {
-                "namespace": database.namespace,
+                "namespace": database.keyspace,
                 "api_endpoint": astra_db_credentials["api_endpoint"],
                 "collection": document_loader_collection.name,
             }
@@ -189,7 +189,7 @@ class TestAstraDB:
             assert content["_id"] not in ids
             ids.add(content["_id"])
             assert doc.metadata == {
-                "namespace": database.namespace,
+                "namespace": database.keyspace,
                 "api_endpoint": astra_db_credentials["api_endpoint"],
                 "collection": async_document_loader_collection.name,
             }
@@ -234,7 +234,7 @@ class TestAstraDB:
             assert content["_id"] not in ids
             ids.add(content["_id"])
             assert doc.metadata == {
-                "namespace": database.namespace,
+                "namespace": database.keyspace,
                 "api_endpoint": astra_db_credentials["api_endpoint"],
                 "collection": async_document_loader_collection.name,
             }
