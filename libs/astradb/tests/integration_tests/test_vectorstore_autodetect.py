@@ -92,6 +92,13 @@ class TestAstraDBVectorStoreAutodetect:
         results2 = ad_store.similarity_search("[-1,-1]", k=3, filter={"q2": "Q2"})
         assert results2 == [Document(id=id4, page_content=pc4, metadata=md4)]
 
+        # delete by metadata
+        del_by_md = ad_store.delete_by_metadata_filter(filter={"q2": "Q2"})
+        assert del_by_md is not None
+        assert del_by_md == 1
+        results2n = ad_store.similarity_search("[-1,-1]", k=3, filter={"q2": "Q2"})
+        assert results2n == []
+
     def test_autodetect_default_novectorize_crud(
         self,
         astra_db_credentials: AstraDBCredentials,
@@ -147,6 +154,13 @@ class TestAstraDBVectorStoreAutodetect:
         # reading with filtering
         results2 = ad_store.similarity_search("[9,10]", k=3, filter={"q2": "Q2"})
         assert results2 == [Document(id=id4, page_content=pc4, metadata=md4)]
+
+        # delete by metadata
+        del_by_md = ad_store.delete_by_metadata_filter(filter={"q2": "Q2"})
+        assert del_by_md is not None
+        assert del_by_md == 1
+        results2n = ad_store.similarity_search("[-1,-1]", k=3, filter={"q2": "Q2"})
+        assert results2n == []
 
     def test_autodetect_flat_vectorize_crud(
         self,
@@ -208,6 +222,13 @@ class TestAstraDBVectorStoreAutodetect:
         results2 = ad_store.similarity_search("query", k=3, filter={"q2": "Q2"})
         assert results2 == [Document(id=id4, page_content=pc4, metadata=md4)]
 
+        # delete by metadata
+        del_by_md = ad_store.delete_by_metadata_filter(filter={"q2": "Q2"})
+        assert del_by_md is not None
+        assert del_by_md == 1
+        results2n = ad_store.similarity_search("[-1,-1]", k=3, filter={"q2": "Q2"})
+        assert results2n == []
+
     def test_autodetect_default_vectorize_crud(
         self,
         *,
@@ -265,6 +286,13 @@ class TestAstraDBVectorStoreAutodetect:
         # reading with filtering
         results2 = ad_store.similarity_search("query", k=3, filter={"q2": "Q2"})
         assert results2 == [Document(id=id4, page_content=pc4, metadata=md4)]
+
+        # delete by metadata
+        del_by_md = ad_store.delete_by_metadata_filter(filter={"q2": "Q2"})
+        assert del_by_md is not None
+        assert del_by_md == 1
+        results2n = ad_store.similarity_search("[-1,-1]", k=3, filter={"q2": "Q2"})
+        assert results2n == []
 
     def test_failed_docs_autodetect_flat_novectorize_crud(
         self,

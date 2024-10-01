@@ -819,6 +819,60 @@ class TestAstraDBVectorStore:
         for doc, _, doc_id in full_results:
             assert doc.page_content == expected_text_by_id[doc_id]
 
+    def test_astradb_vectorstore_delete_by_metadata_sync(
+        self,
+        vector_store_d2: AstraDBVectorStore,
+    ) -> None:
+        """Testing delete_by_metadata_filter."""
+        full_size = 400
+        # one in ... will be deleted
+        deletee_ratio = 3
+
+        documents = [
+            Document(
+                page_content="[1,1]", metadata={"deletee": doc_i % deletee_ratio == 0}
+            )
+            for doc_i in range(full_size)
+        ]
+
+        inserted_ids0 = vector_store_d2.add_documents(documents)
+        assert len(inserted_ids0) == len(documents)
+
+        d_result0 = vector_store_d2.delete_by_metadata_filter({"deletee": True})
+        assert d_result0 is not None
+        assert d_result0 == len([doc for doc in documents if doc.metadata["deletee"]])
+
+        d_result1 = vector_store_d2.delete_by_metadata_filter({})
+        assert d_result1 is None
+        assert len(vector_store_d2.similarity_search("[1,1]", k=1)) == 0
+
+    async def test_astradb_vectorstore_delete_by_metadata_async(
+        self,
+        vector_store_d2: AstraDBVectorStore,
+    ) -> None:
+        """Testing delete_by_metadata_filter, async version."""
+        full_size = 400
+        # one in ... will be deleted
+        deletee_ratio = 3
+
+        documents = [
+            Document(
+                page_content="[1,1]", metadata={"deletee": doc_i % deletee_ratio == 0}
+            )
+            for doc_i in range(full_size)
+        ]
+
+        inserted_ids0 = await vector_store_d2.aadd_documents(documents)
+        assert len(inserted_ids0) == len(documents)
+
+        d_result0 = await vector_store_d2.adelete_by_metadata_filter({"deletee": True})
+        assert d_result0 is not None
+        assert d_result0 == len([doc for doc in documents if doc.metadata["deletee"]])
+
+        d_result1 = await vector_store_d2.adelete_by_metadata_filter({})
+        assert d_result1 is None
+        assert len(await vector_store_d2.asimilarity_search("[1,1]", k=1)) == 0
+
     def test_astradb_vectorstore_mmr_sync(
         self,
         vector_store_d2: AstraDBVectorStore,

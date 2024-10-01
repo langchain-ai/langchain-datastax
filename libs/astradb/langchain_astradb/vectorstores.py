@@ -827,6 +827,62 @@ class AstraDBVectorStore(VectorStore):
         )
         return True
 
+    def delete_by_metadata_filter(
+        self,
+        filter: dict[str, Any],  # noqa: A002
+    ) -> int | None:
+        """Delete all documents matching a certain metadata filtering condition.
+
+        This operation does not use the vector embeddings in any way, it simply
+        removes all documents whose metadata match the provided condition.
+        Use with caution: passing an empty filter dictionary results in
+        completely emptying the vector store.
+
+        Args:
+            filter: Filter on the metadata to apply.
+
+        Returns:
+            An number expressing the amount of deleted documents.
+            This will be None if a `{}` metadata filter condition is passed,
+            implying emptying the store entirely.
+        """
+        self.astra_env.ensure_db_setup()
+        metadata_parameter = self.filter_to_query(filter)
+        del_result = self.astra_env.collection.delete_many(
+            filter=metadata_parameter,
+        )
+        if del_result.deleted_count is not None and del_result.deleted_count >= 0:
+            return del_result.deleted_count
+        return None
+
+    async def adelete_by_metadata_filter(
+        self,
+        filter: dict[str, Any],  # noqa: A002
+    ) -> int | None:
+        """Delete all documents matching a certain metadata filtering condition.
+
+        This operation does not use the vector embeddings in any way, it simply
+        removes all documents whose metadata match the provided condition.
+        Use with caution: passing an empty filter dictionary results in
+        completely emptying the vector store.
+
+        Args:
+            filter: Filter on the metadata to apply.
+
+        Returns:
+            An number expressing the amount of deleted documents.
+            This will be None if a `{}` metadata filter condition is passed,
+            implying emptying the store entirely.
+        """
+        await self.astra_env.aensure_db_setup()
+        metadata_parameter = self.filter_to_query(filter)
+        del_result = await self.astra_env.async_collection.delete_many(
+            filter=metadata_parameter,
+        )
+        if del_result.deleted_count is not None and del_result.deleted_count >= 0:
+            return del_result.deleted_count
+        return None
+
     def delete_collection(self) -> None:
         """Completely delete the collection from the database.
 
