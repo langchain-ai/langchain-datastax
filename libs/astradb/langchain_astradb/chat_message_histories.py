@@ -81,7 +81,7 @@ class AstraDBChatMessageHistory(BaseChatMessageHistory):
             environment=environment,
             astra_db_client=astra_db_client,
             async_astra_db_client=async_astra_db_client,
-            namespace=namespace,
+            keyspace=namespace,
             setup_mode=setup_mode,
             pre_delete_collection=pre_delete_collection,
         )

@@ -46,6 +46,10 @@ class AstraDBBaseStore(Generic[V], BaseStore[str, V], ABC):
             raise ValueError(msg)
         kwargs["requested_indexing_policy"] = {"allow": ["_id"]}
         kwargs["default_indexing_policy"] = {"allow": ["_id"]}
+
+        if "namespace" in kwargs:
+            kwargs["keyspace"] = kwargs.pop("namespace")
+
         self.astra_env = _AstraDBCollectionEnvironment(
             *args,
             **kwargs,

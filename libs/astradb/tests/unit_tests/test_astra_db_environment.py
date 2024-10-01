@@ -5,7 +5,7 @@ from astrapy.db import AstraDB
 
 from langchain_astradb.utils.astradb import (
     API_ENDPOINT_ENV_VAR,
-    NAMESPACE_ENV_VAR,
+    KEYSPACE_ENV_VAR,
     TOKEN_ENV_VAR,
     _AstraDBEnvironment,
 )
@@ -47,15 +47,15 @@ class TestAstraDBEnvironment:
                     API_ENDPOINT_ENV_VAR
                 ]
                 del os.environ[API_ENDPOINT_ENV_VAR]
-            if NAMESPACE_ENV_VAR in os.environ:
-                env_vars_to_restore[NAMESPACE_ENV_VAR] = os.environ[NAMESPACE_ENV_VAR]
-                del os.environ[NAMESPACE_ENV_VAR]
+            if KEYSPACE_ENV_VAR in os.environ:
+                env_vars_to_restore[KEYSPACE_ENV_VAR] = os.environ[KEYSPACE_ENV_VAR]
+                del os.environ[KEYSPACE_ENV_VAR]
 
             # token+endpoint
             env1 = _AstraDBEnvironment(
                 token=FAKE_TOKEN,
                 api_endpoint=a_e_string,
-                namespace="n",
+                keyspace="n",
             )
 
             # through a core AstraDB instance
@@ -126,7 +126,7 @@ class TestAstraDBEnvironment:
                 )
             with pytest.raises(
                 ValueError,
-                match="Conflicting namespaces found in the sync and async AstraDB "
+                match="Conflicting keyspaces found in the sync and async AstraDB "
                 "constructor parameters.",
             ), pytest.warns(DeprecationWarning):
                 _AstraDBEnvironment(
@@ -174,7 +174,7 @@ class TestAstraDBEnvironment:
             os.environ[TOKEN_ENV_VAR] = "t"
             env4 = _AstraDBEnvironment(
                 api_endpoint=a_e_string,
-                namespace="n",
+                keyspace="n",
             )
             del os.environ[TOKEN_ENV_VAR]
             assert env1.data_api_client == env4.data_api_client
@@ -185,7 +185,7 @@ class TestAstraDBEnvironment:
             os.environ[API_ENDPOINT_ENV_VAR] = a_e_string
             env5 = _AstraDBEnvironment(
                 token=FAKE_TOKEN,
-                namespace="n",
+                keyspace="n",
             )
             del os.environ[API_ENDPOINT_ENV_VAR]
             assert env1.data_api_client == env5.data_api_client
@@ -195,19 +195,19 @@ class TestAstraDBEnvironment:
             # both and also namespace via env vars
             os.environ[TOKEN_ENV_VAR] = FAKE_TOKEN
             os.environ[API_ENDPOINT_ENV_VAR] = a_e_string
-            os.environ[NAMESPACE_ENV_VAR] = "n"
+            os.environ[KEYSPACE_ENV_VAR] = "n"
             env6 = _AstraDBEnvironment()
             assert env1.data_api_client == env6.data_api_client
             assert env1.database == env6.database
             assert env1.async_database == env6.async_database
             del os.environ[TOKEN_ENV_VAR]
             del os.environ[API_ENDPOINT_ENV_VAR]
-            del os.environ[NAMESPACE_ENV_VAR]
+            del os.environ[KEYSPACE_ENV_VAR]
 
             # env vars do not interfere if client(s) passed
             os.environ[TOKEN_ENV_VAR] = "NO!"
             os.environ[API_ENDPOINT_ENV_VAR] = "NO!"
-            os.environ[NAMESPACE_ENV_VAR] = "NO!"
+            os.environ[KEYSPACE_ENV_VAR] = "NO!"
             with pytest.warns(DeprecationWarning):
                 env7a = _AstraDBEnvironment(
                     async_astra_db_client=mock_astra_db.to_async(),
@@ -235,7 +235,7 @@ class TestAstraDBEnvironment:
             env8 = _AstraDBEnvironment(
                 token=FAKE_TOKEN,
                 api_endpoint=a_e_string,
-                namespace="n",
+                keyspace="n",
             )
             assert env1.data_api_client == env8.data_api_client
             assert env1.database == env8.database
@@ -247,7 +247,7 @@ class TestAstraDBEnvironment:
                 del os.environ[TOKEN_ENV_VAR]
             if API_ENDPOINT_ENV_VAR in os.environ:
                 del os.environ[API_ENDPOINT_ENV_VAR]
-            if NAMESPACE_ENV_VAR in os.environ:
-                del os.environ[NAMESPACE_ENV_VAR]
+            if KEYSPACE_ENV_VAR in os.environ:
+                del os.environ[KEYSPACE_ENV_VAR]
             for env_var_name, env_var_value in env_vars_to_restore.items():
                 os.environ[env_var_name] = env_var_value
