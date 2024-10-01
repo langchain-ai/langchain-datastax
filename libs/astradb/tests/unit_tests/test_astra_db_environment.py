@@ -1,6 +1,7 @@
 import os
 
 import pytest
+from astrapy.constants import Environment
 from astrapy.db import AstraDB
 
 from langchain_astradb.utils.astradb import (
@@ -251,3 +252,74 @@ class TestAstraDBEnvironment:
                 del os.environ[KEYSPACE_ENV_VAR]
             for env_var_name, env_var_value in env_vars_to_restore.items():
                 os.environ[env_var_name] = env_var_value
+
+    def test_env_autodetect(self) -> None:
+        a_e_string_prod = (
+            "https://01234567-89ab-cdef-0123-456789abcdef-us-east1"
+            ".apps.astra.datastax.com"
+        )
+        a_e_string_dev = (
+            "https://01234567-89ab-cdef-0123-456789abcdef-us-east1"
+            ".apps.astra-dev.datastax.com"
+        )
+        a_e_string_other = "http://localhost:1234"
+        mock_astra_db_prod = AstraDB(
+            token=FAKE_TOKEN,
+            api_endpoint=a_e_string_prod,
+            namespace="n",
+        )
+        mock_astra_db_dev = AstraDB(
+            token=FAKE_TOKEN,
+            api_endpoint=a_e_string_dev,
+            namespace="n",
+        )
+        mock_astra_db_other = AstraDB(
+            token=FAKE_TOKEN,
+            api_endpoint=a_e_string_other,
+            namespace="n",
+        )
+
+        a_env_prod = _AstraDBEnvironment(
+            token=FAKE_TOKEN,
+            api_endpoint=a_e_string_prod,
+            keyspace="n",
+        )
+        assert a_env_prod.environment == Environment.PROD
+        a_env_dev = _AstraDBEnvironment(
+            token=FAKE_TOKEN,
+            api_endpoint=a_e_string_dev,
+            keyspace="n",
+        )
+        assert a_env_dev.environment == Environment.DEV
+        a_env_other = _AstraDBEnvironment(
+            token=FAKE_TOKEN,
+            api_endpoint=a_e_string_other,
+            keyspace="n",
+        )
+        assert a_env_other.environment == Environment.OTHER
+
+        # a funny case
+        with pytest.raises(ValueError, match="mismatch"):
+            _AstraDBEnvironment(
+                token=FAKE_TOKEN,
+                api_endpoint=a_e_string_prod,
+                keyspace="n",
+                environment=Environment.DEV,
+            )
+
+        # initialization using the core clients
+        with pytest.warns(DeprecationWarning):
+            a_env_prod_core = _AstraDBEnvironment(
+                astra_db_client=mock_astra_db_prod,
+            )
+        assert a_env_prod_core.environment == Environment.PROD
+        with pytest.warns(DeprecationWarning):
+            a_env_dev_core = _AstraDBEnvironment(
+                astra_db_client=mock_astra_db_dev,
+            )
+        assert a_env_dev_core.environment == Environment.DEV
+        with pytest.warns(DeprecationWarning):
+            a_env_other_core = _AstraDBEnvironment(
+                astra_db_client=mock_astra_db_other,
+            )
+        assert a_env_other_core.environment == Environment.OTHER
