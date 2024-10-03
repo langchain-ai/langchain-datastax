@@ -873,8 +873,8 @@ class AstraDBVectorStore(VectorStore):
         """
         if not filter:
             msg = (
-                "Method `delete_by_metadata_filter` does not accept an empty "
-                "filter. Use the `clear()` method if you really want to empty "
+                "Method `adelete_by_metadata_filter` does not accept an empty "
+                "filter. Use the `aclear()` method if you really want to empty "
                 "the vector store."
             )
             raise ValueError(msg)
@@ -1242,7 +1242,7 @@ class AstraDBVectorStore(VectorStore):
                 The values of this map are metadata dictionaries for updating
                 the documents. Any pre-existing metadata will be merged with
                 these entries, which take precedence on a key-by-key basis.
-            overwrite_concurrency: number of threads to process the updates
+            overwrite_concurrency: number of threads to process the updates.
                 Defaults to the vector-store overall setting if not provided.
 
         Returns:
@@ -1293,7 +1293,7 @@ class AstraDBVectorStore(VectorStore):
                 The values of this map are metadata dictionaries for updating
                 the documents. Any pre-existing metadata will be merged with
                 these entries, which take precedence on a key-by-key basis.
-            overwrite_concurrency: number of threads to process the updates
+            overwrite_concurrency: number of asynchronous tasks to process the updates.
                 Defaults to the vector-store overall setting if not provided.
 
         Returns:
