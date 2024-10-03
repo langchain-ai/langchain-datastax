@@ -840,7 +840,7 @@ class AstraDBVectorStore(VectorStore):
             filter: Filter on the metadata to apply. The filter cannot be empty.
 
         Returns:
-            An number expressing the amount of deleted documents.
+            A number expressing the amount of deleted documents.
         """
         if not filter:
             msg = (
@@ -869,7 +869,7 @@ class AstraDBVectorStore(VectorStore):
             filter: Filter on the metadata to apply. The filter cannot be empty.
 
         Returns:
-            An number expressing the amount of deleted documents.
+            A number expressing the amount of deleted documents.
         """
         if not filter:
             msg = (
