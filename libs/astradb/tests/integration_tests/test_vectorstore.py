@@ -819,6 +819,180 @@ class TestAstraDBVectorStore:
         for doc, _, doc_id in full_results:
             assert doc.page_content == expected_text_by_id[doc_id]
 
+    def test_astradb_vectorstore_delete_by_metadata_sync(
+        self,
+        vector_store_d2: AstraDBVectorStore,
+    ) -> None:
+        """Testing delete_by_metadata_filter."""
+        full_size = 400
+        # one in ... will be deleted
+        deletee_ratio = 3
+
+        documents = [
+            Document(
+                page_content="[1,1]", metadata={"deletee": doc_i % deletee_ratio == 0}
+            )
+            for doc_i in range(full_size)
+        ]
+        num_deletees = len([doc for doc in documents if doc.metadata["deletee"]])
+
+        inserted_ids0 = vector_store_d2.add_documents(documents)
+        assert len(inserted_ids0) == len(documents)
+
+        d_result0 = vector_store_d2.delete_by_metadata_filter({"deletee": True})
+        assert d_result0 == num_deletees
+        count_on_store0 = len(
+            vector_store_d2.similarity_search("[1,1]", k=full_size + 1)
+        )
+        assert count_on_store0 == full_size - num_deletees
+
+        with pytest.raises(ValueError, match="does not accept an empty"):
+            vector_store_d2.delete_by_metadata_filter({})
+        count_on_store1 = len(
+            vector_store_d2.similarity_search("[1,1]", k=full_size + 1)
+        )
+        assert count_on_store1 == full_size - num_deletees
+
+    async def test_astradb_vectorstore_delete_by_metadata_async(
+        self,
+        vector_store_d2: AstraDBVectorStore,
+    ) -> None:
+        """Testing delete_by_metadata_filter, async version."""
+        full_size = 400
+        # one in ... will be deleted
+        deletee_ratio = 3
+
+        documents = [
+            Document(
+                page_content="[1,1]", metadata={"deletee": doc_i % deletee_ratio == 0}
+            )
+            for doc_i in range(full_size)
+        ]
+        num_deletees = len([doc for doc in documents if doc.metadata["deletee"]])
+
+        inserted_ids0 = await vector_store_d2.aadd_documents(documents)
+        assert len(inserted_ids0) == len(documents)
+
+        d_result0 = await vector_store_d2.adelete_by_metadata_filter({"deletee": True})
+        assert d_result0 == num_deletees
+        count_on_store0 = len(
+            await vector_store_d2.asimilarity_search("[1,1]", k=full_size + 1)
+        )
+        assert count_on_store0 == full_size - num_deletees
+
+        with pytest.raises(ValueError, match="does not accept an empty"):
+            await vector_store_d2.adelete_by_metadata_filter({})
+        count_on_store1 = len(
+            await vector_store_d2.asimilarity_search("[1,1]", k=full_size + 1)
+        )
+        assert count_on_store1 == full_size - num_deletees
+
+    def test_astradb_vectorstore_update_metadata_sync(
+        self,
+        vector_store_d2: AstraDBVectorStore,
+    ) -> None:
+        """Testing update_metadata."""
+        # this should not exceed the max number of hits from ANN search
+        full_size = 20
+        # one in ... will be updated
+        updatee_ratio = 2
+        # set this to lower than full_size // updatee_ratio to test everything.
+        update_concurrency = 7
+
+        def doc_sorter(doc: Document) -> str:
+            return doc.id or ""
+
+        orig_documents0 = [
+            Document(
+                page_content="[1,1]",
+                metadata={
+                    "to_update": doc_i % updatee_ratio == 0,
+                    "inert_field": "I",
+                    "updatee_field": "0",
+                },
+                id=f"um_doc_{doc_i}",
+            )
+            for doc_i in range(full_size)
+        ]
+        orig_documents = sorted(orig_documents0, key=doc_sorter)
+
+        inserted_ids0 = vector_store_d2.add_documents(orig_documents)
+        assert len(inserted_ids0) == len(orig_documents)
+
+        update_map = {
+            f"um_doc_{doc_i}": {"updatee_field": "1", "to_update": False}
+            for doc_i in range(full_size)
+            if doc_i % updatee_ratio == 0
+        }
+        u_result0 = vector_store_d2.update_metadata(
+            update_map,
+            overwrite_concurrency=update_concurrency,
+        )
+        assert u_result0 == len(update_map)
+
+        all_documents = sorted(
+            vector_store_d2.similarity_search("[1,1]", k=full_size),
+            key=doc_sorter,
+        )
+        assert len(all_documents) == len(orig_documents)
+        for doc, orig_doc in zip(all_documents, orig_documents):
+            assert doc.id == orig_doc.id
+            if doc.id in update_map:
+                assert doc.metadata == orig_doc.metadata | update_map[doc.id]
+
+    async def test_astradb_vectorstore_update_metadata_async(
+        self,
+        vector_store_d2: AstraDBVectorStore,
+    ) -> None:
+        """Testing update_metadata, async version."""
+        # this should not exceed the max number of hits from ANN search
+        full_size = 20
+        # one in ... will be updated
+        updatee_ratio = 2
+        # set this to lower than full_size // updatee_ratio to test everything.
+        update_concurrency = 7
+
+        def doc_sorter(doc: Document) -> str:
+            return doc.id or ""
+
+        orig_documents0 = [
+            Document(
+                page_content="[1,1]",
+                metadata={
+                    "to_update": doc_i % updatee_ratio == 0,
+                    "inert_field": "I",
+                    "updatee_field": "0",
+                },
+                id=f"um_doc_{doc_i}",
+            )
+            for doc_i in range(full_size)
+        ]
+        orig_documents = sorted(orig_documents0, key=doc_sorter)
+
+        inserted_ids0 = await vector_store_d2.aadd_documents(orig_documents)
+        assert len(inserted_ids0) == len(orig_documents)
+
+        update_map = {
+            f"um_doc_{doc_i}": {"updatee_field": "1", "to_update": False}
+            for doc_i in range(full_size)
+            if doc_i % updatee_ratio == 0
+        }
+        u_result0 = await vector_store_d2.aupdate_metadata(
+            update_map,
+            overwrite_concurrency=update_concurrency,
+        )
+        assert u_result0 == len(update_map)
+
+        all_documents = sorted(
+            await vector_store_d2.asimilarity_search("[1,1]", k=full_size),
+            key=doc_sorter,
+        )
+        assert len(all_documents) == len(orig_documents)
+        for doc, orig_doc in zip(all_documents, orig_documents):
+            assert doc.id == orig_doc.id
+            if doc.id in update_map:
+                assert doc.metadata == orig_doc.metadata | update_map[doc.id]
+
     def test_astradb_vectorstore_mmr_sync(
         self,
         vector_store_d2: AstraDBVectorStore,
