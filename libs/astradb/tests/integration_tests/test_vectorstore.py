@@ -834,17 +834,24 @@ class TestAstraDBVectorStore:
             )
             for doc_i in range(full_size)
         ]
+        num_deletees = len([doc for doc in documents if doc.metadata["deletee"]])
 
         inserted_ids0 = vector_store_d2.add_documents(documents)
         assert len(inserted_ids0) == len(documents)
 
         d_result0 = vector_store_d2.delete_by_metadata_filter({"deletee": True})
-        assert d_result0 is not None
-        assert d_result0 == len([doc for doc in documents if doc.metadata["deletee"]])
+        assert d_result0 == num_deletees
+        count_on_store0 = len(
+            vector_store_d2.similarity_search("[1,1]", k=full_size + 1)
+        )
+        assert count_on_store0 == full_size - num_deletees
 
-        d_result1 = vector_store_d2.delete_by_metadata_filter({})
-        assert d_result1 is None
-        assert len(vector_store_d2.similarity_search("[1,1]", k=1)) == 0
+        with pytest.raises(ValueError, match="does not accept an empty"):
+            vector_store_d2.delete_by_metadata_filter({})
+        count_on_store1 = len(
+            vector_store_d2.similarity_search("[1,1]", k=full_size + 1)
+        )
+        assert count_on_store1 == full_size - num_deletees
 
     async def test_astradb_vectorstore_delete_by_metadata_async(
         self,
@@ -861,17 +868,24 @@ class TestAstraDBVectorStore:
             )
             for doc_i in range(full_size)
         ]
+        num_deletees = len([doc for doc in documents if doc.metadata["deletee"]])
 
         inserted_ids0 = await vector_store_d2.aadd_documents(documents)
         assert len(inserted_ids0) == len(documents)
 
         d_result0 = await vector_store_d2.adelete_by_metadata_filter({"deletee": True})
-        assert d_result0 is not None
-        assert d_result0 == len([doc for doc in documents if doc.metadata["deletee"]])
+        assert d_result0 == num_deletees
+        count_on_store0 = len(
+            await vector_store_d2.asimilarity_search("[1,1]", k=full_size + 1)
+        )
+        assert count_on_store0 == full_size - num_deletees
 
-        d_result1 = await vector_store_d2.adelete_by_metadata_filter({})
-        assert d_result1 is None
-        assert len(await vector_store_d2.asimilarity_search("[1,1]", k=1)) == 0
+        with pytest.raises(ValueError, match="does not accept an empty"):
+            await vector_store_d2.adelete_by_metadata_filter({})
+        count_on_store1 = len(
+            await vector_store_d2.asimilarity_search("[1,1]", k=full_size + 1)
+        )
+        assert count_on_store1 == full_size - num_deletees
 
     def test_astradb_vectorstore_update_metadata_sync(
         self,
