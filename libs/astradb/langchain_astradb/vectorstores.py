@@ -1328,6 +1328,55 @@ class AstraDBVectorStore(VectorStore):
 
         return sum(u_res.update_info["n"] for u_res in update_results)
 
+    def metadata_search(
+        self,
+        filter: dict[str, Any] | None = None,  # noqa: A002
+        n: int = 5,
+    ) -> list[Document]:
+        """Get documents via a metadata search.
+
+        Args:
+            filter: the metadata to query for.
+            n: the maximum number of documents to return.
+        """
+
+        self.astra_env.ensure_db_setup()
+        metadata_parameter = self.filter_to_query(filter)
+        hits_ite = self.astra_env.collection.find(
+            filter=metadata_parameter,
+            projection=self.document_codec.base_projection,
+            limit=n,
+        )
+        return [
+                self.document_codec.decode(hit)
+                for hit in hits_ite
+            ]
+
+
+    async def ametadata_search(
+        self,
+        filter: dict[str, Any] | None = None,  # noqa: A002
+        n: int = 5,
+    ) -> Iterable[Document]:
+        """Get documents via a metadata search.
+
+        Args:
+            filter: the metadata to query for.
+            n: the maximum number of documents to return.
+        """
+
+        await self.astra_env.aensure_db_setup()
+        metadata_parameter = self.filter_to_query(filter)
+        hits_ite = await self.astra_env.async_collection.find(
+            filter=metadata_parameter,
+            projection=self.document_codec.base_projection,
+            limit=n,
+        )
+        return [
+                self.document_codec.decode(hit)
+                for hit in hits_ite
+            ]
+
     @override
     def similarity_search(
         self,

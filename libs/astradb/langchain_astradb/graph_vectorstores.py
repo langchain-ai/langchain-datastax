@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from typing import (
     TYPE_CHECKING,
     Any,
+    Callable,
     Iterable,
     Sequence,
 )
@@ -14,6 +15,7 @@ from typing import (
 from langchain_community.graph_vectorstores.base import (
     GraphVectorStore,
     Node,
+    Link,
 )
 from langchain_core.documents import Document
 from typing_extensions import override
@@ -37,8 +39,8 @@ class _Edge:
 
 # NOTE: Conversion to string is necessary
 # because AstraDB doesn't support matching on arrays of tuples
-def _tag_to_str(kind: str, tag: str) -> str:
-    return f"{kind}:{tag}"
+def _link_to_str(link: Link) -> str:
+    return f"{link.kind}:{link.tag}"
 
 
 class AstraDBGraphVectorStore(GraphVectorStore):
@@ -75,6 +77,23 @@ class AstraDBGraphVectorStore(GraphVectorStore):
     def embeddings(self) -> Embeddings | None:
         return self.embedding
 
+    def _convert_links_to_metadata(self, links: set[Link]) -> dict[str, Any]:
+        link_to_tags = set()  # link to these tags
+        link_from_tags = set()  # link from these tags
+
+        for link in links:
+            if link.direction in {"in", "bidir"}:
+                # An incoming link should be linked *from* nodes with the given
+                # tag.
+                link_from_tags.add(_link_to_str(link=link))
+            if link.direction in {"out", "bidir"}:
+                link_to_tags.add(_link_to_str(link=link))
+
+        metadata = {}
+        metadata[self.link_to_metadata_key] = list(link_to_tags)
+        metadata[self.link_from_metadata_key] = list(link_from_tags)
+        return metadata
+
     @override
     def add_nodes(
         self,
@@ -87,30 +106,40 @@ class AstraDBGraphVectorStore(GraphVectorStore):
         for node in nodes:
             node_id = secrets.token_hex(8) if not node.id else node.id
 
-            link_to_tags = set()  # link to these tags
-            link_from_tags = set()  # link from these tags
-
-            for tag in node.links:
-                if tag.direction in {"in", "bidir"}:
-                    # An incoming link should be linked *from* nodes with the given
-                    # tag.
-                    link_from_tags.add(_tag_to_str(tag.kind, tag.tag))
-                if tag.direction in {"out", "bidir"}:
-                    link_to_tags.add(_tag_to_str(tag.kind, tag.tag))
-
-            metadata = node.metadata
-            metadata[self.link_to_metadata_key] = list(link_to_tags)
-            metadata[self.link_from_metadata_key] = list(link_from_tags)
+            node.metadata.extend(self._convert_links_to_metadata(node.links))
 
             doc = Document(
                 page_content=node.text,
-                metadata=metadata,
+                metadata=node.metadata,
                 id=node_id,
             )
             docs.append(doc)
             ids.append(node_id)
 
         return self.vectorstore.add_documents(docs, ids=ids)
+
+    def upgrade_chunks(
+            self,
+            link_function: Callable[[Document], set[Link]],
+            batch_size = 10,
+    ) -> int:
+        filter = {"upgraded": {"$exists": False}}
+
+        chunks = self.vectorstore.metadata_search(filter=filter, n=batch_size)
+        if len(chunks) == 0:
+            return 0
+
+        id_to_md_map: dict[str, dict] = {}
+
+        for chunk in chunks:
+            links = link_function(chunk)
+            new_metadata = self._convert_links_to_metadata(links=links)
+            new_metadata["upgraded"] = True
+            id_to_md_map[chunk.id] = new_metadata
+
+        return self.vectorstore.update_metadata(id_to_metadata=id_to_md_map)
+
+
 
     @classmethod
     def from_texts(
@@ -198,7 +227,7 @@ class AstraDBGraphVectorStore(GraphVectorStore):
                     visited_docs.append(doc)
 
                     # If we can continue traversing from this document,
-                    if d < depth and doc.metadata[self.link_to_metadata_key]:
+                    if d < depth and doc.metadata.get(self.link_to_metadata_key):
                         # Record any new (or newly discovered at a lower depth)
                         # tags to the set to traverse.
                         for tag in doc.metadata[self.link_to_metadata_key]:
