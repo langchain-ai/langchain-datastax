@@ -117,7 +117,7 @@ class TestCallers:
             base_path,
             method="POST",
             headers={
-                "User-Agent": f"{COMPONENT_NAME_LOADER}/",
+                "User-Agent": f"ec0/ev0 {COMPONENT_NAME_LOADER}/",
             },
             header_value_matcher=hv_prefix_matcher,
         ).respond_with_json({"data": {"nextPageState": None, "documents": [{}]}})
@@ -127,6 +127,7 @@ class TestCallers:
             api_endpoint=base_endpoint,
             environment=Environment.OTHER,
             namespace="ks",
+            ext_callers=[("ec0", "ev0")],
         )
         next(loader.lazy_load())
 
@@ -144,7 +145,7 @@ class TestCallers:
             base_path,
             method="POST",
             headers={
-                "User-Agent": f"{COMPONENT_NAME_VECTORSTORE}/",
+                "User-Agent": f"ec0/ev0 {COMPONENT_NAME_VECTORSTORE}/",
             },
             header_value_matcher=hv_prefix_matcher,
         ).respond_with_json({})
@@ -155,6 +156,7 @@ class TestCallers:
             environment=Environment.OTHER,
             namespace="ks",
             embedding=ParserEmbeddings(2),
+            ext_callers=[("ec0", "ev0")],
         )
 
         # autodetect mode independently surveys the collection:
@@ -162,7 +164,7 @@ class TestCallers:
             base_path + "/my_coll",
             method="POST",
             headers={
-                "User-Agent": f"{COMPONENT_NAME_VECTORSTORE}/",
+                "User-Agent": f"ec0/ev0 {COMPONENT_NAME_VECTORSTORE}/",
             },
             header_value_matcher=hv_prefix_matcher,
         ).respond_with_json({"data": {"nextPageState": None, "documents": []}})
@@ -170,7 +172,7 @@ class TestCallers:
             base_path,
             method="POST",
             headers={
-                "User-Agent": f"{COMPONENT_NAME_VECTORSTORE}/",
+                "User-Agent": f"ec0/ev0 {COMPONENT_NAME_VECTORSTORE}/",
             },
             data='{"findCollections":{"options":{"explain":true}}}',
             header_value_matcher=hv_prefix_matcher,
@@ -191,6 +193,7 @@ class TestCallers:
             embedding=ParserEmbeddings(2),
             autodetect_collection=True,
             content_field="confie",
+            ext_callers=[("ec0", "ev0")],
         )
 
     @pytest.mark.parametrize(
@@ -240,7 +243,7 @@ class TestCallers:
             base_path,
             method="POST",
             headers={
-                "User-Agent": f"{component_name}/",
+                "User-Agent": f"ec0/ev0 {component_name}/",
             },
             header_value_matcher=hv_prefix_matcher,
         ).respond_with_json({})
@@ -250,5 +253,6 @@ class TestCallers:
             api_endpoint=base_endpoint,
             environment=Environment.OTHER,
             namespace="ks",
+            ext_callers=[("ec0", "ev0")],
             **kwargs,
         )
