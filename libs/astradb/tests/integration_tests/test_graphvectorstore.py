@@ -163,8 +163,7 @@ def autodetect_populated_graph_vector_store_d2(
     gstore = AstraDBGraphVectorStore(
         embedding=embedding_d2,
         collection_name=ephemeral_collection_cleaner_idxall_d2,
-        link_to_metadata_key="x_link_to_x",
-        link_from_metadata_key="x_link_from_x",
+        metadata_incoming_links_key="x_link_to_x",
         token=StaticTokenProvider(astra_db_credentials["token"]),
         api_endpoint=astra_db_credentials["api_endpoint"],
         namespace=astra_db_credentials["namespace"],
@@ -216,7 +215,7 @@ class TestAstraDBGraphVectorStore:
         ss_by_v_labels = [doc.metadata["label"] for doc in ss_by_v_response]
         assert ss_by_v_labels == ["AR", "A0"]
         if is_autodetected:
-            assert_all_flat_docs(store.vectorstore.astra_env.collection)
+            assert_all_flat_docs(store.vector_store.astra_env.collection)
 
     @pytest.mark.parametrize(
         ("store_name", "is_autodetected"),
@@ -241,7 +240,7 @@ class TestAstraDBGraphVectorStore:
         ts_labels = {doc.metadata["label"] for doc in ts_response}
         assert ts_labels == {"AR", "A0", "BR", "B0", "TR", "T0"}
         if is_autodetected:
-            assert_all_flat_docs(store.vectorstore.astra_env.collection)
+            assert_all_flat_docs(store.vector_store.astra_env.collection)
 
     @pytest.mark.parametrize(
         ("store_name", "is_autodetected"),
@@ -272,7 +271,7 @@ class TestAstraDBGraphVectorStore:
         mt_labels = {doc.metadata["label"] for doc in mt_response}
         assert mt_labels == {"AR", "BR"}
         if is_autodetected:
-            assert_all_flat_docs(store.vectorstore.astra_env.collection)
+            assert_all_flat_docs(store.vector_store.astra_env.collection)
 
     def test_gvs_from_texts(
         self,

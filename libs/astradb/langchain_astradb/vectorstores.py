@@ -22,6 +22,7 @@ from typing import (
 
 import numpy as np
 from astrapy.exceptions import InsertManyException
+from langchain_community.vectorstores.utils import maximal_marginal_relevance
 from langchain_core.runnables.utils import gather_with_concurrency
 from langchain_core.vectorstores import VectorStore
 from typing_extensions import override
@@ -36,7 +37,6 @@ from langchain_astradb.utils.astradb import (
     _AstraDBCollectionEnvironment,
     _survey_collection,
 )
-from langchain_astradb.utils.mmr import maximal_marginal_relevance
 from langchain_astradb.utils.vector_store_autodetect import (
     _detect_document_codec,
 )
@@ -1339,6 +1339,91 @@ class AstraDBVectorStore(VectorStore):
 
         return sum(u_res.update_info["n"] for u_res in update_results)
 
+    def metadata_search(
+        self,
+        filter: dict[str, Any] | None = None,  # noqa: A002
+        n: int = 5,
+    ) -> list[Document]:
+        """Get documents via a metadata search.
+
+        Args:
+            filter: the metadata to query for.
+            n: the maximum number of documents to return.
+        """
+        self.astra_env.ensure_db_setup()
+        metadata_parameter = self.filter_to_query(filter)
+        hits_ite = self.astra_env.collection.find(
+            filter=metadata_parameter,
+            projection=self.document_codec.base_projection,
+            limit=n,
+        )
+        docs = [self.document_codec.decode(hit) for hit in hits_ite]
+        return [doc for doc in docs if doc is not None]
+
+    async def ametadata_search(
+        self,
+        filter: dict[str, Any] | None = None,  # noqa: A002
+        n: int = 5,
+    ) -> Iterable[Document]:
+        """Get documents via a metadata search.
+
+        Args:
+            filter: the metadata to query for.
+            n: the maximum number of documents to return.
+        """
+        await self.astra_env.aensure_db_setup()
+        metadata_parameter = self.filter_to_query(filter)
+        return [
+            doc
+            async for doc in (
+                self.document_codec.decode(hit)
+                async for hit in self.astra_env.async_collection.find(
+                    filter=metadata_parameter,
+                    projection=self.document_codec.base_projection,
+                    limit=n,
+                )
+            )
+            if doc is not None
+        ]
+
+    def get_by_document_id(self, document_id: str) -> Document | None:
+        """Retrieve a single document from the store, given its document ID.
+
+        Args:
+            document_id: The document ID
+
+        Returns:
+            The the document if it exists. Otherwise None.
+        """
+        self.astra_env.ensure_db_setup()
+        # self.collection is not None (by _ensure_astra_db_client)
+        hit = self.astra_env.collection.find_one(
+            {"_id": document_id},
+            projection=self.document_codec.base_projection,
+        )
+        if hit is None:
+            return None
+        return self.document_codec.decode(hit)
+
+    async def aget_by_document_id(self, document_id: str) -> Document | None:
+        """Retrieve a single document from the store, given its document ID.
+
+        Args:
+            document_id: The document ID
+
+        Returns:
+            The the document if it exists. Otherwise None.
+        """
+        await self.astra_env.aensure_db_setup()
+        # self.collection is not None (by _ensure_astra_db_client)
+        hit = await self.astra_env.async_collection.find_one(
+            {"_id": document_id},
+            projection=self.document_codec.base_projection,
+        )
+        if hit is None:
+            return None
+        return self.document_codec.decode(hit)
+
     @override
     def similarity_search(
         self,
@@ -1701,6 +1786,44 @@ class AstraDBVectorStore(VectorStore):
             k=k,
             filter=filter,
         )
+
+    async def asimilarity_search_with_embedding_id_by_vector(
+        self,
+        embedding: list[float],
+        k: int = 4,
+        filter: dict[str, Any] | None = None,  # noqa: A002
+    ) -> list[tuple[Document, list[float], str]]:
+        """Return docs most similar to embedding vector.
+
+        Args:
+            embedding: Embedding to look up documents similar to.
+            k: Number of Documents to return. Defaults to 4.
+            filter: Filter on the metadata to apply.
+
+        Returns:
+            List of (Document, embedding, id), the most similar to the query vector.
+        """
+        await self.astra_env.aensure_db_setup()
+        metadata_parameter = self.filter_to_query(filter).copy()
+        results: list[tuple[Document, list[float], str]] = []
+        async for hit in self.astra_env.async_collection.find(
+            filter=metadata_parameter,
+            projection=self.document_codec.full_projection,
+            limit=k,
+            include_similarity=True,
+            include_sort_vector=True,
+            sort=self.document_codec.encode_vector_sort(embedding),
+        ):
+            doc = self.document_codec.decode(hit)
+            if doc is None or doc.id is None:
+                continue
+
+            vector = self.document_codec.decode_vector(hit)
+            if vector is None:
+                continue
+
+            results.append((doc, vector, doc.id))
+        return results
 
     async def _asimilarity_search_with_score_id_by_sort(
         self,
