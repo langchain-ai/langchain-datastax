@@ -18,6 +18,7 @@ from langchain_community.graph_vectorstores.base import (
 from langchain_core.documents import Document
 from typing_extensions import override
 
+from langchain_astradb.utils.astradb import COMPONENT_NAME_GRAPHVECTORSTORE
 from langchain_astradb.utils.mmr_traversal import MmrHelper
 from langchain_astradb.vectorstores import AstraDBVectorStore
 
@@ -65,6 +66,7 @@ class AstraDBGraphVectorStore(GraphVectorStore):
             metadata_indexing_include=metadata_indexing_include,
             metadata_indexing_exclude=metadata_indexing_exclude,
             collection_indexing_policy=collection_indexing_policy,
+            component_name=COMPONENT_NAME_GRAPHVECTORSTORE,
             **kwargs,
         )
 

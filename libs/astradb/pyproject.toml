@@ -13,7 +13,7 @@ license = "MIT"
 [tool.poetry.dependencies]
 python = ">=3.9,<4.0"
 langchain-community = ">=0.3.1"
-astrapy = "^1.5"
+astrapy = "^1.5.2"
 numpy = "^1.26.0"
 
 [tool.poetry.group.test]
@@ -21,6 +21,7 @@ optional = true
 
 [tool.poetry.group.test.dependencies]
 pytest = "^7.3.0"
+pytest-httpserver = "~1.0.8"
 pytest-dotenv = "^0.5.2"
 freezegun = "^1.2.2"
 pytest-mock = "^3.10.0"
