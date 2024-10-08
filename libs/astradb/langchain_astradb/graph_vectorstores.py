@@ -22,7 +22,12 @@ from langchain_astradb.utils.mmr_traversal import MmrHelper
 from langchain_astradb.vectorstores import AstraDBVectorStore
 
 if TYPE_CHECKING:
+    from astrapy.authentication import TokenProvider
+    from astrapy.db import AstraDB as AstraDBClient
+    from astrapy.db import AsyncAstraDB as AsyncAstraDBClient
     from langchain_core.embeddings import Embeddings
+
+    from langchain_astradb.utils.astradb import SetupMode
 
 DEFAULT_INDEXING_OPTIONS = {"allow": ["metadata"]}
 
@@ -44,28 +49,144 @@ def _tag_to_str(kind: str, tag: str) -> str:
 class AstraDBGraphVectorStore(GraphVectorStore):
     def __init__(
         self,
+        *,
         embedding: Embeddings,
         collection_name: str,
         link_to_metadata_key: str = "links_to",
         link_from_metadata_key: str = "links_from",
+        token: str | TokenProvider | None = None,
+        api_endpoint: str | None = None,
+        environment: str | None = None,
+        astra_db_client: AstraDBClient | None = None,
+        async_astra_db_client: AsyncAstraDBClient | None = None,
+        namespace: str | None = None,
+        metric: str | None = None,
+        batch_size: int | None = None,
+        bulk_insert_batch_concurrency: int | None = None,
+        bulk_insert_overwrite_concurrency: int | None = None,
+        bulk_delete_concurrency: int | None = None,
+        setup_mode: SetupMode | None = None,
+        pre_delete_collection: bool = False,
         metadata_indexing_include: Iterable[str] | None = None,
         metadata_indexing_exclude: Iterable[str] | None = None,
         collection_indexing_policy: dict[str, Any] | None = None,
-        **kwargs: Any,
+        content_field: str | None = None,
+        ignore_invalid_documents: bool = False,
+        autodetect_collection: bool = False,
     ):
-        """Create a new Graph Vector Store backed by AstraDB."""
+        """Graph Vector Store backed by AstraDB.
+
+        Args:
+            embedding: the embeddings function.
+            collection_name: name of the Astra DB collection to create/use.
+            link_to_metadata_key: document metadata key where the outgoing links are
+                stored.
+            link_from_metadata_key: document metadata key where the incoming links are
+                stored.
+            token: API token for Astra DB usage, either in the form of a string
+                or a subclass of ``astrapy.authentication.TokenProvider``.
+                If not provided, the environment variable
+                ASTRA_DB_APPLICATION_TOKEN is inspected.
+            api_endpoint: full URL to the API endpoint, such as
+                ``https://<DB-ID>-us-east1.apps.astra.datastax.com``. If not provided,
+                the environment variable ASTRA_DB_API_ENDPOINT is inspected.
+            environment: a string specifying the environment of the target Data API.
+                If omitted, defaults to "prod" (Astra DB production).
+                Other values are in ``astrapy.constants.Environment`` enum class.
+            astra_db_client:
+                *DEPRECATED starting from version 0.3.5.*
+                *Please use 'token', 'api_endpoint' and optionally 'environment'.*
+                you can pass an already-created 'astrapy.db.AstraDB' instance
+                (alternatively to 'token', 'api_endpoint' and 'environment').
+            async_astra_db_client:
+                *DEPRECATED starting from version 0.3.5.*
+                *Please use 'token', 'api_endpoint' and optionally 'environment'.*
+                you can pass an already-created 'astrapy.db.AsyncAstraDB' instance
+                (alternatively to 'token', 'api_endpoint' and 'environment').
+            namespace: namespace (aka keyspace) where the collection is created.
+                If not provided, the environment variable ASTRA_DB_KEYSPACE is
+                inspected. Defaults to the database's "default namespace".
+            metric: similarity function to use out of those available in Astra DB.
+                If left out, it will use Astra DB API's defaults (i.e. "cosine" - but,
+                for performance reasons, "dot_product" is suggested if embeddings are
+                normalized to one).
+            batch_size: Size of document chunks for each individual insertion
+                API request. If not provided, astrapy defaults are applied.
+            bulk_insert_batch_concurrency: Number of threads or coroutines to insert
+                batches concurrently.
+            bulk_insert_overwrite_concurrency: Number of threads or coroutines in a
+                batch to insert pre-existing entries.
+            bulk_delete_concurrency: Number of threads or coroutines for
+                multiple-entry deletes.
+            setup_mode: mode used to create the collection (SYNC, ASYNC or OFF).
+            pre_delete_collection: whether to delete the collection before creating it.
+                If False and the collection already exists, the collection will be used
+                as is.
+            metadata_indexing_include: an allowlist of the specific metadata subfields
+                that should be indexed for later filtering in searches.
+            metadata_indexing_exclude: a denylist of the specific metadata subfields
+                that should not be indexed for later filtering in searches.
+            collection_indexing_policy: a full "indexing" specification for
+                what fields should be indexed for later filtering in searches.
+                This dict must conform to to the API specifications
+                (see https://docs.datastax.com/en/astra-db-serverless/api-reference/collections.html#the-indexing-option)
+            content_field: name of the field containing the textual content
+                in the documents when saved on Astra DB. Defaults to "content".
+                The special value "*" can be passed only if autodetect_collection=True.
+                In this case, the actual name of the key for the textual content is
+                guessed by inspection of a few documents from the collection, under the
+                assumption that the longer strings are the most likely candidates.
+                Please understand the limitations of this method and get some
+                understanding of your data before passing ``"*"`` for this parameter.
+            ignore_invalid_documents: if False (default), exceptions are raised
+                when a document is found on the Astra DB collection that does
+                not have the expected shape. If set to True, such results
+                from the database are ignored and a warning is issued. Note
+                that in this case a similarity search may end up returning fewer
+                results than the required ``k``.
+            autodetect_collection: if True, turns on autodetect behavior.
+                The store will look for an existing collection of the provided name
+                and infer the store settings from it. Default is False.
+                In autodetect mode, ``content_field`` can be given as ``"*"``, meaning
+                that an attempt will be made to determine it by inspection.
+                In autodetect mode, the store switches
+                automatically between "nested" and "flat" representations of documents
+                on DB (i.e. having the metadata key-value pairs grouped in a
+                ``metadata`` field or spread at the documents' top-level). The former
+                scheme is the native mode of the AstraDBVectorStore; the store resorts
+                to the latter in case of vector collections populated with external
+                means (such as a third-party data import tool) before applying
+                an AstraDBVectorStore to them.
+                Note that the following parameters cannot be used if this is True:
+                ``metric``, ``setup_mode``, ``metadata_indexing_include``,
+                ``metadata_indexing_exclude``, ``collection_indexing_policy``.
+        """
         self.link_to_metadata_key = link_to_metadata_key
         self.link_from_metadata_key = link_from_metadata_key
-        self.session = None
         self.embedding = embedding
 
         self.vectorstore = AstraDBVectorStore(
             collection_name=collection_name,
             embedding=embedding,
+            token=token,
+            api_endpoint=api_endpoint,
+            environment=environment,
+            astra_db_client=astra_db_client,
+            async_astra_db_client=async_astra_db_client,
+            namespace=namespace,
+            metric=metric,
+            batch_size=batch_size,
+            bulk_insert_batch_concurrency=bulk_insert_batch_concurrency,
+            bulk_insert_overwrite_concurrency=bulk_insert_overwrite_concurrency,
+            bulk_delete_concurrency=bulk_delete_concurrency,
+            setup_mode=setup_mode,
+            pre_delete_collection=pre_delete_collection,
             metadata_indexing_include=metadata_indexing_include,
             metadata_indexing_exclude=metadata_indexing_exclude,
             collection_indexing_policy=collection_indexing_policy,
-            **kwargs,
+            content_field=content_field,
+            ignore_invalid_documents=ignore_invalid_documents,
+            autodetect_collection=autodetect_collection,
         )
 
         self.astra_env = self.vectorstore.astra_env
@@ -81,7 +202,6 @@ class AstraDBGraphVectorStore(GraphVectorStore):
         nodes: Iterable[Node],
         **kwargs: Any,
     ) -> Iterable[str]:
-        """Add nodes to the graph store."""
         docs = []
         ids = []
         for node in nodes:
@@ -113,6 +233,7 @@ class AstraDBGraphVectorStore(GraphVectorStore):
         return self.vectorstore.add_documents(docs, ids=ids)
 
     @classmethod
+    @override
     def from_texts(
         cls: type[AstraDBGraphVectorStore],
         texts: Iterable[str],
@@ -121,20 +242,19 @@ class AstraDBGraphVectorStore(GraphVectorStore):
         ids: Iterable[str] | None = None,
         **kwargs: Any,
     ) -> AstraDBGraphVectorStore:
-        """Return GraphVectorStore initialized from texts and embeddings."""
-        store = cls(embedding, **kwargs)
+        store = cls(embedding=embedding, **kwargs)
         store.add_texts(texts, metadatas, ids=ids)
         return store
 
     @classmethod
+    @override
     def from_documents(
         cls: type[AstraDBGraphVectorStore],
         documents: Iterable[Document],
         embedding: Embeddings,
         **kwargs: Any,
     ) -> AstraDBGraphVectorStore:
-        """Return GraphVectorStore initialized from documents and embeddings."""
-        store = cls(embedding, **kwargs)
+        store = cls(embedding=embedding, **kwargs)
         store.add_documents(documents)
         return store
 
