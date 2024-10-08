@@ -8,6 +8,7 @@ import logging
 import uuid
 import warnings
 from concurrent.futures import ThreadPoolExecutor
+from operator import itemgetter
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -706,6 +707,7 @@ class AstraDBVectorStore(VectorStore):
         """
         return self.embedding
 
+    @override
     def _select_relevance_score_fn(self) -> Callable[[float], float]:
         # The underlying API calls already returns a "score proper",
         # i.e. one in [0, 1] where higher means more *similar*,
@@ -935,7 +937,7 @@ class AstraDBVectorStore(VectorStore):
         # make unique by id, keeping the last
         return _unique_list(
             documents_to_insert[::-1],
-            lambda document: document["_id"],
+            itemgetter("_id"),
         )[::-1]
 
     @staticmethod

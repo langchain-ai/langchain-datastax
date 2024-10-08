@@ -104,7 +104,10 @@ class TestAstraDBVectorStoreAutodetect:
 
         # update metadata
         ad_store.update_metadata(
-            {"1": {"m1": "A", "mZ": "Z"}, "2": {"m1": "B", "mZ": "Z"}}
+            {
+                "1": {"m1": "A", "mZ": "Z"},
+                "2": {"m1": "B", "mZ": "Z"},
+            }
         )
         matches_z = ad_store.similarity_search("[-1,-1]", k=3, filter={"mZ": "Z"})
         assert len(matches_z) == 2
@@ -180,7 +183,10 @@ class TestAstraDBVectorStoreAutodetect:
 
         # update metadata
         ad_store.update_metadata(
-            {"1": {"m1": "A", "mZ": "Z"}, "2": {"m1": "B", "mZ": "Z"}}
+            {
+                "1": {"m1": "A", "mZ": "Z"},
+                "2": {"m1": "B", "mZ": "Z"},
+            }
         )
         matches_z = ad_store.similarity_search("[-1,-1]", k=3, filter={"mZ": "Z"})
         assert len(matches_z) == 2
@@ -260,7 +266,10 @@ class TestAstraDBVectorStoreAutodetect:
 
         # update metadata
         ad_store.update_metadata(
-            {"1": {"m1": "A", "mZ": "Z"}, "2": {"m1": "B", "mZ": "Z"}}
+            {
+                "1": {"m1": "A", "mZ": "Z"},
+                "2": {"m1": "B", "mZ": "Z"},
+            }
         )
         matches_z = ad_store.similarity_search("[-1,-1]", k=3, filter={"mZ": "Z"})
         assert len(matches_z) == 2
@@ -338,7 +347,10 @@ class TestAstraDBVectorStoreAutodetect:
 
         # update metadata
         ad_store.update_metadata(
-            {"1": {"m1": "A", "mZ": "Z"}, "2": {"m1": "B", "mZ": "Z"}}
+            {
+                "1": {"m1": "A", "mZ": "Z"},
+                "2": {"m1": "B", "mZ": "Z"},
+            }
         )
         matches_z = ad_store.similarity_search("[-1,-1]", k=3, filter={"mZ": "Z"})
         assert len(matches_z) == 2
