@@ -381,7 +381,7 @@ class AstraDBVectorStore(VectorStore):
         content_field: str | None = None,
         ignore_invalid_documents: bool = False,
         autodetect_collection: bool = False,
-        ext_callers: list[tuple[str | None, str | None]] | None = None,
+        ext_callers: list[tuple[str | None, str | None] | str | None] | None = None,
         component_name: str = COMPONENT_NAME_VECTORSTORE,
         astra_db_client: AstraDBClient | None = None,
         async_astra_db_client: AsyncAstraDBClient | None = None,

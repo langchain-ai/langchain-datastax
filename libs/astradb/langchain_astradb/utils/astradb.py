@@ -31,7 +31,7 @@ KEYSPACE_ENV_VAR = "ASTRA_DB_KEYSPACE"
 # Caller-related constants
 LC_CORE_CALLER_NAME = "langchain"
 LC_CORE_CALLER_VERSION = getattr(langchain_core, "__version__", None)
-LC_CORE_CALLER = [(LC_CORE_CALLER_NAME, LC_CORE_CALLER_VERSION)]
+LC_CORE_CALLER = (LC_CORE_CALLER_NAME, LC_CORE_CALLER_VERSION)
 
 LC_ASTRADB_VERSION: str | None
 try:
@@ -81,7 +81,7 @@ def _survey_collection(
     api_endpoint: str | None = None,
     keyspace: str | None = None,
     environment: str | None = None,
-    ext_callers: list[tuple[str | None, str | None]] | None = None,
+    ext_callers: list[tuple[str | None, str | None] | str | None] | None = None,
     component_name: str | None = None,
     astra_db_client: AstraDB | None = None,
     async_astra_db_client: AsyncAstraDB | None = None,
@@ -144,7 +144,7 @@ class _AstraDBEnvironment:
         api_endpoint: str | None = None,
         keyspace: str | None = None,
         environment: str | None = None,
-        ext_callers: list[tuple[str | None, str | None]] | None = None,
+        ext_callers: list[tuple[str | None, str | None] | str | None] | None = None,
         component_name: str | None = None,
         astra_db_client: AstraDB | None = None,
         async_astra_db_client: AsyncAstraDB | None = None,
@@ -278,11 +278,19 @@ class _AstraDBEnvironment:
         )
 
         # create the clients
-        full_callers = (
-            (ext_callers or [])
-            + [(component_name, LC_ASTRADB_VERSION)]
-            + LC_CORE_CALLER
-        )
+        norm_ext_callers = [
+            cpair
+            for cpair in (
+                _raw_caller if isinstance(_raw_caller, tuple) else (_raw_caller, None)
+                for _raw_caller in (ext_callers or [])
+            )
+            if cpair[0] is not None or cpair[1] is not None
+        ]
+        full_callers = [
+            *norm_ext_callers,
+            (component_name, LC_ASTRADB_VERSION),
+            LC_CORE_CALLER,
+        ]
         self.data_api_client = DataAPIClient(
             environment=self.environment,
             callers=full_callers,
@@ -304,7 +312,7 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
         api_endpoint: str | None = None,
         keyspace: str | None = None,
         environment: str | None = None,
-        ext_callers: list[tuple[str | None, str | None]] | None = None,
+        ext_callers: list[tuple[str | None, str | None] | str | None] | None = None,
         component_name: str | None = None,
         setup_mode: SetupMode = SetupMode.SYNC,
         pre_delete_collection: bool = False,

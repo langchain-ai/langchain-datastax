@@ -40,7 +40,7 @@ class AstraDBChatMessageHistory(BaseChatMessageHistory):
         environment: str | None = None,
         setup_mode: SetupMode = SetupMode.SYNC,
         pre_delete_collection: bool = False,
-        ext_callers: list[tuple[str | None, str | None]] | None = None,
+        ext_callers: list[tuple[str | None, str | None] | str | None] | None = None,
         astra_db_client: AstraDB | None = None,
         async_astra_db_client: AsyncAstraDB | None = None,
     ) -> None:

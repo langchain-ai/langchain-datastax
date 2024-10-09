@@ -112,7 +112,7 @@ class AstraDBCache(BaseCache):
         environment: str | None = None,
         pre_delete_collection: bool = False,
         setup_mode: SetupMode = SetupMode.SYNC,
-        ext_callers: list[tuple[str | None, str | None]] | None = None,
+        ext_callers: list[tuple[str | None, str | None] | str | None] | None = None,
         astra_db_client: AstraDB | None = None,
         async_astra_db_client: AsyncAstraDB | None = None,
     ):
@@ -336,7 +336,7 @@ class AstraDBSemanticCache(BaseCache):
         embedding: Embeddings,
         metric: str | None = None,
         similarity_threshold: float = ASTRA_DB_SEMANTIC_CACHE_DEFAULT_THRESHOLD,
-        ext_callers: list[tuple[str | None, str | None]] | None = None,
+        ext_callers: list[tuple[str | None, str | None] | str | None] | None = None,
         astra_db_client: AstraDB | None = None,
         async_astra_db_client: AsyncAstraDB | None = None,
     ):

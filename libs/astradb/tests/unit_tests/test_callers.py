@@ -104,6 +104,31 @@ class TestCallers:
             component_name="langchain_my_compo",
         )
 
+        # prefix check, incomplete callers
+        httpserver.expect_oneshot_request(
+            base_path,
+            method="POST",
+            headers={
+                "User-Agent": "ic0 ic1 ic2 langchain_my_compo/",
+            },
+            header_value_matcher=hv_prefix_matcher,
+        ).respond_with_json({})
+        _AstraDBCollectionEnvironment(
+            "my_coll",
+            api_endpoint=base_endpoint,
+            keyspace="ks",
+            environment=Environment.OTHER,
+            ext_callers=[
+                None,
+                (None, None),
+                ("ic0", None),
+                "ic1",
+                (None, "zzz"),
+                "ic2",
+            ],
+            component_name="langchain_my_compo",
+        )
+
     def test_callers_component_loader(self, httpserver: HTTPServer) -> None:
         """
         End-to-end testing of callers passed through the components.

@@ -48,7 +48,7 @@ class AstraDBLoader(BaseLoader):
         nb_prefetched: int = _NOT_SET,  # type: ignore[assignment]
         page_content_mapper: Callable[[dict], str] = json.dumps,
         metadata_mapper: Callable[[dict], dict[str, Any]] | None = None,
-        ext_callers: list[tuple[str | None, str | None]] | None = None,
+        ext_callers: list[tuple[str | None, str | None] | str | None] | None = None,
         astra_db_client: AstraDB | None = None,
         async_astra_db_client: AsyncAstraDB | None = None,
     ) -> None:
