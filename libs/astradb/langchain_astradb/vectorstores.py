@@ -150,8 +150,8 @@ class AstraDBVectorStore(VectorStore):
 
     Setup:
         Install the ``langchain-astradb`` package and head to the
-        `AstraDB website <https://astra.datastax.com>`, create an account, create a
-        new database and `create an application token <https://docs.datastax.com/en/astra-db-serverless/administration/manage-application-tokens.html>`.
+        `AstraDB website <https://astra.datastax.com>`_, create an account, create a
+        new database and `create an application token <https://docs.datastax.com/en/astra-db-serverless/administration/manage-application-tokens.html>`_.
 
         .. code-block:: bash
 
@@ -172,7 +172,6 @@ class AstraDBVectorStore(VectorStore):
             Namespace (aka keyspace) where the collection is created
 
     Instantiate:
-
         Get your API endpoint and application token from the dashboard of your database.
 
         .. code-block:: python
@@ -192,7 +191,7 @@ class AstraDBVectorStore(VectorStore):
             )
 
         Have the vector store figure out its configuration (documents scheme on DB)
-        from an existing collection, in the case of `server-side-embeddings <https://docs.datastax.com/en/astra-db-serverless/databases/embedding-generation.html>`:
+        from an existing collection, in the case of `server-side-embeddings <https://docs.datastax.com/en/astra-db-serverless/databases/embedding-generation.html>`_:
 
         .. code-block:: python
 
@@ -210,7 +209,6 @@ class AstraDBVectorStore(VectorStore):
             )
 
     Add Documents:
-
         .. code-block:: python
 
             from langchain_core.documents import Document
@@ -224,13 +222,11 @@ class AstraDBVectorStore(VectorStore):
             vector_store.add_documents(documents=documents, ids=ids)
 
     Delete Documents:
-
         .. code-block:: python
 
             vector_store.delete(ids=["3"])
 
     Search:
-
         .. code-block:: python
 
             results = vector_store.similarity_search(query="thud",k=1)
@@ -242,7 +238,6 @@ class AstraDBVectorStore(VectorStore):
             thud [{'bar': 'baz'}]
 
     Search with filter:
-
         .. code-block:: python
 
             results = vector_store.similarity_search(query="thud",k=1,filter={"bar": "baz"})
@@ -254,7 +249,6 @@ class AstraDBVectorStore(VectorStore):
             thud [{'bar': 'baz'}]
 
     Search with score:
-
         .. code-block:: python
 
             results = vector_store.similarity_search_with_score(query="qux",k=1)
@@ -266,7 +260,6 @@ class AstraDBVectorStore(VectorStore):
             [SIM=0.916135] foo [{'baz': 'bar'}]
 
     Async:
-
         .. code-block:: python
 
             # add documents
@@ -288,7 +281,6 @@ class AstraDBVectorStore(VectorStore):
             [SIM=0.916135] foo [{'baz': 'bar'}]
 
     Use as Retriever:
-
         .. code-block:: python
 
             retriever = vector_store.as_retriever(
