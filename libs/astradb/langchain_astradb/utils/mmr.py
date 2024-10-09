@@ -21,7 +21,15 @@ Matrix = Union[List[List[float]], List[np.ndarray], np.ndarray]
 
 
 def cosine_similarity(x: Matrix, y: Matrix) -> np.ndarray:
-    """Row-wise cosine similarity between two equal-width matrices."""
+    """Row-wise cosine similarity between two equal-width matrices.
+
+    Args:
+        x: First matrix.
+        y: Second matrix.
+
+    Returns:
+        np.ndarray: Cosine similarity matrix.
+    """
     if len(x) == 0 or len(y) == 0:
         return np.array([])
 
@@ -62,7 +70,19 @@ def maximal_marginal_relevance(
     lambda_mult: float = 0.5,
     k: int = 4,
 ) -> list[int]:
-    """Calculate maximal marginal relevance."""
+    """Calculate maximal marginal relevance.
+
+    Args:
+        query_embedding: Query embedding to compare.
+        embedding_list: List of embeddings to select from.
+        lambda_mult: Number between 0 and 1 that determines the degree
+            of diversity among the results with 0 corresponding
+            to maximum diversity and 1 to minimum diversity.
+        k: Number of embeddings to select.
+
+    Returns:
+        List of indices of selected embeddings.
+    """
     if min(k, len(embedding_list)) <= 0:
         return []
     if query_embedding.ndim == 1:

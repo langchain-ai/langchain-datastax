@@ -738,7 +738,7 @@ class TestAstraDBVectorStore:
         second_group_slicer = [30, 100, 2]
 
         all_ids = [f"doc_{idx}" for idx in range(full_size)]
-        all_texts = [f"[0,{idx+1}]" for idx in range(full_size)]
+        all_texts = [f"[0,{idx + 1}]" for idx in range(full_size)]
 
         # massive insertion on empty
         group0_ids = all_ids[0:first_group_size]
@@ -786,7 +786,7 @@ class TestAstraDBVectorStore:
         second_group_slicer = [30, 100, 2]
 
         all_ids = [f"doc_{idx}" for idx in range(full_size)]
-        all_texts = [f"[0,{idx+1}]" for idx in range(full_size)]
+        all_texts = [f"[0,{idx + 1}]" for idx in range(full_size)]
 
         # massive insertion on empty
         group0_ids = all_ids[0:first_group_size]
@@ -1271,8 +1271,8 @@ class TestAstraDBVectorStore:
         vstore: AstraDBVectorStore = request.getfixturevalue(vector_store)
         m = 150
         texts = [f"[0,{i + 1 / 7.0}]" for i in range(2 * m)]
-        ids0 = ["doc_%i" % i for i in range(m)]
-        ids1 = ["doc_%i" % (i + m) for i in range(m)]
+        ids0 = [f"doc_{i}" for i in range(m)]
+        ids1 = [f"doc_{i + m}" for i in range(m)]
         ids = ids0 + ids1
         vstore.add_texts(texts=texts, ids=ids)
         # deleting a bunch of these
@@ -1307,7 +1307,7 @@ class TestAstraDBVectorStore:
         # add_texts and delete some
         n = 120
         texts = [f"[0,{i + 1 / 7.0}]" for i in range(n)]
-        ids = ["doc_%i" % i for i in range(n)]
+        ids = [f"doc_{i}" for i in range(n)]
         v_store.add_texts(texts=texts, ids=ids)
         v_store.add_texts(
             texts=texts,
@@ -1342,7 +1342,7 @@ class TestAstraDBVectorStore:
         # add_texts and delete some
         n = 120
         texts = [f"[0,{i + 1 / 7.0}]" for i in range(n)]
-        ids = ["doc_%i" % i for i in range(n)]
+        ids = [f"doc_{i}" for i in range(n)]
         await v_store.aadd_texts(texts=texts, ids=ids)
         await v_store.aadd_texts(
             texts=texts,

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from concurrent.futures import ThreadPoolExecutor
 from typing import (
     TYPE_CHECKING,
@@ -37,7 +37,7 @@ if TYPE_CHECKING:
 V = TypeVar("V")
 
 
-class AstraDBBaseStore(Generic[V], BaseStore[str, V], ABC):
+class AstraDBBaseStore(BaseStore[str, V], Generic[V]):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         """Base class for the DataStax Astra DB data store."""
         if "requested_indexing_policy" in kwargs:

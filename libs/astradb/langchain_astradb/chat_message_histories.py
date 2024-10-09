@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import time
+from operator import itemgetter
 from typing import TYPE_CHECKING, Sequence
 
 from langchain_core.chat_history import BaseChatMessageHistory
@@ -118,7 +119,7 @@ class AstraDBChatMessageHistory(BaseChatMessageHistory):
                         "body_blob": True,
                     },
                 ),
-                key=lambda _doc: _doc["timestamp"],
+                key=itemgetter("timestamp"),
             )
         ]
         items = [json.loads(message_blob) for message_blob in message_blobs]
@@ -143,7 +144,7 @@ class AstraDBChatMessageHistory(BaseChatMessageHistory):
         )
         sorted_docs = sorted(
             [doc async for doc in docs],
-            key=lambda _doc: _doc["timestamp"],
+            key=itemgetter("timestamp"),
         )
         message_blobs = [doc["body_blob"] for doc in sorted_docs]
         items = [json.loads(message_blob) for message_blob in message_blobs]

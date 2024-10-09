@@ -70,6 +70,7 @@ flake8-annotations.mypy-init-return = true
 select = ["ALL"]
 ignore = [
     "COM812", # Messes with the formatter
+    "CPY", # No copyright
     "D101", # We prefer using the __init__ docstring to document the class
     "ERA001", # Do we want to activate (no commented code) ?
     "FIX002", # Accept TODOs
@@ -82,10 +83,14 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = [
     "D",
+    "DOC201",
+    "DOC402",
     "S101",
     "SLF001",
     "T201",
+    "PLC2701",
     "PLR2004",
+    "PLR6301",
 ]
 "scripts/*" = [
     "D",
