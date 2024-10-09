@@ -180,9 +180,7 @@ class AstraDBGraphVectorStore(GraphVectorStore):
         visited_tags: dict[str, int] = {}
 
         def visit_documents(d: int, docs: Iterable[Any]) -> None:
-            nonlocal visited_ids
-            nonlocal visited_docs
-            nonlocal visited_tags
+            nonlocal visited_ids, visited_docs, visited_tags
 
             # Visit documents at the given depth.
             # Each document has `id`, `link_from_tags` and `link_to_tags`.
@@ -424,7 +422,7 @@ class AstraDBGraphVectorStore(GraphVectorStore):
             fetch_initial_candidates()
 
         # Tracks the depth of each candidate.
-        depths = {candidate_id: 0 for candidate_id in helper.candidate_ids()}
+        depths = dict.fromkeys(helper.candidate_ids(), 0)
 
         # Select the best item, K times.
         for _ in range(k):

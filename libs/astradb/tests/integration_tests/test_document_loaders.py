@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+from operator import itemgetter
 from typing import TYPE_CHECKING
 
 import pytest
@@ -126,7 +127,7 @@ class TestAstraDB:
             namespace=astra_db_credentials["namespace"],
             environment=astra_db_credentials["environment"],
             limit=30,
-            page_content_mapper=lambda x: x["foo"],
+            page_content_mapper=itemgetter("foo"),
             filter_criteria={"foo": "bar"},
         )
         docs = loader.lazy_load()
@@ -251,7 +252,7 @@ class TestAstraDB:
             namespace=astra_db_credentials["namespace"],
             environment=astra_db_credentials["environment"],
             limit=30,
-            page_content_mapper=lambda x: x["foo"],
+            page_content_mapper=itemgetter("foo"),
             filter_criteria={"foo": "bar"},
         )
         doc = await loader.alazy_load().__anext__()

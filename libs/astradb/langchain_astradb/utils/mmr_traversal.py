@@ -218,7 +218,10 @@ class MmrHelper:
         # Now, build up a matrix of the remaining candidate embeddings.
         # And add them to the
         new_embeddings: NDArray[np.float32] = np.ndarray(
-            (len(include_ids), self.dimensions)
+            (
+                len(include_ids),
+                self.dimensions,
+            )
         )
         offset = self.candidate_embeddings.shape[0]
         for index, candidate_id in enumerate(include_ids):
@@ -253,5 +256,8 @@ class MmrHelper:
 
         # Add the new embeddings to the candidate set.
         self.candidate_embeddings = np.vstack(
-            (self.candidate_embeddings, new_embeddings)
+            (
+                self.candidate_embeddings,
+                new_embeddings,
+            )
         )

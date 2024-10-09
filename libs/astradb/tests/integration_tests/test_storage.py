@@ -91,7 +91,10 @@ class TestAstraDBStore:
     ) -> None:
         """Test AstraDBStore amget/amset/amdelete method. Async version."""
         await astra_db_empty_store_async.amset(
-            [("key1", [0.1, 0.2]), ("key2", "value2")]
+            [
+                ("key1", [0.1, 0.2]),
+                ("key2", "value2"),
+            ]
         )
         assert await astra_db_empty_store_async.amget(["key1", "key2"]) == [
             [0.1, 0.2],
@@ -213,7 +216,10 @@ class TestAstraDBStore:
     ) -> None:
         """Test of yield_keys, async version"""
         await astra_db_empty_store_async.amset(
-            [("key1", [0.1, 0.2]), ("key2", "value2")]
+            [
+                ("key1", [0.1, 0.2]),
+                ("key2", "value2"),
+            ]
         )
         assert {k async for k in astra_db_empty_store_async.ayield_keys()} == {
             "key1",

@@ -63,7 +63,7 @@ def _detect_document_content_field(document: dict[str, Any]) -> str | None:
     }
     if not strlen_map:
         return None
-    return sorted(strlen_map.items(), key=itemgetter(1), reverse=True)[0][0]
+    return max(strlen_map.items(), key=itemgetter(1))[0]
 
 
 def _detect_documents_content_field(
