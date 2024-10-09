@@ -153,9 +153,10 @@ class AstraDBGraphVectorStore(GraphVectorStore):
                 ``metric``, ``setup_mode``, ``metadata_indexing_include``,
                 ``metadata_indexing_exclude``, ``collection_indexing_policy``.
             ext_callers: one or more caller identities to identify Data API calls
-                in the User-Agent header. This is a list of (name, version) pairs
-                which, if supplied, becomes the leading part of the User-Agent string
-                in all API requests related to this component.
+                in the User-Agent header. This is a list of (name, version) pairs,
+                or just strings if no version info is provided, which, if supplied,
+                becomes the leading part of the User-Agent string in all API requests
+                related to this component.
             astra_db_client:
                 *DEPRECATED starting from version 0.3.5.*
                 *Please use 'token', 'api_endpoint' and optionally 'environment'.*

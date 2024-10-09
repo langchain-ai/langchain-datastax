@@ -482,9 +482,10 @@ class AstraDBVectorStore(VectorStore):
                 ``metadata_indexing_exclude``, ``collection_indexing_policy``,
                 ``collection_vector_service_options``.
             ext_callers: one or more caller identities to identify Data API calls
-                in the User-Agent header. This is a list of (name, version) pairs
-                which, if supplied, becomes the leading part of the User-Agent string
-                in all API requests related to this component.
+                in the User-Agent header. This is a list of (name, version) pairs,
+                or just strings if no version info is provided, which, if supplied,
+                becomes the leading part of the User-Agent string in all API requests
+                related to this component.
             component_name: the string identifying this specific component in the
                 stack of usage info passed as the User-Agent string to the Data API.
                 Defaults to "langchain_vectorstore", but can be overridden if this

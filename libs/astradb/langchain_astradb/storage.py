@@ -281,9 +281,10 @@ class AstraDBStore(AstraDBBaseStore[Any]):
                 before creating it. If False and the collection already exists,
                 the collection will be used as is.
             ext_callers: one or more caller identities to identify Data API calls
-                in the User-Agent header. This is a list of (name, version) pairs
-                which, if supplied, becomes the leading part of the User-Agent string
-                in all API requests related to this component.
+                in the User-Agent header. This is a list of (name, version) pairs,
+                or just strings if no version info is provided, which, if supplied,
+                becomes the leading part of the User-Agent string in all API requests
+                related to this component.
             astra_db_client:
                 *DEPRECATED starting from version 0.3.5.*
                 *Please use 'token', 'api_endpoint' and optionally 'environment'.*
@@ -365,9 +366,10 @@ class AstraDBByteStore(AstraDBBaseStore[bytes], ByteStore):
                 before creating it. If False and the collection already exists,
                 the collection will be used as is.
             ext_callers: one or more caller identities to identify Data API calls
-                in the User-Agent header. This is a list of (name, version) pairs
-                which, if supplied, becomes the leading part of the User-Agent string
-                in all API requests related to this component.
+                in the User-Agent header. This is a list of (name, version) pairs,
+                or just strings if no version info is provided, which, if supplied,
+                becomes the leading part of the User-Agent string in all API requests
+                related to this component.
             astra_db_client:
                 *DEPRECATED starting from version 0.3.5.*
                 *Please use 'token', 'api_endpoint' and optionally 'environment'.*
