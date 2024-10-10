@@ -353,9 +353,9 @@ class TestAstraDBGraphVectorStore:
         assert hits[0].page_content == "[0, 2]"
         md0 = hits[0].metadata
         assert md0["m"] == 0
-        assert any(isinstance(v, list) for k, v in md0.items() if k != "m")
+        assert any(isinstance(v, set) for k, v in md0.items() if k != "m")
         assert hits[1].id != "id0"
         assert hits[1].page_content == "[0, 1]"
         md1 = hits[1].metadata
         assert md1["m"] == 1
-        assert any(isinstance(v, list) for k, v in md1.items() if k != "m")
+        assert any(isinstance(v, set) for k, v in md1.items() if k != "m")
