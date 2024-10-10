@@ -277,7 +277,12 @@ class _AstraDBEnvironment:
             self.api_endpoint,
         )
 
-        # create the clients
+        # prepare the "callers" list to create the clients.
+        # The callers, passed to astrapy, are made of these Caller pairs in this order:
+        # - zero, one or more are the "ext_callers" passed to this environment
+        # - a single ("langchain", <version of langchain_core>)
+        # - if such is provided, a (component_name, <version of langchain_astradb>)
+        #   (note: if component_name is None, astrapy strips it out automatically)
         norm_ext_callers = [
             cpair
             for cpair in (
@@ -288,9 +293,11 @@ class _AstraDBEnvironment:
         ]
         full_callers = [
             *norm_ext_callers,
-            (component_name, LC_ASTRADB_VERSION),
             LC_CORE_CALLER,
+            (component_name, LC_ASTRADB_VERSION),
         ]
+
+        # create the callers
         self.data_api_client = DataAPIClient(
             environment=self.environment,
             callers=full_callers,

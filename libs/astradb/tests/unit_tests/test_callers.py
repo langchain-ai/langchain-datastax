@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Callable
 
 import pytest
 from astrapy.constants import Environment
@@ -32,17 +32,58 @@ if TYPE_CHECKING:
     from pytest_httpserver import HTTPServer
 
 
-def hv_prefix_matcher(hk: str, hv: str | None, ev: str) -> bool:
-    """Custom header matcher function for httpserver.
+def hv_prefix_matcher_factory(
+    expected_name_after_lc: str | None = None,
+) -> Callable[[str, str | None, str], bool]:
+    """Prepare a customized header matcher function for httpserver.
 
-    We require that the UA to start with the provided string,
-    and also that "langchain/<v> is found later in the UA.
+    The matcher does exact string equality for all headers except User-Agent.
+    For User-Agent:
+
+    1. whatever is in the "header" part of `expect_request()` and similar must
+    be at the beginning of the intercepted UA string
+    2. "langchain/<something" must be the one block immediately after that
+    3. if provided, there must be at least another block, whose first half
+    (before the "/") is the `expected_name_after_lc` param, if such is provided to
+    this factory.
+
+    In other words, if the expect_request has something like
+        headers={"User-Agent": ""}
+    then this matcher verifies that the UA *starts with* "langchain"
+    Otherwise, the string there will come before "langchain".
+    Independently of the above, if a "expected_name_after_lc" is given, its
+    presence right after the "langchain/<version>" part is validated.
+
+    Note: This contrived implementation is to comply with the header matcher
+    signature of pytest_httpsserver.
     """
-    if hk.lower() == "user-agent":
-        if hv is not None:
-            return hv.startswith(ev) and " langchain/" in hv
-        return False
-    return True
+
+    def _matcher(hk: str, hv: str | None, ev: str) -> bool:
+        if hk.lower() == "user-agent":
+            if hv is not None:
+                if hv.startswith(ev):
+                    # condition 1 is OK. Look at the rest
+                    remaining = hv[len(ev) :]
+                    blocks = [bl.strip() for bl in remaining.split(" ") if bl.strip()]
+                    if any(bl.count("/") != 1 for bl in blocks):
+                        return False
+                    block_pairs = [bl.split("/") for bl in blocks]
+                    if not block_pairs:
+                        return False
+                    # check 2:
+                    if block_pairs[0][0] != "langchain":
+                        return False
+                    further_block_pairs = block_pairs[1:]
+                    # check 3 if an `expected_name_after_lc` is given
+                    if expected_name_after_lc:
+                        return further_block_pairs[0][0] == expected_name_after_lc
+                    # otherwise (if 3 is not required), 1 and 2 are satisfied by now:
+                    return True
+                return False
+            return False
+        return hv == ev
+
+    return _matcher
 
 
 class TestCallers:
@@ -56,9 +97,9 @@ class TestCallers:
             base_path,
             method="POST",
             headers={
-                "User-Agent": "langchain_my_compo/",
+                "User-Agent": "",
             },
-            header_value_matcher=hv_prefix_matcher,
+            header_value_matcher=hv_prefix_matcher_factory("langchain_my_compo"),
         ).respond_with_json({})
         _AstraDBCollectionEnvironment(
             "my_coll",
@@ -68,14 +109,30 @@ class TestCallers:
             component_name="langchain_my_compo",
         )
 
+        # prefix check, empty ext_callers and no component name
+        httpserver.expect_oneshot_request(
+            base_path,
+            method="POST",
+            headers={
+                "User-Agent": "",
+            },
+            header_value_matcher=hv_prefix_matcher_factory(),
+        ).respond_with_json({})
+        _AstraDBCollectionEnvironment(
+            "my_coll",
+            api_endpoint=base_endpoint,
+            keyspace="ks",
+            environment=Environment.OTHER,
+        )
+
         # prefix check, one ext_caller
         httpserver.expect_oneshot_request(
             base_path,
             method="POST",
             headers={
-                "User-Agent": "ec0/ev0 langchain_my_compo/",
+                "User-Agent": "ec0/ev0",
             },
-            header_value_matcher=hv_prefix_matcher,
+            header_value_matcher=hv_prefix_matcher_factory("langchain_my_compo"),
         ).respond_with_json({})
         _AstraDBCollectionEnvironment(
             "my_coll",
@@ -86,14 +143,31 @@ class TestCallers:
             component_name="langchain_my_compo",
         )
 
+        # prefix check, one ext_caller and no component name
+        httpserver.expect_oneshot_request(
+            base_path,
+            method="POST",
+            headers={
+                "User-Agent": "ec0/ev0",
+            },
+            header_value_matcher=hv_prefix_matcher_factory(),
+        ).respond_with_json({})
+        _AstraDBCollectionEnvironment(
+            "my_coll",
+            api_endpoint=base_endpoint,
+            keyspace="ks",
+            environment=Environment.OTHER,
+            ext_callers=[("ec0", "ev0")],
+        )
+
         # prefix check, two ext_callers
         httpserver.expect_oneshot_request(
             base_path,
             method="POST",
             headers={
-                "User-Agent": "ec0/ev0 ec1/ev1 langchain_my_compo/",
+                "User-Agent": "ec0/ev0 ec1/ev1",
             },
-            header_value_matcher=hv_prefix_matcher,
+            header_value_matcher=hv_prefix_matcher_factory("langchain_my_compo"),
         ).respond_with_json({})
         _AstraDBCollectionEnvironment(
             "my_coll",
@@ -109,9 +183,9 @@ class TestCallers:
             base_path,
             method="POST",
             headers={
-                "User-Agent": "ic0 ic1 ic2 langchain_my_compo/",
+                "User-Agent": "ic0 ic1 ic2",
             },
-            header_value_matcher=hv_prefix_matcher,
+            header_value_matcher=hv_prefix_matcher_factory("langchain_my_compo"),
         ).respond_with_json({})
         _AstraDBCollectionEnvironment(
             "my_coll",
@@ -137,14 +211,13 @@ class TestCallers:
         base_endpoint = httpserver.url_for("/")
         base_path = "/v1/ks/my_coll"
 
-        # prefix check, empty ext_callers
         httpserver.expect_oneshot_request(
             base_path,
             method="POST",
             headers={
-                "User-Agent": f"ec0/ev0 {COMPONENT_NAME_LOADER}/",
+                "User-Agent": "ec0/ev0",
             },
-            header_value_matcher=hv_prefix_matcher,
+            header_value_matcher=hv_prefix_matcher_factory(COMPONENT_NAME_LOADER),
         ).respond_with_json({"data": {"nextPageState": None, "documents": [{}]}})
 
         loader = AstraDBLoader(
@@ -165,14 +238,14 @@ class TestCallers:
         base_endpoint = httpserver.url_for("/")
         base_path = "/v1/ks"
 
-        # prefix check, empty ext_callers
+        # through the init flow
         httpserver.expect_oneshot_request(
             base_path,
             method="POST",
             headers={
-                "User-Agent": f"ec0/ev0 {COMPONENT_NAME_VECTORSTORE}/",
+                "User-Agent": "ec0/ev0",
             },
-            header_value_matcher=hv_prefix_matcher,
+            header_value_matcher=hv_prefix_matcher_factory(COMPONENT_NAME_VECTORSTORE),
         ).respond_with_json({})
 
         AstraDBVectorStore(
@@ -189,18 +262,18 @@ class TestCallers:
             base_path + "/my_coll",
             method="POST",
             headers={
-                "User-Agent": f"ec0/ev0 {COMPONENT_NAME_VECTORSTORE}/",
+                "User-Agent": "ec0/ev0",
             },
-            header_value_matcher=hv_prefix_matcher,
+            header_value_matcher=hv_prefix_matcher_factory(COMPONENT_NAME_VECTORSTORE),
         ).respond_with_json({"data": {"nextPageState": None, "documents": []}})
         httpserver.expect_request(
             base_path,
             method="POST",
             headers={
-                "User-Agent": f"ec0/ev0 {COMPONENT_NAME_VECTORSTORE}/",
+                "User-Agent": "ec0/ev0",
             },
             data='{"findCollections":{"options":{"explain":true}}}',
-            header_value_matcher=hv_prefix_matcher,
+            header_value_matcher=hv_prefix_matcher_factory(COMPONENT_NAME_VECTORSTORE),
         ).respond_with_json(
             {
                 "status": {
@@ -263,14 +336,13 @@ class TestCallers:
         base_endpoint = httpserver.url_for("/")
         base_path = "/v1/ks"
 
-        # prefix check, empty ext_callers
         httpserver.expect_oneshot_request(
             base_path,
             method="POST",
             headers={
-                "User-Agent": f"ec0/ev0 {component_name}/",
+                "User-Agent": "ec0/ev0",
             },
-            header_value_matcher=hv_prefix_matcher,
+            header_value_matcher=hv_prefix_matcher_factory(component_name),
         ).respond_with_json({})
 
         component_class(  # type: ignore[operator]
