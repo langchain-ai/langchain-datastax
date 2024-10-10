@@ -15,7 +15,12 @@ from langchain_core.load.load import loads
 from langchain_core.outputs import Generation
 from typing_extensions import override
 
-from langchain_astradb.utils.astradb import SetupMode, _AstraDBCollectionEnvironment
+from langchain_astradb.utils.astradb import (
+    COMPONENT_NAME_CACHE,
+    COMPONENT_NAME_SEMANTICCACHE,
+    SetupMode,
+    _AstraDBCollectionEnvironment,
+)
 
 if TYPE_CHECKING:
     from astrapy.authentication import TokenProvider
@@ -103,12 +108,13 @@ class AstraDBCache(BaseCache):
         collection_name: str = ASTRA_DB_CACHE_DEFAULT_COLLECTION_NAME,
         token: str | TokenProvider | None = None,
         api_endpoint: str | None = None,
-        environment: str | None = None,
-        astra_db_client: AstraDB | None = None,
-        async_astra_db_client: AsyncAstraDB | None = None,
         namespace: str | None = None,
+        environment: str | None = None,
         pre_delete_collection: bool = False,
         setup_mode: SetupMode = SetupMode.SYNC,
+        ext_callers: list[tuple[str | None, str | None] | str | None] | None = None,
+        astra_db_client: AstraDB | None = None,
+        async_astra_db_client: AsyncAstraDB | None = None,
     ):
         """Cache that uses Astra DB as a backend.
 
@@ -127,9 +133,22 @@ class AstraDBCache(BaseCache):
             api_endpoint: full URL to the API endpoint, such as
                 `https://<DB-ID>-us-east1.apps.astra.datastax.com`. If not provided,
                 the environment variable ASTRA_DB_API_ENDPOINT is inspected.
+            namespace: namespace (aka keyspace) where the collection is created.
+                If not provided, the environment variable ASTRA_DB_KEYSPACE is
+                inspected. Defaults to the database's "default namespace".
             environment: a string specifying the environment of the target Data API.
                 If omitted, defaults to "prod" (Astra DB production).
                 Other values are in `astrapy.constants.Environment` enum class.
+            setup_mode: mode used to create the Astra DB collection (SYNC, ASYNC or
+                OFF).
+            pre_delete_collection: whether to delete the collection
+                before creating it. If False and the collection already exists,
+                the collection will be used as is.
+            ext_callers: one or more caller identities to identify Data API calls
+                in the User-Agent header. This is a list of (name, version) pairs,
+                or just strings if no version info is provided, which, if supplied,
+                becomes the leading part of the User-Agent string in all API requests
+                related to this component.
             astra_db_client:
                 *DEPRECATED starting from version 0.3.5.*
                 *Please use 'token', 'api_endpoint' and optionally 'environment'.*
@@ -140,25 +159,19 @@ class AstraDBCache(BaseCache):
                 *Please use 'token', 'api_endpoint' and optionally 'environment'.*
                 you can pass an already-created 'astrapy.db.AsyncAstraDB' instance
                 (alternatively to 'token', 'api_endpoint' and 'environment').
-            namespace: namespace (aka keyspace) where the collection is created.
-                If not provided, the environment variable ASTRA_DB_KEYSPACE is
-                inspected. Defaults to the database's "default namespace".
-            setup_mode: mode used to create the Astra DB collection (SYNC, ASYNC or
-                OFF).
-            pre_delete_collection: whether to delete the collection
-                before creating it. If False and the collection already exists,
-                the collection will be used as is.
         """
         self.astra_env = _AstraDBCollectionEnvironment(
             collection_name=collection_name,
             token=token,
             api_endpoint=api_endpoint,
-            environment=environment,
-            astra_db_client=astra_db_client,
-            async_astra_db_client=async_astra_db_client,
             keyspace=namespace,
+            environment=environment,
             setup_mode=setup_mode,
             pre_delete_collection=pre_delete_collection,
+            ext_callers=ext_callers,
+            component_name=COMPONENT_NAME_CACHE,
+            astra_db_client=astra_db_client,
+            async_astra_db_client=async_astra_db_client,
         )
         self.collection = self.astra_env.collection
         self.async_collection = self.astra_env.async_collection
@@ -317,15 +330,16 @@ class AstraDBSemanticCache(BaseCache):
         collection_name: str = ASTRA_DB_SEMANTIC_CACHE_DEFAULT_COLLECTION_NAME,
         token: str | TokenProvider | None = None,
         api_endpoint: str | None = None,
-        environment: str | None = None,
-        astra_db_client: AstraDB | None = None,
-        async_astra_db_client: AsyncAstraDB | None = None,
         namespace: str | None = None,
+        environment: str | None = None,
         setup_mode: SetupMode = SetupMode.SYNC,
         pre_delete_collection: bool = False,
         embedding: Embeddings,
         metric: str | None = None,
         similarity_threshold: float = ASTRA_DB_SEMANTIC_CACHE_DEFAULT_THRESHOLD,
+        ext_callers: list[tuple[str | None, str | None] | str | None] | None = None,
+        astra_db_client: AstraDB | None = None,
+        async_astra_db_client: AsyncAstraDB | None = None,
     ):
         """Astra DB semantic cache.
 
@@ -349,22 +363,12 @@ class AstraDBSemanticCache(BaseCache):
             api_endpoint: full URL to the API endpoint, such as
                 `https://<DB-ID>-us-east1.apps.astra.datastax.com`. If not provided,
                 the environment variable ASTRA_DB_API_ENDPOINT is inspected.
-            environment: a string specifying the environment of the target Data API.
-                If omitted, defaults to "prod" (Astra DB production).
-                Other values are in `astrapy.constants.Environment` enum class.
-            astra_db_client:
-                *DEPRECATED starting from version 0.3.5.*
-                *Please use 'token', 'api_endpoint' and optionally 'environment'.*
-                you can pass an already-created 'astrapy.db.AstraDB' instance
-                (alternatively to 'token', 'api_endpoint' and 'environment').
-            async_astra_db_client:
-                *DEPRECATED starting from version 0.3.5.*
-                *Please use 'token', 'api_endpoint' and optionally 'environment'.*
-                you can pass an already-created 'astrapy.db.AsyncAstraDB' instance
-                (alternatively to 'token', 'api_endpoint' and 'environment').
             namespace: namespace (aka keyspace) where the collection is created.
                 If not provided, the environment variable ASTRA_DB_KEYSPACE is
                 inspected. Defaults to the database's "default namespace".
+            environment: a string specifying the environment of the target Data API.
+                If omitted, defaults to "prod" (Astra DB production).
+                Other values are in `astrapy.constants.Environment` enum class.
             setup_mode: mode used to create the Astra DB collection (SYNC, ASYNC or
                 OFF).
             pre_delete_collection: whether to delete the collection
@@ -375,6 +379,21 @@ class AstraDBSemanticCache(BaseCache):
                 Defaults to 'cosine' (alternatives: 'euclidean', 'dot_product')
             similarity_threshold: the minimum similarity for accepting a
                 (semantic-search) match.
+            ext_callers: one or more caller identities to identify Data API calls
+                in the User-Agent header. This is a list of (name, version) pairs,
+                or just strings if no version info is provided, which, if supplied,
+                becomes the leading part of the User-Agent string in all API requests
+                related to this component.
+            astra_db_client:
+                *DEPRECATED starting from version 0.3.5.*
+                *Please use 'token', 'api_endpoint' and optionally 'environment'.*
+                you can pass an already-created 'astrapy.db.AstraDB' instance
+                (alternatively to 'token', 'api_endpoint' and 'environment').
+            async_astra_db_client:
+                *DEPRECATED starting from version 0.3.5.*
+                *Please use 'token', 'api_endpoint' and optionally 'environment'.*
+                you can pass an already-created 'astrapy.db.AsyncAstraDB' instance
+                (alternatively to 'token', 'api_endpoint' and 'environment').
         """
         self.embedding = embedding
         self.metric = metric
@@ -408,14 +427,16 @@ class AstraDBSemanticCache(BaseCache):
             collection_name=collection_name,
             token=token,
             api_endpoint=api_endpoint,
-            environment=environment,
-            astra_db_client=astra_db_client,
-            async_astra_db_client=async_astra_db_client,
             keyspace=namespace,
+            environment=environment,
             setup_mode=setup_mode,
             pre_delete_collection=pre_delete_collection,
             embedding_dimension=embedding_dimension,
             metric=metric,
+            ext_callers=ext_callers,
+            component_name=COMPONENT_NAME_SEMANTICCACHE,
+            astra_db_client=astra_db_client,
+            async_astra_db_client=async_astra_db_client,
         )
         self.collection = self.astra_env.collection
         self.async_collection = self.astra_env.async_collection

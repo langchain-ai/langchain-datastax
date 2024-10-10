@@ -18,6 +18,7 @@ from langchain_community.graph_vectorstores.base import (
 from langchain_core.documents import Document
 from typing_extensions import override
 
+from langchain_astradb.utils.astradb import COMPONENT_NAME_GRAPHVECTORSTORE
 from langchain_astradb.utils.mmr_traversal import MmrHelper
 from langchain_astradb.vectorstores import AstraDBVectorStore
 
@@ -56,10 +57,8 @@ class AstraDBGraphVectorStore(GraphVectorStore):
         link_from_metadata_key: str = "links_from",
         token: str | TokenProvider | None = None,
         api_endpoint: str | None = None,
-        environment: str | None = None,
-        astra_db_client: AstraDBClient | None = None,
-        async_astra_db_client: AsyncAstraDBClient | None = None,
         namespace: str | None = None,
+        environment: str | None = None,
         metric: str | None = None,
         batch_size: int | None = None,
         bulk_insert_batch_concurrency: int | None = None,
@@ -73,6 +72,9 @@ class AstraDBGraphVectorStore(GraphVectorStore):
         content_field: str | None = None,
         ignore_invalid_documents: bool = False,
         autodetect_collection: bool = False,
+        ext_callers: list[tuple[str | None, str | None] | str | None] | None = None,
+        astra_db_client: AstraDBClient | None = None,
+        async_astra_db_client: AsyncAstraDBClient | None = None,
     ):
         """Graph Vector Store backed by AstraDB.
 
@@ -90,22 +92,12 @@ class AstraDBGraphVectorStore(GraphVectorStore):
             api_endpoint: full URL to the API endpoint, such as
                 ``https://<DB-ID>-us-east1.apps.astra.datastax.com``. If not provided,
                 the environment variable ASTRA_DB_API_ENDPOINT is inspected.
-            environment: a string specifying the environment of the target Data API.
-                If omitted, defaults to "prod" (Astra DB production).
-                Other values are in ``astrapy.constants.Environment`` enum class.
-            astra_db_client:
-                *DEPRECATED starting from version 0.3.5.*
-                *Please use 'token', 'api_endpoint' and optionally 'environment'.*
-                you can pass an already-created 'astrapy.db.AstraDB' instance
-                (alternatively to 'token', 'api_endpoint' and 'environment').
-            async_astra_db_client:
-                *DEPRECATED starting from version 0.3.5.*
-                *Please use 'token', 'api_endpoint' and optionally 'environment'.*
-                you can pass an already-created 'astrapy.db.AsyncAstraDB' instance
-                (alternatively to 'token', 'api_endpoint' and 'environment').
             namespace: namespace (aka keyspace) where the collection is created.
                 If not provided, the environment variable ASTRA_DB_KEYSPACE is
                 inspected. Defaults to the database's "default namespace".
+            environment: a string specifying the environment of the target Data API.
+                If omitted, defaults to "prod" (Astra DB production).
+                Other values are in ``astrapy.constants.Environment`` enum class.
             metric: similarity function to use out of those available in Astra DB.
                 If left out, it will use Astra DB API's defaults (i.e. "cosine" - but,
                 for performance reasons, "dot_product" is suggested if embeddings are
@@ -160,6 +152,21 @@ class AstraDBGraphVectorStore(GraphVectorStore):
                 Note that the following parameters cannot be used if this is True:
                 ``metric``, ``setup_mode``, ``metadata_indexing_include``,
                 ``metadata_indexing_exclude``, ``collection_indexing_policy``.
+            ext_callers: one or more caller identities to identify Data API calls
+                in the User-Agent header. This is a list of (name, version) pairs,
+                or just strings if no version info is provided, which, if supplied,
+                becomes the leading part of the User-Agent string in all API requests
+                related to this component.
+            astra_db_client:
+                *DEPRECATED starting from version 0.3.5.*
+                *Please use 'token', 'api_endpoint' and optionally 'environment'.*
+                you can pass an already-created 'astrapy.db.AstraDB' instance
+                (alternatively to 'token', 'api_endpoint' and 'environment').
+            async_astra_db_client:
+                *DEPRECATED starting from version 0.3.5.*
+                *Please use 'token', 'api_endpoint' and optionally 'environment'.*
+                you can pass an already-created 'astrapy.db.AsyncAstraDB' instance
+                (alternatively to 'token', 'api_endpoint' and 'environment').
         """
         self.link_to_metadata_key = link_to_metadata_key
         self.link_from_metadata_key = link_from_metadata_key
@@ -170,10 +177,8 @@ class AstraDBGraphVectorStore(GraphVectorStore):
             embedding=embedding,
             token=token,
             api_endpoint=api_endpoint,
-            environment=environment,
-            astra_db_client=astra_db_client,
-            async_astra_db_client=async_astra_db_client,
             namespace=namespace,
+            environment=environment,
             metric=metric,
             batch_size=batch_size,
             bulk_insert_batch_concurrency=bulk_insert_batch_concurrency,
@@ -187,6 +192,10 @@ class AstraDBGraphVectorStore(GraphVectorStore):
             content_field=content_field,
             ignore_invalid_documents=ignore_invalid_documents,
             autodetect_collection=autodetect_collection,
+            ext_callers=ext_callers,
+            component_name=COMPONENT_NAME_GRAPHVECTORSTORE,
+            astra_db_client=astra_db_client,
+            async_astra_db_client=async_astra_db_client,
         )
 
         self.astra_env = self.vectorstore.astra_env

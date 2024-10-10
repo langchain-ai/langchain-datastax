@@ -18,6 +18,7 @@ from langchain_core.documents import Document
 from typing_extensions import override
 
 from langchain_astradb.utils.astradb import (
+    COMPONENT_NAME_LOADER,
     SetupMode,
     _AstraDBCollectionEnvironment,
 )
@@ -39,8 +40,6 @@ class AstraDBLoader(BaseLoader):
         token: str | TokenProvider | None = None,
         api_endpoint: str | None = None,
         environment: str | None = None,
-        astra_db_client: AstraDB | None = None,
-        async_astra_db_client: AsyncAstraDB | None = None,
         namespace: str | None = None,
         filter_criteria: dict[str, Any] | None = None,
         projection: dict[str, Any] | None = _NOT_SET,  # type: ignore[assignment]
@@ -49,6 +48,9 @@ class AstraDBLoader(BaseLoader):
         nb_prefetched: int = _NOT_SET,  # type: ignore[assignment]
         page_content_mapper: Callable[[dict], str] = json.dumps,
         metadata_mapper: Callable[[dict], dict[str, Any]] | None = None,
+        ext_callers: list[tuple[str | None, str | None] | str | None] | None = None,
+        astra_db_client: AstraDB | None = None,
+        async_astra_db_client: AsyncAstraDB | None = None,
     ) -> None:
         """Load DataStax Astra DB documents.
 
@@ -64,16 +66,6 @@ class AstraDBLoader(BaseLoader):
             environment: a string specifying the environment of the target Data API.
                 If omitted, defaults to "prod" (Astra DB production).
                 Other values are in `astrapy.constants.Environment` enum class.
-            astra_db_client:
-                *DEPRECATED starting from version 0.3.5.*
-                *Please use 'token', 'api_endpoint' and optionally 'environment'.*
-                you can pass an already-created 'astrapy.db.AstraDB' instance
-                (alternatively to 'token', 'api_endpoint' and 'environment').
-            async_astra_db_client:
-                *DEPRECATED starting from version 0.3.5.*
-                *Please use 'token', 'api_endpoint' and optionally 'environment'.*
-                you can pass an already-created 'astrapy.db.AsyncAstraDB' instance
-                (alternatively to 'token', 'api_endpoint' and 'environment').
             namespace: namespace (aka keyspace) where the collection resides.
                 If not provided, the environment variable ASTRA_DB_KEYSPACE is
                 inspected. Defaults to the database's "default namespace".
@@ -91,16 +83,33 @@ class AstraDBLoader(BaseLoader):
             metadata_mapper: Function applied to collection documents to create the
                 `metadata` of the LangChain Document. Defaults to returning the
                  namespace, API endpoint and collection name.
+            ext_callers: one or more caller identities to identify Data API calls
+                in the User-Agent header. This is a list of (name, version) pairs,
+                or just strings if no version info is provided, which, if supplied,
+                becomes the leading part of the User-Agent string in all API requests
+                related to this component.
+            astra_db_client:
+                *DEPRECATED starting from version 0.3.5.*
+                *Please use 'token', 'api_endpoint' and optionally 'environment'.*
+                you can pass an already-created 'astrapy.db.AstraDB' instance
+                (alternatively to 'token', 'api_endpoint' and 'environment').
+            async_astra_db_client:
+                *DEPRECATED starting from version 0.3.5.*
+                *Please use 'token', 'api_endpoint' and optionally 'environment'.*
+                you can pass an already-created 'astrapy.db.AsyncAstraDB' instance
+                (alternatively to 'token', 'api_endpoint' and 'environment').
         """
         astra_db_env = _AstraDBCollectionEnvironment(
             collection_name=collection_name,
             token=token,
             api_endpoint=api_endpoint,
+            keyspace=namespace,
             environment=environment,
+            setup_mode=SetupMode.OFF,
+            ext_callers=ext_callers,
+            component_name=COMPONENT_NAME_LOADER,
             astra_db_client=astra_db_client,
             async_astra_db_client=async_astra_db_client,
-            keyspace=namespace,
-            setup_mode=SetupMode.OFF,
         )
         self.astra_db_env = astra_db_env
         self.filter = filter_criteria

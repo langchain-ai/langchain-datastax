@@ -27,6 +27,7 @@ from langchain_core.vectorstores import VectorStore
 from typing_extensions import override
 
 from langchain_astradb.utils.astradb import (
+    COMPONENT_NAME_VECTORSTORE,
     DEFAULT_DOCUMENT_CHUNK_SIZE,
     MAX_CONCURRENT_DOCUMENT_DELETIONS,
     MAX_CONCURRENT_DOCUMENT_INSERTIONS,
@@ -364,8 +365,6 @@ class AstraDBVectorStore(VectorStore):
         token: str | TokenProvider | None = None,
         api_endpoint: str | None = None,
         environment: str | None = None,
-        astra_db_client: AstraDBClient | None = None,
-        async_astra_db_client: AsyncAstraDBClient | None = None,
         namespace: str | None = None,
         metric: str | None = None,
         batch_size: int | None = None,
@@ -382,6 +381,10 @@ class AstraDBVectorStore(VectorStore):
         content_field: str | None = None,
         ignore_invalid_documents: bool = False,
         autodetect_collection: bool = False,
+        ext_callers: list[tuple[str | None, str | None] | str | None] | None = None,
+        component_name: str = COMPONENT_NAME_VECTORSTORE,
+        astra_db_client: AstraDBClient | None = None,
+        async_astra_db_client: AsyncAstraDBClient | None = None,
     ) -> None:
         """Wrapper around DataStax Astra DB for vector-store workloads.
 
@@ -405,16 +408,6 @@ class AstraDBVectorStore(VectorStore):
             environment: a string specifying the environment of the target Data API.
                 If omitted, defaults to "prod" (Astra DB production).
                 Other values are in ``astrapy.constants.Environment`` enum class.
-            astra_db_client:
-                *DEPRECATED starting from version 0.3.5.*
-                *Please use 'token', 'api_endpoint' and optionally 'environment'.*
-                you can pass an already-created 'astrapy.db.AstraDB' instance
-                (alternatively to 'token', 'api_endpoint' and 'environment').
-            async_astra_db_client:
-                *DEPRECATED starting from version 0.3.5.*
-                *Please use 'token', 'api_endpoint' and optionally 'environment'.*
-                you can pass an already-created 'astrapy.db.AsyncAstraDB' instance
-                (alternatively to 'token', 'api_endpoint' and 'environment').
             namespace: namespace (aka keyspace) where the collection is created.
                 If not provided, the environment variable ASTRA_DB_KEYSPACE is
                 inspected. Defaults to the database's "default namespace".
@@ -488,6 +481,26 @@ class AstraDBVectorStore(VectorStore):
                 ``metric``, ``setup_mode``, ``metadata_indexing_include``,
                 ``metadata_indexing_exclude``, ``collection_indexing_policy``,
                 ``collection_vector_service_options``.
+            ext_callers: one or more caller identities to identify Data API calls
+                in the User-Agent header. This is a list of (name, version) pairs,
+                or just strings if no version info is provided, which, if supplied,
+                becomes the leading part of the User-Agent string in all API requests
+                related to this component.
+            component_name: the string identifying this specific component in the
+                stack of usage info passed as the User-Agent string to the Data API.
+                Defaults to "langchain_vectorstore", but can be overridden if this
+                component actually serves as the building block for another component
+                (such as a Graph Vector Store).
+            astra_db_client:
+                *DEPRECATED starting from version 0.3.5.*
+                *Please use 'token', 'api_endpoint' and optionally 'environment'.*
+                you can pass an already-created 'astrapy.db.AstraDB' instance
+                (alternatively to 'token', 'api_endpoint' and 'environment').
+            async_astra_db_client:
+                *DEPRECATED starting from version 0.3.5.*
+                *Please use 'token', 'api_endpoint' and optionally 'environment'.*
+                you can pass an already-created 'astrapy.db.AsyncAstraDB' instance
+                (alternatively to 'token', 'api_endpoint' and 'environment').
 
         Note:
             For concurrency in synchronous :meth:`~add_texts`:, as a rule of thumb,
@@ -587,10 +600,12 @@ class AstraDBVectorStore(VectorStore):
                 collection_name=self.collection_name,
                 token=self.token,
                 api_endpoint=self.api_endpoint,
+                keyspace=self.namespace,
                 environment=self.environment,
+                ext_callers=ext_callers,
+                component_name=component_name,
                 astra_db_client=astra_db_client,
                 async_astra_db_client=async_astra_db_client,
-                keyspace=self.namespace,
             )
             if c_descriptor is None:
                 msg = f"Collection '{self.collection_name}' not found."
@@ -643,10 +658,8 @@ class AstraDBVectorStore(VectorStore):
             collection_name=collection_name,
             token=self.token,
             api_endpoint=self.api_endpoint,
-            environment=self.environment,
-            astra_db_client=astra_db_client,
-            async_astra_db_client=async_astra_db_client,
             keyspace=self.namespace,
+            environment=self.environment,
             setup_mode=_setup_mode,
             pre_delete_collection=pre_delete_collection,
             embedding_dimension=_embedding_dimension,
@@ -655,6 +668,10 @@ class AstraDBVectorStore(VectorStore):
             default_indexing_policy=DEFAULT_INDEXING_OPTIONS,
             collection_vector_service_options=self.collection_vector_service_options,
             collection_embedding_api_key=self.collection_embedding_api_key,
+            ext_callers=ext_callers,
+            component_name=component_name,
+            astra_db_client=astra_db_client,
+            async_astra_db_client=async_astra_db_client,
         )
 
     def _get_safe_embedding(self) -> Embeddings:

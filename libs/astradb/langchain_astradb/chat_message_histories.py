@@ -16,6 +16,7 @@ from langchain_core.messages import (
 from typing_extensions import override
 
 from langchain_astradb.utils.astradb import (
+    COMPONENT_NAME_CHATMESSAGEHISTORY,
     SetupMode,
     _AstraDBCollectionEnvironment,
 )
@@ -35,12 +36,13 @@ class AstraDBChatMessageHistory(BaseChatMessageHistory):
         collection_name: str = DEFAULT_COLLECTION_NAME,
         token: str | TokenProvider | None = None,
         api_endpoint: str | None = None,
-        environment: str | None = None,
-        astra_db_client: AstraDB | None = None,
-        async_astra_db_client: AsyncAstraDB | None = None,
         namespace: str | None = None,
+        environment: str | None = None,
         setup_mode: SetupMode = SetupMode.SYNC,
         pre_delete_collection: bool = False,
+        ext_callers: list[tuple[str | None, str | None] | str | None] | None = None,
+        astra_db_client: AstraDB | None = None,
+        async_astra_db_client: AsyncAstraDB | None = None,
     ) -> None:
         """Chat message history that stores history in Astra DB.
 
@@ -55,9 +57,22 @@ class AstraDBChatMessageHistory(BaseChatMessageHistory):
             api_endpoint: full URL to the API endpoint, such as
                 `https://<DB-ID>-us-east1.apps.astra.datastax.com`. If not provided,
                 the environment variable ASTRA_DB_API_ENDPOINT is inspected.
+            namespace: namespace (aka keyspace) where the collection is created.
+                If not provided, the environment variable ASTRA_DB_KEYSPACE is
+                inspected. Defaults to the database's "default namespace".
             environment: a string specifying the environment of the target Data API.
                 If omitted, defaults to "prod" (Astra DB production).
                 Other values are in `astrapy.constants.Environment` enum class.
+            setup_mode: mode used to create the Astra DB collection (SYNC, ASYNC or
+                OFF).
+            pre_delete_collection: whether to delete the collection
+                before creating it. If False and the collection already exists,
+                the collection will be used as is.
+            ext_callers: one or more caller identities to identify Data API calls
+                in the User-Agent header. This is a list of (name, version) pairs,
+                or just strings if no version info is provided, which, if supplied,
+                becomes the leading part of the User-Agent string in all API requests
+                related to this component.
             astra_db_client:
                 *DEPRECATED starting from version 0.3.5.*
                 *Please use 'token', 'api_endpoint' and optionally 'environment'.*
@@ -68,23 +83,19 @@ class AstraDBChatMessageHistory(BaseChatMessageHistory):
                 *Please use 'token', 'api_endpoint' and optionally 'environment'.*
                 you can pass an already-created 'astrapy.db.AsyncAstraDB' instance
                 (alternatively to 'token', 'api_endpoint' and 'environment').
-            namespace: namespace (aka keyspace) where the collection is created.
-                If not provided, the environment variable ASTRA_DB_KEYSPACE is
-                inspected. Defaults to the database's "default namespace".
-            setup_mode: mode used to create the Astra DB collection (SYNC, ASYNC or
-                OFF).
-            pre_delete_collection: whether to delete the collection.
         """
         self.astra_env = _AstraDBCollectionEnvironment(
             collection_name=collection_name,
             token=token,
             api_endpoint=api_endpoint,
-            environment=environment,
-            astra_db_client=astra_db_client,
-            async_astra_db_client=async_astra_db_client,
             keyspace=namespace,
+            environment=environment,
             setup_mode=setup_mode,
             pre_delete_collection=pre_delete_collection,
+            ext_callers=ext_callers,
+            component_name=COMPONENT_NAME_CHATMESSAGEHISTORY,
+            astra_db_client=astra_db_client,
+            async_astra_db_client=async_astra_db_client,
         )
 
         self.collection = self.astra_env.collection
