@@ -98,12 +98,12 @@ class TestMmrHelper:
         The embedding function used here ensures `texts` become
         the following vectors on a circle (numbered v0 through v3):
 
-            ______ v2
-            /      \
-            /        |  v1
+               ______ v2
+              /      \
+             /        |  v1
         v3  |     .    | query
-            |        /  v0
-            |______/                 (N.B. very crude drawing)
+             |        /  v0
+              |______/                 (N.B. very crude drawing)
 
 
         With fetch_k==2 and k==2, when query is at 0.0, (1, ),
@@ -123,7 +123,7 @@ class TestMmrHelper:
         )
         assert helper.pop_best() == "v0"
 
-        # After v0 is seletected, new nodes are discovered.
+        # After v0 is selected, new nodes are discovered.
         # v2 is closer than v3. v1 is "too similar" to "v0" so it's not included.
         helper.add_candidates(
             {
