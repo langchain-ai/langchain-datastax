@@ -366,7 +366,7 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
                 self.database.drop_collection(collection_name)
             if inspect.isawaitable(embedding_dimension):
                 msg = (
-                    "Cannot use an awaitable embedding_dimension with async_setup "
+                    "Cannot use an awaitable embedding_dimension with sync_setup "
                     "set to False"
                 )
                 raise ValueError(msg)
@@ -380,18 +380,20 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
                     service=collection_vector_service_options,
                     check_exists=False,
                 )
-            except DataAPIException:
+            except DataAPIException as data_api_exception:
                 # possibly the collection is preexisting and may have legacy,
                 # or custom, indexing settings: verify
                 collection_descriptors = list(self.database.list_collections())
-                if not self._validate_indexing_policy(
-                    collection_descriptors=collection_descriptors,
-                    collection_name=self.collection_name,
-                    requested_indexing_policy=requested_indexing_policy,
-                    default_indexing_policy=default_indexing_policy,
-                ):
-                    # other reasons for the exception
-                    raise
+                try:
+                    if not self._validate_indexing_policy(
+                        collection_descriptors=collection_descriptors,
+                        collection_name=self.collection_name,
+                        requested_indexing_policy=requested_indexing_policy,
+                        default_indexing_policy=default_indexing_policy,
+                    ):
+                        raise data_api_exception  # noqa: TRY201
+                except ValueError as validation_error:
+                    raise validation_error from data_api_exception
 
     async def _asetup_db(
         self,
@@ -420,20 +422,23 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
                 service=collection_vector_service_options,
                 check_exists=False,
             )
-        except DataAPIException:
+        except DataAPIException as data_api_exception:
             # possibly the collection is preexisting and may have legacy,
             # or custom, indexing settings: verify
             collection_descriptors = [
                 coll_desc async for coll_desc in self.async_database.list_collections()
             ]
-            if not self._validate_indexing_policy(
-                collection_descriptors=collection_descriptors,
-                collection_name=self.collection_name,
-                requested_indexing_policy=requested_indexing_policy,
-                default_indexing_policy=default_indexing_policy,
-            ):
-                # other reasons for the exception
-                raise
+            try:
+                if not self._validate_indexing_policy(
+                    collection_descriptors=collection_descriptors,
+                    collection_name=self.collection_name,
+                    requested_indexing_policy=requested_indexing_policy,
+                    default_indexing_policy=default_indexing_policy,
+                ):
+                    # other reasons for the exception
+                    raise data_api_exception  # noqa: TRY201
+            except ValueError as validation_error:
+                raise validation_error from data_api_exception
 
     @staticmethod
     def _validate_indexing_policy(

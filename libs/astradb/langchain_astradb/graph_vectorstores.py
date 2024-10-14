@@ -267,46 +267,61 @@ class AstraDBGraphVectorStore(GraphVectorStore):
         self.metadata_incoming_links_key = metadata_incoming_links_key
         self.embedding = embedding
 
-        # update indexing policy to ensure incoming_links are indexed, and the
-        # full links blob is not.
-        if collection_indexing_policy is not None:
-            collection_indexing_policy["allow"].append(self.metadata_incoming_links_key)
-        elif metadata_indexing_include is not None:
+        # update indexing policy to ensure incoming_links are indexed
+        if metadata_indexing_include is not None:
             metadata_indexing_include = set(metadata_indexing_include)
             metadata_indexing_include.add(self.metadata_incoming_links_key)
-        elif metadata_indexing_exclude is not None:
-            metadata_indexing_exclude = set(metadata_indexing_exclude)
-            metadata_indexing_exclude.add(METADATA_LINKS_KEY)
-        elif not autodetect_collection:
-            metadata_indexing_exclude = [METADATA_LINKS_KEY]
+        elif collection_indexing_policy is not None:
+            allow_list = collection_indexing_policy.get("allow")
+            if allow_list is not None:
+                allow_list = set(allow_list)
+                allow_list.add(self.metadata_incoming_links_key)
+                collection_indexing_policy["allow"] = list(allow_list)
 
-        self.vector_store = AstraDBVectorStore(
-            collection_name=collection_name,
-            embedding=embedding,
-            token=token,
-            api_endpoint=api_endpoint,
-            environment=environment,
-            namespace=namespace,
-            metric=metric,
-            batch_size=batch_size,
-            bulk_insert_batch_concurrency=bulk_insert_batch_concurrency,
-            bulk_insert_overwrite_concurrency=bulk_insert_overwrite_concurrency,
-            bulk_delete_concurrency=bulk_delete_concurrency,
-            setup_mode=setup_mode,
-            pre_delete_collection=pre_delete_collection,
-            metadata_indexing_include=metadata_indexing_include,
-            metadata_indexing_exclude=metadata_indexing_exclude,
-            collection_indexing_policy=collection_indexing_policy,
-            collection_vector_service_options=collection_vector_service_options,
-            collection_embedding_api_key=collection_embedding_api_key,
-            content_field=content_field,
-            ignore_invalid_documents=ignore_invalid_documents,
-            autodetect_collection=autodetect_collection,
-            ext_callers=ext_callers,
-            component_name=component_name,
-            astra_db_client=astra_db_client,
-            async_astra_db_client=async_astra_db_client,
-        )
+        try:
+            self.vector_store = AstraDBVectorStore(
+                collection_name=collection_name,
+                embedding=embedding,
+                token=token,
+                api_endpoint=api_endpoint,
+                environment=environment,
+                namespace=namespace,
+                metric=metric,
+                batch_size=batch_size,
+                bulk_insert_batch_concurrency=bulk_insert_batch_concurrency,
+                bulk_insert_overwrite_concurrency=bulk_insert_overwrite_concurrency,
+                bulk_delete_concurrency=bulk_delete_concurrency,
+                setup_mode=setup_mode,
+                pre_delete_collection=pre_delete_collection,
+                metadata_indexing_include=metadata_indexing_include,
+                metadata_indexing_exclude=metadata_indexing_exclude,
+                collection_indexing_policy=collection_indexing_policy,
+                collection_vector_service_options=collection_vector_service_options,
+                collection_embedding_api_key=collection_embedding_api_key,
+                content_field=content_field,
+                ignore_invalid_documents=ignore_invalid_documents,
+                autodetect_collection=autodetect_collection,
+                ext_callers=ext_callers,
+                component_name=component_name,
+                astra_db_client=astra_db_client,
+                async_astra_db_client=async_astra_db_client,
+            )
+
+            # # attempt a query to see if the table is setup correctly
+
+            # self.metadata_search(filter = {
+            #     self.metadata_incoming_links_key : "test"
+            # }, n=1)
+        except BaseException as exp:
+            # determine if error is because of a un-indexed column. Ref:
+            # https://docs.datastax.com/en/astra-db-serverless/api-reference/collections.html#considerations-for-selective-indexing
+            error_message = str(exp).lower()
+            if ("unindexed filter path" in error_message) or (
+                "incompatible with the requested indexing policy" in error_message
+            ):
+                msg = "The collection configuration is incompatible with vector graph store. Please create a new collection."  # noqa: E501
+                raise ValueError(msg) from exp
+            raise exp  # noqa: TRY201
 
         self.astra_env = self.vector_store.astra_env
 
@@ -340,7 +355,8 @@ class AstraDBGraphVectorStore(GraphVectorStore):
         """
         links = _deserialize_links(doc.metadata.get(METADATA_LINKS_KEY))
         doc.metadata[METADATA_LINKS_KEY] = links
-        del doc.metadata[self.metadata_incoming_links_key]
+        if self.metadata_incoming_links_key in doc.metadata:
+            del doc.metadata[self.metadata_incoming_links_key]
         return doc
 
     # TODO: Async (aadd_nodes)
@@ -559,6 +575,31 @@ class AstraDBGraphVectorStore(GraphVectorStore):
                 n=n,
             )
         ]
+
+    def get_by_document_id(self, document_id: str) -> Document | None:
+        """Retrieve a single document from the store, given its document ID.
+
+        Args:
+            document_id: The document ID
+
+        Returns:
+            The the document if it exists. Otherwise None.
+        """
+        doc = self.vector_store.get_by_document_id(document_id=document_id)
+        return self._restore_links(doc) if doc is not None else None
+
+    async def aget_by_document_id(self, document_id: str) -> Document | None:
+        """Retrieve a single document from the store, given its document ID.
+
+        Args:
+            document_id: The document ID
+
+        Returns:
+            The the document if it exists. Otherwise None.
+        """
+        await self.astra_env.aensure_db_setup()
+        doc = await self.vector_store.aget_by_document_id(document_id=document_id)
+        return self._restore_links(doc) if doc is not None else None
 
     def get_node(self, node_id: str) -> Node | None:
         """Retrieve a single node from the store, given its ID.
