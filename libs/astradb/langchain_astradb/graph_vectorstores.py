@@ -359,7 +359,31 @@ class AstraDBGraphVectorStore(GraphVectorStore):
             del doc.metadata[self.metadata_incoming_links_key]
         return doc
 
-    # TODO: Async (aadd_nodes)
+    def _get_node_metadata_for_insertion(self, node: Node) -> dict[str, Any]:
+        metadata = node.metadata.copy()
+        metadata[METADATA_LINKS_KEY] = _serialize_links(node.links)
+        metadata[self.metadata_incoming_links_key] = [
+            _metadata_link_key(link=link) for link in _incoming_links(node=node)
+        ]
+        return metadata
+
+    def _get_docs_for_insertion(
+        self, nodes: Iterable[Node]
+    ) -> tuple[list[Document], list[str]]:
+        docs = []
+        ids = []
+        for node in nodes:
+            node_id = secrets.token_hex(8) if not node.id else node.id
+
+            doc = Document(
+                page_content=node.text,
+                metadata=self._get_node_metadata_for_insertion(node=node),
+                id=node_id,
+            )
+            docs.append(doc)
+            ids.append(node_id)
+        return (docs, ids)
+
     @override
     def add_nodes(
         self,
@@ -372,26 +396,24 @@ class AstraDBGraphVectorStore(GraphVectorStore):
             nodes: the nodes to add.
             **kwargs: Additional keyword arguments.
         """
-        docs = []
-        ids = []
-        for node in nodes:
-            node_id = secrets.token_hex(8) if not node.id else node.id
-
-            combined_metadata = node.metadata.copy()
-            combined_metadata[METADATA_LINKS_KEY] = _serialize_links(node.links)
-            combined_metadata[self.metadata_incoming_links_key] = [
-                _metadata_link_key(link=link) for link in _incoming_links(node=node)
-            ]
-
-            doc = Document(
-                page_content=node.text,
-                metadata=combined_metadata,
-                id=node_id,
-            )
-            docs.append(doc)
-            ids.append(node_id)
-
+        (docs, ids) = self._get_docs_for_insertion(nodes=nodes)
         return self.vector_store.add_documents(docs, ids=ids)
+
+    @override
+    async def aadd_nodes(
+        self,
+        nodes: Iterable[Node],
+        **kwargs: Any,
+    ) -> AsyncIterable[str]:
+        """Add nodes to the graph store.
+
+        Args:
+            nodes: the nodes to add.
+            **kwargs: Additional keyword arguments.
+        """
+        (docs, ids) = self._get_docs_for_insertion(nodes=nodes)
+        for inserted_id in await self.vector_store.aadd_documents(docs, ids=ids):
+            yield inserted_id
 
     @classmethod
     @override
@@ -597,7 +619,6 @@ class AstraDBGraphVectorStore(GraphVectorStore):
         Returns:
             The the document if it exists. Otherwise None.
         """
-        await self.astra_env.aensure_db_setup()
         doc = await self.vector_store.aget_by_document_id(document_id=document_id)
         return self._restore_links(doc) if doc is not None else None
 
