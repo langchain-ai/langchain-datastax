@@ -342,14 +342,19 @@ class AstraDBGraphVectorStore(GraphVectorStore):
             test_vs.metadata_search(
                 filter={self.metadata_incoming_links_key: "test"}, n=1
             )
-        except BaseException as exp:
+        except ValueError as exp:
             # determine if error is because of a un-indexed column. Ref:
             # https://docs.datastax.com/en/astra-db-serverless/api-reference/collections.html#considerations-for-selective-indexing
             error_message = str(exp).lower()
             if ("unindexed filter path" in error_message) or (
                 "incompatible with the requested indexing policy" in error_message
             ):
-                msg = "The collection configuration is incompatible with vector graph store. Please create a new collection."  # noqa: E501
+                msg = (
+                    "The collection configuration is incompatible with vector graph "
+                    "store. Please create a new collection and make sure the path "
+                    f"`{self.metadata_incoming_links_key}` is not excluded by indexing."
+                )
+
                 raise ValueError(msg) from exp
             raise exp  # noqa: TRY201
 

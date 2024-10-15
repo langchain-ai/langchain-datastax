@@ -232,7 +232,11 @@ class TestUpgradeToGraphVectorStore:
         assert v_doc is not None
         assert v_doc.page_content == doc_al.page_content
 
-        expected_msg = "The collection configuration is incompatible with vector graph store. Please create a new collection."  # noqa: E501
+        expected_msg = (
+            "The collection configuration is incompatible with vector graph "
+            "store. Please create a new collection and make sure the path "
+            "`incoming_links` is not excluded by indexing."
+        )
         with pytest.raises(ValueError, match=expected_msg):
             # Create a GRAPH Vector Store using the existing collection from above
             # with setup_mode=gvs_setup_mode and indexing_policy=gvs_indexing_policy
@@ -294,7 +298,11 @@ class TestUpgradeToGraphVectorStore:
         assert v_doc is not None
         assert v_doc.page_content == doc_al.page_content
 
-        expected_msg = "The collection configuration is incompatible with vector graph store. Please create a new collection."  # noqa: E501
+        expected_msg = (
+            "The collection configuration is incompatible with vector graph "
+            "store. Please create a new collection and make sure the path "
+            "`incoming_links` is not excluded by indexing."
+        )
         with pytest.raises(ValueError, match=expected_msg):
             # Create a GRAPH Vector Store using the existing collection from above
             # with setup_mode=gvs_setup_mode and indexing_policy=gvs_indexing_policy
