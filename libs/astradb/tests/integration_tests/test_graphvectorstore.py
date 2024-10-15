@@ -61,24 +61,24 @@ def graph_vector_store_docs() -> list[Document]:
     """
 
     docs_a = [
-        Document(page_content="[-1, 9]", metadata={"label": "AL"}),
-        Document(page_content="[0, 10]", metadata={"label": "A0"}),
-        Document(page_content="[1, 9]", metadata={"label": "AR"}),
+        Document(id="AL", page_content="[-1, 9]", metadata={"label": "AL"}),
+        Document(id="A0", page_content="[0, 10]", metadata={"label": "A0"}),
+        Document(id="AR", page_content="[1, 9]", metadata={"label": "AR"}),
     ]
     docs_b = [
-        Document(page_content="[9, 1]", metadata={"label": "BL"}),
-        Document(page_content="[10, 0]", metadata={"label": "B0"}),
-        Document(page_content="[9, -1]", metadata={"label": "BR"}),
+        Document(id="BL", page_content="[9, 1]", metadata={"label": "BL"}),
+        Document(id="B0", page_content="[10, 0]", metadata={"label": "B0"}),
+        Document(id="BL", page_content="[9, -1]", metadata={"label": "BR"}),
     ]
     docs_f = [
-        Document(page_content="[1, -9]", metadata={"label": "BL"}),
-        Document(page_content="[0, -10]", metadata={"label": "B0"}),
-        Document(page_content="[-1, -9]", metadata={"label": "BR"}),
+        Document(id="FL", page_content="[1, -9]", metadata={"label": "FL"}),
+        Document(id="F0", page_content="[0, -10]", metadata={"label": "F0"}),
+        Document(id="FR", page_content="[-1, -9]", metadata={"label": "FR"}),
     ]
     docs_t = [
-        Document(page_content="[-9, -1]", metadata={"label": "TL"}),
-        Document(page_content="[-10, 0]", metadata={"label": "T0"}),
-        Document(page_content="[-9, 1]", metadata={"label": "TR"}),
+        Document(id="TL", page_content="[-9, -1]", metadata={"label": "TL"}),
+        Document(id="T0", page_content="[-10, 0]", metadata={"label": "T0"}),
+        Document(id="TR", page_content="[-9, 1]", metadata={"label": "TR"}),
     ]
     for doc_a, suffix in zip(docs_a, ["l", "0", "r"]):
         add_links(doc_a, Link.bidir(kind="ab_example", tag=f"tag_{suffix}"))
@@ -199,7 +199,7 @@ class TestAstraDBGraphVectorStore:
         ],
         ids=["native_store", "autodetected_store"],
     )
-    def test_gvs_similarity_search(
+    def test_gvs_similarity_search_sync(
         self,
         *,
         store_name: str,
@@ -225,7 +225,35 @@ class TestAstraDBGraphVectorStore:
         ],
         ids=["native_store", "autodetected_store"],
     )
-    def test_gvs_traversal_search(
+    async def test_gvs_similarity_search_async(
+        self,
+        *,
+        store_name: str,
+        is_autodetected: bool,
+        request: pytest.FixtureRequest,
+    ) -> None:
+        """Simple (non-graph) similarity search on a graph vector store."""
+        store: AstraDBGraphVectorStore = request.getfixturevalue(store_name)
+        ss_response = await store.asimilarity_search(query="[2, 10]", k=2)
+        ss_labels = [doc.metadata["label"] for doc in ss_response]
+        assert ss_labels == ["AR", "A0"]
+        ss_by_v_response = await store.asimilarity_search_by_vector(
+            embedding=[2, 10], k=2
+        )
+        ss_by_v_labels = [doc.metadata["label"] for doc in ss_by_v_response]
+        assert ss_by_v_labels == ["AR", "A0"]
+        if is_autodetected:
+            assert_all_flat_docs(store.vector_store.astra_env.collection)
+
+    @pytest.mark.parametrize(
+        ("store_name", "is_autodetected"),
+        [
+            ("populated_graph_vector_store_d2", False),
+            ("autodetect_populated_graph_vector_store_d2", True),
+        ],
+        ids=["native_store", "autodetected_store"],
+    )
+    def test_gvs_traversal_search_sync(
         self,
         *,
         store_name: str,
@@ -250,7 +278,33 @@ class TestAstraDBGraphVectorStore:
         ],
         ids=["native_store", "autodetected_store"],
     )
-    def test_gvs_mmr_traversal_search(
+    async def test_gvs_traversal_search_async(
+        self,
+        *,
+        store_name: str,
+        is_autodetected: bool,
+        request: pytest.FixtureRequest,
+    ) -> None:
+        """Graph traversal search on a graph vector store."""
+        store: AstraDBGraphVectorStore = request.getfixturevalue(store_name)
+        ts_labels = set()
+        async for doc in store.atraversal_search(query="[2, 10]", k=2, depth=2):
+            ts_labels.add(doc.metadata["label"])
+        # this is a set, as some of the internals of trav.search are set-driven
+        # so ordering is not deterministic:
+        assert ts_labels == {"AR", "A0", "BR", "B0", "TR", "T0"}
+        if is_autodetected:
+            assert_all_flat_docs(store.vector_store.astra_env.collection)
+
+    @pytest.mark.parametrize(
+        ("store_name", "is_autodetected"),
+        [
+            ("populated_graph_vector_store_d2", False),
+            ("autodetect_populated_graph_vector_store_d2", True),
+        ],
+        ids=["native_store", "autodetected_store"],
+    )
+    def test_gvs_mmr_traversal_search_sync(
         self,
         *,
         store_name: str,
@@ -272,6 +326,158 @@ class TestAstraDBGraphVectorStore:
         assert mt_labels == {"AR", "BR"}
         if is_autodetected:
             assert_all_flat_docs(store.vector_store.astra_env.collection)
+
+    @pytest.mark.parametrize(
+        ("store_name", "is_autodetected"),
+        [
+            ("populated_graph_vector_store_d2", False),
+            ("autodetect_populated_graph_vector_store_d2", True),
+        ],
+        ids=["native_store", "autodetected_store"],
+    )
+    async def test_gvs_mmr_traversal_search_async(
+        self,
+        *,
+        store_name: str,
+        is_autodetected: bool,
+        request: pytest.FixtureRequest,
+    ) -> None:
+        """MMR Graph traversal search on a graph vector store."""
+        store: AstraDBGraphVectorStore = request.getfixturevalue(store_name)
+        mt_labels = set()
+        async for doc in store.ammr_traversal_search(
+            query="[2, 10]",
+            k=2,
+            depth=2,
+            fetch_k=1,
+            adjacent_k=2,
+            lambda_mult=0.1,
+        ):
+            mt_labels.add(doc.metadata["label"])
+        # TODO: can this rightfully be a list (or must it be a set)?
+        assert mt_labels == {"AR", "BR"}
+        if is_autodetected:
+            assert_all_flat_docs(store.vector_store.astra_env.collection)
+
+    @pytest.mark.parametrize(
+        ("store_name"),
+        [
+            ("populated_graph_vector_store_d2"),
+            ("autodetect_populated_graph_vector_store_d2"),
+        ],
+        ids=["native_store", "autodetected_store"],
+    )
+    def test_gvs_metadata_search_sync(
+        self,
+        *,
+        store_name: str,
+        request: pytest.FixtureRequest,
+    ) -> None:
+        """Metadata search on a graph vector store."""
+        store: AstraDBGraphVectorStore = request.getfixturevalue(store_name)
+        mt_response = store.metadata_search(
+            filter={"label": "T0"},
+            n=2,
+        )
+        doc: Document = next(iter(mt_response))
+        assert doc.page_content == "[-10, 0]"
+        links = doc.metadata["links"]
+        assert len(links) == 1
+        link: Link = links.pop()
+        assert isinstance(link, Link)
+        assert link.direction == "in"
+        assert link.kind == "at_example"
+        assert link.tag == "tag_0"
+
+    @pytest.mark.parametrize(
+        ("store_name"),
+        [
+            ("populated_graph_vector_store_d2"),
+            ("autodetect_populated_graph_vector_store_d2"),
+        ],
+        ids=["native_store", "autodetected_store"],
+    )
+    async def test_gvs_metadata_search_async(
+        self,
+        *,
+        store_name: str,
+        request: pytest.FixtureRequest,
+    ) -> None:
+        """Metadata search on a graph vector store."""
+        store: AstraDBGraphVectorStore = request.getfixturevalue(store_name)
+        mt_response = await store.ametadata_search(
+            filter={"label": "T0"},
+            n=2,
+        )
+        doc: Document = next(iter(mt_response))
+        assert doc.page_content == "[-10, 0]"
+        links: set[Link] = doc.metadata["links"]
+        assert len(links) == 1
+        link: Link = links.pop()
+        assert isinstance(link, Link)
+        assert link.direction == "in"
+        assert link.kind == "at_example"
+        assert link.tag == "tag_0"
+
+    @pytest.mark.parametrize(
+        ("store_name"),
+        [
+            ("populated_graph_vector_store_d2"),
+            ("autodetect_populated_graph_vector_store_d2"),
+        ],
+        ids=["native_store", "autodetected_store"],
+    )
+    def test_gvs_get_by_document_id_sync(
+        self,
+        *,
+        store_name: str,
+        request: pytest.FixtureRequest,
+    ) -> None:
+        """Get by document_id on a graph vector store."""
+        store: AstraDBGraphVectorStore = request.getfixturevalue(store_name)
+        doc = store.get_by_document_id(document_id="FL")
+        assert doc is not None
+        assert doc.page_content == "[1, -9]"
+        links = doc.metadata["links"]
+        assert len(links) == 1
+        link: Link = links.pop()
+        assert isinstance(link, Link)
+        assert link.direction == "out"
+        assert link.kind == "af_example"
+        assert link.tag == "tag_l"
+
+        invalid_doc = store.get_by_document_id(document_id="invalid")
+        assert invalid_doc is None
+
+    @pytest.mark.parametrize(
+        ("store_name"),
+        [
+            ("populated_graph_vector_store_d2"),
+            ("autodetect_populated_graph_vector_store_d2"),
+        ],
+        ids=["native_store", "autodetected_store"],
+    )
+    async def test_gvs_get_by_document_id_async(
+        self,
+        *,
+        store_name: str,
+        request: pytest.FixtureRequest,
+    ) -> None:
+        """Get by document_id on a graph vector store."""
+        store: AstraDBGraphVectorStore = request.getfixturevalue(store_name)
+        doc = await store.aget_by_document_id(document_id="FL")
+        assert doc is not None
+        assert doc.page_content == "[1, -9]"
+        links = doc.metadata["links"]
+        assert len(links) == 1
+        link: Link = links.pop()
+        assert isinstance(link, Link)
+        assert link.direction == "out"
+        assert link.kind == "af_example"
+        assert link.tag == "tag_l"
+
+        invalid_doc = await store.aget_by_document_id(document_id="invalid")
+        assert invalid_doc is None
 
     def test_gvs_from_texts(
         self,
@@ -330,7 +536,7 @@ class TestAstraDBGraphVectorStore:
         # there may be more re:graph structure.
         assert hits[0].metadata["md"] == 1
 
-    def test_gvs_add_nodes(
+    def test_gvs_add_nodes_sync(
         self,
         *,
         graph_vector_store_d2: AstraDBGraphVectorStore,
@@ -348,6 +554,38 @@ class TestAstraDBGraphVectorStore:
         ]
         graph_vector_store_d2.add_nodes(nodes)
         hits = graph_vector_store_d2.similarity_search_by_vector([0, 3])
+        assert len(hits) == 2
+        assert hits[0].id == "id0"
+        assert hits[0].page_content == "[0, 2]"
+        md0 = hits[0].metadata
+        assert md0["m"] == 0
+        assert any(isinstance(v, set) for k, v in md0.items() if k != "m")
+        assert hits[1].id != "id0"
+        assert hits[1].page_content == "[0, 1]"
+        md1 = hits[1].metadata
+        assert md1["m"] == 1
+        assert any(isinstance(v, set) for k, v in md1.items() if k != "m")
+
+    async def test_gvs_add_nodes_async(
+        self,
+        *,
+        graph_vector_store_d2: AstraDBGraphVectorStore,
+    ) -> None:
+        links0 = [
+            Link(kind="kA", direction="out", tag="tA"),
+            Link(kind="kB", direction="bidir", tag="tB"),
+        ]
+        links1 = [
+            Link(kind="kC", direction="in", tag="tC"),
+        ]
+        nodes = [
+            Node(id="id0", text="[0, 2]", metadata={"m": 0}, links=links0),
+            Node(text="[0, 1]", metadata={"m": 1}, links=links1),
+        ]
+        async for _ in graph_vector_store_d2.aadd_nodes(nodes):
+            pass
+
+        hits = await graph_vector_store_d2.asimilarity_search_by_vector([0, 3])
         assert len(hits) == 2
         assert hits[0].id == "id0"
         assert hits[0].page_content == "[0, 2]"

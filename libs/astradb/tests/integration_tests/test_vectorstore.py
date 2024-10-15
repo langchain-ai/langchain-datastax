@@ -29,6 +29,43 @@ if TYPE_CHECKING:
     from .conftest import AstraDBCredentials
 
 
+@pytest.fixture
+def metadata_documents() -> list[Document]:
+    """Documents for metadata and id tests"""
+    return [
+        Document(
+            id="q",
+            page_content="[1,2]",
+            metadata={"ord": ord("q"), "group": "consonant", "letter": "q"},
+        ),
+        Document(
+            id="w",
+            page_content="[3,4]",
+            metadata={"ord": ord("w"), "group": "consonant", "letter": "w"},
+        ),
+        Document(
+            id="r",
+            page_content="[5,6]",
+            metadata={"ord": ord("r"), "group": "consonant", "letter": "r"},
+        ),
+        Document(
+            id="e",
+            page_content="[-1,2]",
+            metadata={"ord": ord("e"), "group": "vowel", "letter": "e"},
+        ),
+        Document(
+            id="i",
+            page_content="[-3,4]",
+            metadata={"ord": ord("i"), "group": "vowel", "letter": "i"},
+        ),
+        Document(
+            id="o",
+            page_content="[-5,6]",
+            metadata={"ord": ord("o"), "group": "vowel", "letter": "o"},
+        ),
+    ]
+
+
 @pytest.mark.skipif(
     not astra_db_env_vars_available(), reason="Missing Astra DB env. vars"
 )
@@ -1100,41 +1137,15 @@ class TestAstraDBVectorStore:
             "vector_store_vz",
         ],
     )
-    def test_astradb_vectorstore_metadata(
+    def test_astradb_vectorstore_metadata_filter(
         self,
         vector_store: str,
         request: pytest.FixtureRequest,
+        metadata_documents: list[Document],
     ) -> None:
         """Metadata filtering."""
         vstore: AstraDBVectorStore = request.getfixturevalue(vector_store)
-        vstore.add_documents(
-            [
-                Document(
-                    page_content="[1,2]",
-                    metadata={"ord": ord("q"), "group": "consonant", "letter": "q"},
-                ),
-                Document(
-                    page_content="[3,4]",
-                    metadata={"ord": ord("w"), "group": "consonant", "letter": "w"},
-                ),
-                Document(
-                    page_content="[5,6]",
-                    metadata={"ord": ord("r"), "group": "consonant", "letter": "r"},
-                ),
-                Document(
-                    page_content="[-1,2]",
-                    metadata={"ord": ord("e"), "group": "vowel", "letter": "e"},
-                ),
-                Document(
-                    page_content="[-3,4]",
-                    metadata={"ord": ord("i"), "group": "vowel", "letter": "i"},
-                ),
-                Document(
-                    page_content="[-5,6]",
-                    metadata={"ord": ord("o"), "group": "vowel", "letter": "o"},
-                ),
-            ]
-        )
+        vstore.add_documents(metadata_documents)
         # no filters
         res0 = vstore.similarity_search("[-1,-1]", k=10)
         assert {doc.metadata["letter"] for doc in res0} == set("qwreio")
@@ -1166,6 +1177,148 @@ class TestAstraDBVectorStore:
             filter={"$or": [{"ord": ord("q")}, {"ord": ord("r")}]},
         )
         assert {doc.metadata["letter"] for doc in res4} == {"q", "r"}
+
+    @pytest.mark.parametrize(
+        "vector_store",
+        [
+            "vector_store_d2",
+            "vector_store_vz",
+        ],
+    )
+    def test_astradb_vectorstore_metadata_search_sync(
+        self,
+        vector_store: str,
+        request: pytest.FixtureRequest,
+        metadata_documents: list[Document],
+    ) -> None:
+        """Metadata Search"""
+        vstore: AstraDBVectorStore = request.getfixturevalue(vector_store)
+        vstore.add_documents(metadata_documents)
+        # no filters
+        res0 = vstore.metadata_search(filter={}, n=10)
+        assert {doc.metadata["letter"] for doc in res0} == set("qwreio")
+        # single filter
+        res1 = vstore.metadata_search(
+            n=10,
+            filter={"group": "vowel"},
+        )
+        assert {doc.metadata["letter"] for doc in res1} == set("eio")
+        # multiple filters
+        res2 = vstore.metadata_search(
+            n=10,
+            filter={"group": "consonant", "ord": ord("q")},
+        )
+        assert {doc.metadata["letter"] for doc in res2} == set("q")
+        # excessive filters
+        res3 = vstore.metadata_search(
+            n=10,
+            filter={"group": "consonant", "ord": ord("q"), "case": "upper"},
+        )
+        assert res3 == []
+        # filter with logical operator
+        res4 = vstore.metadata_search(
+            n=10,
+            filter={"$or": [{"ord": ord("q")}, {"ord": ord("r")}]},
+        )
+        assert {doc.metadata["letter"] for doc in res4} == {"q", "r"}
+
+    @pytest.mark.parametrize(
+        "vector_store",
+        [
+            "vector_store_d2",
+            "vector_store_vz",
+        ],
+    )
+    async def test_astradb_vectorstore_metadata_search_async(
+        self,
+        vector_store: str,
+        request: pytest.FixtureRequest,
+        metadata_documents: list[Document],
+    ) -> None:
+        """Metadata Search"""
+        vstore: AstraDBVectorStore = request.getfixturevalue(vector_store)
+        await vstore.aadd_documents(metadata_documents)
+        # no filters
+        res0 = await vstore.ametadata_search(filter={}, n=10)
+        assert {doc.metadata["letter"] for doc in res0} == set("qwreio")
+        # single filter
+        res1 = vstore.metadata_search(
+            n=10,
+            filter={"group": "vowel"},
+        )
+        assert {doc.metadata["letter"] for doc in res1} == set("eio")
+        # multiple filters
+        res2 = await vstore.ametadata_search(
+            n=10,
+            filter={"group": "consonant", "ord": ord("q")},
+        )
+        assert {doc.metadata["letter"] for doc in res2} == set("q")
+        # excessive filters
+        res3 = await vstore.ametadata_search(
+            n=10,
+            filter={"group": "consonant", "ord": ord("q"), "case": "upper"},
+        )
+        assert res3 == []
+        # filter with logical operator
+        res4 = await vstore.ametadata_search(
+            n=10,
+            filter={"$or": [{"ord": ord("q")}, {"ord": ord("r")}]},
+        )
+        assert {doc.metadata["letter"] for doc in res4} == {"q", "r"}
+
+    @pytest.mark.parametrize(
+        "vector_store",
+        [
+            "vector_store_d2",
+            "vector_store_vz",
+        ],
+    )
+    def test_astradb_vectorstore_get_by_document_id_sync(
+        self,
+        vector_store: str,
+        request: pytest.FixtureRequest,
+        metadata_documents: list[Document],
+    ) -> None:
+        """Get by document_id"""
+        vstore: AstraDBVectorStore = request.getfixturevalue(vector_store)
+        vstore.add_documents(metadata_documents)
+        # invalid id
+        invalid = vstore.get_by_document_id(document_id="z")
+        assert invalid is None
+        # valid id
+        valid = vstore.get_by_document_id(document_id="q")
+        assert isinstance(valid, Document)
+        assert valid.id == "q"
+        assert valid.page_content == "[1,2]"
+        assert valid.metadata["group"] == "consonant"
+        assert valid.metadata["letter"] == "q"
+
+    @pytest.mark.parametrize(
+        "vector_store",
+        [
+            "vector_store_d2",
+            "vector_store_vz",
+        ],
+    )
+    async def test_astradb_vectorstore_get_by_document_id_async(
+        self,
+        vector_store: str,
+        request: pytest.FixtureRequest,
+        metadata_documents: list[Document],
+    ) -> None:
+        """Get by document_id"""
+        vstore: AstraDBVectorStore = request.getfixturevalue(vector_store)
+        await vstore.aadd_documents(metadata_documents)
+        # invalid id
+        invalid = await vstore.aget_by_document_id(document_id="z")
+        assert invalid is None
+        # valid id
+        valid = await vstore.aget_by_document_id(document_id="q")
+        assert isinstance(valid, Document)
+        assert valid.id == "q"
+        assert valid.page_content == "[1,2]"
+        assert valid.metadata["group"] == "consonant"
+        assert valid.metadata["letter"] == "q"
 
     @pytest.mark.parametrize(
         ("is_vectorize", "vector_store", "texts", "query"),

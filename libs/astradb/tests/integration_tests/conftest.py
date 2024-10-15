@@ -66,8 +66,10 @@ EPHEMERAL_COLLECTION_NAME_VZ = "lc_test_vz_cosine_short"
 # for KMS (aka shared_secret) vectorize setup (vectorstores)
 EPHEMERAL_COLLECTION_NAME_VZ_KMS = "lc_test_vz_kms_short"
 # indexing-related collection names (function-lived) (vectorstores)
+EPHEMERAL_ALLOW_IDX_NAME_D2 = "lc_test_allow_idx_d2_short"
 EPHEMERAL_CUSTOM_IDX_NAME_D2 = "lc_test_custom_idx_d2_short"
 EPHEMERAL_DEFAULT_IDX_NAME_D2 = "lc_test_default_idx_d2_short"
+EPHEMERAL_DENY_IDX_NAME_D2 = "lc_test_deny_idx_d2_short"
 EPHEMERAL_LEGACY_IDX_NAME_D2 = "lc_test_legacy_idx_d2_short"
 # indexing-related collection names (function-lived) (storage)
 EPHEMERAL_CUSTOM_IDX_NAME = "lc_test_custom_idx_short"
@@ -515,8 +517,10 @@ def ephemeral_indexing_collections_cleaner(
     """
 
     collection_names = [
+        EPHEMERAL_ALLOW_IDX_NAME_D2,
         EPHEMERAL_CUSTOM_IDX_NAME_D2,
         EPHEMERAL_DEFAULT_IDX_NAME_D2,
+        EPHEMERAL_DENY_IDX_NAME_D2,
         EPHEMERAL_LEGACY_IDX_NAME_D2,
         EPHEMERAL_CUSTOM_IDX_NAME,
         EPHEMERAL_LEGACY_IDX_NAME,

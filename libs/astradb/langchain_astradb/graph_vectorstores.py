@@ -22,7 +22,7 @@ from langchain_core._api import beta
 from langchain_core.documents import Document
 from typing_extensions import override
 
-from langchain_astradb.utils.astradb import COMPONENT_NAME_GRAPHVECTORSTORE
+from langchain_astradb.utils.astradb import COMPONENT_NAME_GRAPHVECTORSTORE, SetupMode
 from langchain_astradb.utils.mmr_helper import MmrHelper
 from langchain_astradb.vectorstores import AstraDBVectorStore
 
@@ -32,8 +32,6 @@ if TYPE_CHECKING:
     from astrapy.db import AsyncAstraDB as AsyncAstraDBClient
     from astrapy.info import CollectionVectorServiceOptions
     from langchain_core.embeddings import Embeddings
-
-    from langchain_astradb.utils.astradb import SetupMode
 
 DEFAULT_INDEXING_OPTIONS = {"allow": ["metadata"]}
 
@@ -307,11 +305,43 @@ class AstraDBGraphVectorStore(GraphVectorStore):
                 async_astra_db_client=async_astra_db_client,
             )
 
-            # # attempt a query to see if the table is setup correctly
+            # for the test search, if setup_mode is ASYNC,
+            # create a temp store with SYNC
+            if setup_mode == SetupMode.ASYNC:
+                test_vs = AstraDBVectorStore(
+                    collection_name=collection_name,
+                    embedding=embedding,
+                    token=token,
+                    api_endpoint=api_endpoint,
+                    environment=environment,
+                    namespace=namespace,
+                    metric=metric,
+                    batch_size=batch_size,
+                    bulk_insert_batch_concurrency=bulk_insert_batch_concurrency,
+                    bulk_insert_overwrite_concurrency=bulk_insert_overwrite_concurrency,
+                    bulk_delete_concurrency=bulk_delete_concurrency,
+                    setup_mode=SetupMode.SYNC,
+                    pre_delete_collection=pre_delete_collection,
+                    metadata_indexing_include=metadata_indexing_include,
+                    metadata_indexing_exclude=metadata_indexing_exclude,
+                    collection_indexing_policy=collection_indexing_policy,
+                    collection_vector_service_options=collection_vector_service_options,
+                    collection_embedding_api_key=collection_embedding_api_key,
+                    content_field=content_field,
+                    ignore_invalid_documents=ignore_invalid_documents,
+                    autodetect_collection=autodetect_collection,
+                    ext_callers=ext_callers,
+                    component_name=component_name,
+                    astra_db_client=astra_db_client,
+                    async_astra_db_client=async_astra_db_client,
+                )
+            else:
+                test_vs = self.vector_store
 
-            # self.metadata_search(filter = {
-            #     self.metadata_incoming_links_key : "test"
-            # }, n=1)
+            # try a simple search to ensure that the indexes are setup properly
+            test_vs.metadata_search(
+                filter={self.metadata_incoming_links_key: "test"}, n=1
+            )
         except BaseException as exp:
             # determine if error is because of a un-indexed column. Ref:
             # https://docs.datastax.com/en/astra-db-serverless/api-reference/collections.html#considerations-for-selective-indexing
