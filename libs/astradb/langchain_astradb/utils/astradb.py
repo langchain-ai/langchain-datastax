@@ -366,7 +366,7 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
                 self.database.drop_collection(collection_name)
             if inspect.isawaitable(embedding_dimension):
                 msg = (
-                    "Cannot use an awaitable embedding_dimension with sync_setup "
+                    "Cannot use an awaitable embedding_dimension with async_setup "
                     "set to False"
                 )
                 raise ValueError(msg)

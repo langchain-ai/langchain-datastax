@@ -824,6 +824,7 @@ class TestAstraDBVectorStore:
 
         all_ids = [f"doc_{idx}" for idx in range(full_size)]
         all_texts = [f"[0,{idx + 1}]" for idx in range(full_size)]
+        all_embeddings = [[0, idx + 1] for idx in range(full_size)]
 
         # massive insertion on empty
         group0_ids = all_ids[0:first_group_size]
@@ -855,6 +856,16 @@ class TestAstraDBVectorStore:
         )
         for doc, _, doc_id in full_results:
             assert doc.page_content == expected_text_by_id[doc_id]
+        expected_embedding_by_id = dict(zip(all_ids, all_embeddings))
+        full_results_with_embeddings = (
+            await vector_store_d2.asimilarity_search_with_embedding_id_by_vector(
+                embedding=[1.0, 1.0],
+                k=full_size,
+            )
+        )
+        for doc, embedding, doc_id in full_results_with_embeddings:
+            assert doc.page_content == expected_text_by_id[doc_id]
+            assert embedding == expected_embedding_by_id[doc_id]
 
     def test_astradb_vectorstore_delete_by_metadata_sync(
         self,
