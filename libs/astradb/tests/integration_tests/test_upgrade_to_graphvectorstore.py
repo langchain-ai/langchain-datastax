@@ -234,8 +234,8 @@ class TestUpgradeToGraphVectorStore:
 
         expected_msg = (
             "The collection configuration is incompatible with vector graph "
-            "store. Please create a new collection and make sure the path "
-            "`incoming_links` is not excluded by indexing."
+            "store. Please create a new collection and make sure the metadata "
+            f"path is not excluded by indexing."
         )
         with pytest.raises(ValueError, match=expected_msg):
             # Create a GRAPH Vector Store using the existing collection from above
@@ -300,8 +300,8 @@ class TestUpgradeToGraphVectorStore:
 
         expected_msg = (
             "The collection configuration is incompatible with vector graph "
-            "store. Please create a new collection and make sure the path "
-            "`incoming_links` is not excluded by indexing."
+            "store. Please create a new collection and make sure the metadata "
+            f"path is not excluded by indexing."
         )
         with pytest.raises(ValueError, match=expected_msg):
             # Create a GRAPH Vector Store using the existing collection from above

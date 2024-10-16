@@ -327,14 +327,6 @@ class TestCallers:
             ),
         ).respond_with_json(
             {
-                "status": {
-                    "collections": [
-                        {
-                            "name": "my_graph_coll",
-                            "options": {"vector": {"dimension": 2}},
-                        }
-                    ]
-                },
                 "data": {
                     "nextPageState": None,
                     "documents": [],

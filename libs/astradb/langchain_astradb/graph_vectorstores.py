@@ -232,8 +232,7 @@ class AstraDBGraphVectorStore(GraphVectorStore):
             component_name: the string identifying this specific component in the
                 stack of usage info passed as the User-Agent string to the Data API.
                 Defaults to "langchain_graphvectorstore", but can be overridden if this
-                component actually serves as the building block for another component
-                (such as a Graph Vector Store).
+                component actually serves as the building block for another component.
             astra_db_client:
                 *DEPRECATED starting from version 0.3.5.*
                 *Please use 'token', 'api_endpoint' and optionally 'environment'.*
@@ -351,8 +350,8 @@ class AstraDBGraphVectorStore(GraphVectorStore):
             ):
                 msg = (
                     "The collection configuration is incompatible with vector graph "
-                    "store. Please create a new collection and make sure the path "
-                    f"`{self.metadata_incoming_links_key}` is not excluded by indexing."
+                    "store. Please create a new collection and make sure the metadata "
+                    f"path is not excluded by indexing."
                 )
 
                 raise ValueError(msg) from exp
