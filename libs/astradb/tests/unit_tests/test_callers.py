@@ -294,6 +294,55 @@ class TestCallers:
             ext_callers=[("ec0", "ev0")],
         )
 
+    def test_callers_component_graphvectorstore(self, httpserver: HTTPServer) -> None:
+        """
+        End-to-end testing of callers passed through the components.
+        The graphvectorstore, which can also do autodetect operations,
+        requires separate handling.
+        """
+        base_endpoint = httpserver.url_for("/")
+        base_path = "/v1/ks"
+
+        # through the init flow
+        httpserver.expect_oneshot_request(
+            base_path,
+            method="POST",
+            headers={
+                "User-Agent": "ec0/ev0",
+            },
+            header_value_matcher=hv_prefix_matcher_factory(
+                COMPONENT_NAME_GRAPHVECTORSTORE
+            ),
+        ).respond_with_json({})
+
+        # the metadata_search test call
+        httpserver.expect_oneshot_request(
+            base_path + "/my_graph_coll",
+            method="POST",
+            headers={
+                "User-Agent": "ec0/ev0",
+            },
+            header_value_matcher=hv_prefix_matcher_factory(
+                COMPONENT_NAME_GRAPHVECTORSTORE
+            ),
+        ).respond_with_json(
+            {
+                "data": {
+                    "nextPageState": None,
+                    "documents": [],
+                },
+            }
+        )
+
+        AstraDBGraphVectorStore(
+            collection_name="my_graph_coll",
+            api_endpoint=base_endpoint,
+            environment=Environment.OTHER,
+            namespace="ks",
+            embedding=ParserEmbeddings(2),
+            ext_callers=[("ec0", "ev0")],
+        )
+
     @pytest.mark.parametrize(
         ("component_class", "component_name", "kwargs"),
         [
@@ -303,11 +352,6 @@ class TestCallers:
                 AstraDBChatMessageHistory,
                 COMPONENT_NAME_CHATMESSAGEHISTORY,
                 {"session_id": "x"},
-            ),
-            (
-                AstraDBGraphVectorStore,
-                COMPONENT_NAME_GRAPHVECTORSTORE,
-                {"embedding": ParserEmbeddings(2)},
             ),
             (
                 AstraDBSemanticCache,
@@ -320,7 +364,6 @@ class TestCallers:
             "Byte store",
             "Cache",
             "Chat message history",
-            "Graph vector store",
             "Semantic cache",
             "Store",
         ],

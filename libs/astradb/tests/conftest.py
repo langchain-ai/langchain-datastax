@@ -33,7 +33,6 @@ class ParserEmbeddings(Embeddings):
         try:
             vals = json.loads(text)
         except json.JSONDecodeError:
-            print(f'[ParserEmbeddings] Returning a moot vector for "{text}"')
             return [0.0] * self.dimension
         else:
             assert len(vals) == self.dimension
