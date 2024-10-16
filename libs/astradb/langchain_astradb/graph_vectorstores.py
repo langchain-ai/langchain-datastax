@@ -351,7 +351,7 @@ class AstraDBGraphVectorStore(GraphVectorStore):
                 msg = (
                     "The collection configuration is incompatible with vector graph "
                     "store. Please create a new collection and make sure the metadata "
-                    f"path is not excluded by indexing."
+                    "path is not excluded by indexing."
                 )
 
                 raise ValueError(msg) from exp
