@@ -104,7 +104,7 @@ class AstraDBGraphVectorStore(GraphVectorStore):
         self,
         *,
         collection_name: str,
-        embedding: Embeddings,
+        embedding: Embeddings | None = None,
         metadata_incoming_links_key: str = "incoming_links",
         token: str | TokenProvider | None = None,
         api_endpoint: str | None = None,
@@ -454,13 +454,20 @@ class AstraDBGraphVectorStore(GraphVectorStore):
     def from_texts(
         cls: type[AstraDBGraphVectorStore],
         texts: Iterable[str],
-        embedding: Embeddings,
+        embedding: Embeddings | None = None,
         metadatas: list[dict] | None = None,
         ids: Iterable[str] | None = None,
+        collection_vector_service_options: CollectionVectorServiceOptions | None = None,
+        collection_embedding_api_key: str | EmbeddingHeadersProvider | None = None,
         **kwargs: Any,
     ) -> AstraDBGraphVectorStore:
         """Return AstraDBGraphVectorStore initialized from texts and embeddings."""
-        store = cls(embedding=embedding, **kwargs)
+        store = cls(
+                embedding=embedding,
+                collection_vector_service_options=collection_vector_service_options,
+                collection_embedding_api_key=collection_embedding_api_key,
+                **kwargs
+            )
         store.add_texts(texts, metadatas, ids=ids)
         return store
 
@@ -469,12 +476,19 @@ class AstraDBGraphVectorStore(GraphVectorStore):
     def from_documents(
         cls: type[AstraDBGraphVectorStore],
         documents: Iterable[Document],
-        embedding: Embeddings,
+        embedding: Embeddings | None = None,
         ids: Iterable[str] | None = None,
+        collection_vector_service_options: CollectionVectorServiceOptions | None = None,
+        collection_embedding_api_key: str | EmbeddingHeadersProvider | None = None,
         **kwargs: Any,
     ) -> AstraDBGraphVectorStore:
         """Return AstraDBGraphVectorStore initialized from docs and embeddings."""
-        store = cls(embedding=embedding, **kwargs)
+        store = cls(
+                embedding=embedding,
+                collection_vector_service_options=collection_vector_service_options,
+                collection_embedding_api_key=collection_embedding_api_key,
+                **kwargs
+            )
         store.add_documents(documents, ids=ids)
         return store
 

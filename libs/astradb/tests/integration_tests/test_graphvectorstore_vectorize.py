@@ -1,5 +1,5 @@
 """Test of Astra DB graph vector store class `AstraDBGraphVectorStore`
-using client-side embedding.
+using Vectorize.
 
 Refer to `test_vectorstores.py` for the requirements to run.
 """
@@ -16,22 +16,21 @@ from langchain_core.documents import Document
 
 from langchain_astradb.graph_vectorstores import AstraDBGraphVectorStore
 from langchain_astradb.utils.astradb import SetupMode
+from langchain_openai import OpenAIEmbeddings
 
 from .conftest import (
-    CUSTOM_CONTENT_KEY,
-    LONG_TEXT,
+    OPENAI_VECTORIZE_OPTIONS_HEADER,
     astra_db_env_vars_available,
 )
 
 if TYPE_CHECKING:
-    from astrapy import Collection, Database
+    from astrapy import Collection
     from langchain_core.embeddings import Embeddings
 
     from .conftest import AstraDBCredentials
 
-
 @pytest.fixture
-def graph_vector_store_docs() -> list[Document]:
+def graph_vector_store_docs_vz() -> list[Document]:
     """
     This is a set of Documents to pre-populate a graph vector store,
     with entries placed in a certain way.
@@ -61,25 +60,25 @@ def graph_vector_store_docs() -> list[Document]:
     The links are like: L with L, 0 with 0 and R with R.
     """
 
-    docs_a = [
-        Document(id="AL", page_content="[-1, 9]", metadata={"label": "AL"}),
-        Document(id="A0", page_content="[0, 10]", metadata={"label": "A0"}),
-        Document(id="AR", page_content="[1, 9]", metadata={"label": "AR"}),
+    docs_a = [ # docs related to space and the universe
+        Document(id="AL", page_content="distant stars shine", metadata={"label": "AL"}),
+        Document(id="A0", page_content="nebulae swirl in space", metadata={"label": "A0"}),
+        Document(id="AR", page_content="planets orbit quietly", metadata={"label": "AR"}),
     ]
-    docs_b = [
-        Document(id="BL", page_content="[9, 1]", metadata={"label": "BL"}),
-        Document(id="B0", page_content="[10, 0]", metadata={"label": "B0"}),
-        Document(id="BL", page_content="[9, -1]", metadata={"label": "BR"}),
+    docs_b = [ # docs related to emotions and relationships
+        Document(id="BL", page_content="hearts intertwined", metadata={"label": "BL"}),
+        Document(id="B0", page_content="a gentle embrace", metadata={"label": "B0"}),
+        Document(id="BL", page_content="love conquers all", metadata={"label": "BR"}),
     ]
-    docs_f = [
-        Document(id="FL", page_content="[1, -9]", metadata={"label": "FL"}),
-        Document(id="F0", page_content="[0, -10]", metadata={"label": "F0"}),
-        Document(id="FR", page_content="[-1, -9]", metadata={"label": "FR"}),
+    docs_f = [ # docs related to technology and programming
+        Document(id="FL", page_content="code compiles efficiently", metadata={"label": "FL"}),
+        Document(id="F0", page_content="a neural network learns", metadata={"label": "F0"}),
+        Document(id="FR", page_content="data structures organize", metadata={"label": "FR"}),
     ]
-    docs_t = [
-        Document(id="TL", page_content="[-9, -1]", metadata={"label": "TL"}),
-        Document(id="T0", page_content="[-10, 0]", metadata={"label": "T0"}),
-        Document(id="TR", page_content="[-9, 1]", metadata={"label": "TR"}),
+    docs_t = [ # docs related to nature and wildlife
+        Document(id="TL", page_content="trees sway in the wind", metadata={"label": "TL"}),
+        Document(id="T0", page_content="a river runs deep", metadata={"label": "T0"}),
+        Document(id="TR", page_content="birds chirping at dawn", metadata={"label": "TR"}),
     ]
     for doc_a, suffix in zip(docs_a, ["l", "0", "r"]):
         add_links(doc_a, Link.bidir(kind="ab_example", tag=f"tag_{suffix}"))
@@ -95,14 +94,15 @@ def graph_vector_store_docs() -> list[Document]:
 
 
 @pytest.fixture
-def graph_vector_store_d2(
+def graph_vector_store_vz(
     astra_db_credentials: AstraDBCredentials,
-    empty_collection_d2: Collection,
-    embedding_d2: Embeddings,
+    openai_api_key: str,
+    empty_collection_vz: Collection,
 ) -> AstraDBGraphVectorStore:
     return AstraDBGraphVectorStore(
-        embedding=embedding_d2,
-        collection_name=empty_collection_d2.name,
+        collection_vector_service_options=OPENAI_VECTORIZE_OPTIONS_HEADER,
+        collection_embedding_api_key=openai_api_key,
+        collection_name=empty_collection_vz.name,
         token=StaticTokenProvider(astra_db_credentials["token"]),
         api_endpoint=astra_db_credentials["api_endpoint"],
         namespace=astra_db_credentials["namespace"],
@@ -112,67 +112,59 @@ def graph_vector_store_d2(
 
 
 @pytest.fixture
-def populated_graph_vector_store_d2(
-    graph_vector_store_d2: AstraDBGraphVectorStore,
-    graph_vector_store_docs: list[Document],
+def populated_graph_vector_store_vz(
+    graph_vector_store_vz: AstraDBGraphVectorStore,
+    graph_vector_store_docs_vz: list[Document],
 ) -> AstraDBGraphVectorStore:
-    graph_vector_store_d2.add_documents(graph_vector_store_docs)
-    return graph_vector_store_d2
+    graph_vector_store_vz.add_documents(graph_vector_store_docs_vz)
+    return graph_vector_store_vz
 
 
 @pytest.fixture
-def autodetect_populated_graph_vector_store_d2(
+def autodetect_populated_graph_vector_store_vz(
     astra_db_credentials: AstraDBCredentials,
-    database: Database,
-    embedding_d2: Embeddings,
-    graph_vector_store_docs: list[Document],
-    ephemeral_collection_cleaner_idxall_d2: str,
+    openai_api_key: str,
+    graph_vector_store_docs_vz: list[Document],
+    empty_collection_idxall_vz: Collection,
 ) -> AstraDBGraphVectorStore:
     """
     Pre-populate the collection and have (VectorStore)autodetect work on it,
     then create and return a GraphVectorStore, additionally filled with
-    the same (graph-)entries as for `populated_graph_vector_store_d2`.
+    the same (graph-)entries as for `populated_graph_vector_store_vz`.
     """
-    empty_collection_d2_idxall = database.create_collection(
-        ephemeral_collection_cleaner_idxall_d2,
-        dimension=2,
-        check_exists=False,
-        metric="euclidean",
-    )
-    empty_collection_d2_idxall.insert_many(
+    empty_collection_idxall_vz.insert_many(
         [
             {
-                CUSTOM_CONTENT_KEY: LONG_TEXT,
-                "$vector": [100, 0],
+                "_id": "1",
+                "$vectorize": "Cont1",
                 "mds": "S",
                 "mdi": 100,
             },
             {
-                CUSTOM_CONTENT_KEY: LONG_TEXT,
-                "$vector": [100, 1],
+                "_id": "2",
+                "$vectorize": "Cont2",
                 "mds": "T",
                 "mdi": 101,
             },
             {
-                CUSTOM_CONTENT_KEY: LONG_TEXT,
-                "$vector": [100, 2],
+                "_id": "3",
+                "$vectorize": "Cont3",
                 "mds": "U",
                 "mdi": 102,
             },
         ]
     )
     gstore = AstraDBGraphVectorStore(
-        embedding=embedding_d2,
-        collection_name=ephemeral_collection_cleaner_idxall_d2,
+        collection_embedding_api_key=openai_api_key,
+        collection_name=empty_collection_idxall_vz.name,
         metadata_incoming_links_key="x_link_to_x",
         token=StaticTokenProvider(astra_db_credentials["token"]),
         api_endpoint=astra_db_credentials["api_endpoint"],
         namespace=astra_db_credentials["namespace"],
         environment=astra_db_credentials["environment"],
-        content_field="*",
         autodetect_collection=True,
     )
-    gstore.add_documents(graph_vector_store_docs)
+    gstore.add_documents(graph_vector_store_docs_vz)
     return gstore
 
 
@@ -184,7 +176,6 @@ def assert_all_flat_docs(collection: Collection) -> None:
     """
     for doc in collection.find({}, projection={"*": True}):
         assert all(not isinstance(v, dict) for v in doc.values())
-        assert CUSTOM_CONTENT_KEY in doc
         assert isinstance(doc["$vector"], list)
 
 
@@ -195,8 +186,8 @@ class TestAstraDBGraphVectorStore:
     @pytest.mark.parametrize(
         ("store_name", "is_autodetected"),
         [
-            ("populated_graph_vector_store_d2", False),
-            ("autodetect_populated_graph_vector_store_d2", True),
+            ("populated_graph_vector_store_vz", False),
+            ("autodetect_populated_graph_vector_store_vz", True),
         ],
         ids=["native_store", "autodetected_store"],
     )
@@ -209,20 +200,22 @@ class TestAstraDBGraphVectorStore:
     ) -> None:
         """Simple (non-graph) similarity search on a graph vector store."""
         store: AstraDBGraphVectorStore = request.getfixturevalue(store_name)
-        ss_response = store.similarity_search(query="[2, 10]", k=2)
+        ss_response = store.similarity_search(query="universe", k=2)
         ss_labels = [doc.metadata["label"] for doc in ss_response]
-        assert ss_labels == ["AR", "A0"]
-        ss_by_v_response = store.similarity_search_by_vector(embedding=[2, 10], k=2)
+        assert ss_labels == ["A0", "AL"]
+
+        embedding = OpenAIEmbeddings().embed_query("nature")
+        ss_by_v_response = store.similarity_search_by_vector(embedding=embedding, k=2)
         ss_by_v_labels = [doc.metadata["label"] for doc in ss_by_v_response]
-        assert ss_by_v_labels == ["AR", "A0"]
+        assert ss_by_v_labels == ["TL", "TR"]
         if is_autodetected:
             assert_all_flat_docs(store.vector_store.astra_env.collection)
 
     @pytest.mark.parametrize(
         ("store_name", "is_autodetected"),
         [
-            ("populated_graph_vector_store_d2", False),
-            ("autodetect_populated_graph_vector_store_d2", True),
+            ("populated_graph_vector_store_vz", False),
+            ("autodetect_populated_graph_vector_store_vz", True),
         ],
         ids=["native_store", "autodetected_store"],
     )
@@ -235,22 +228,24 @@ class TestAstraDBGraphVectorStore:
     ) -> None:
         """Simple (non-graph) similarity search on a graph vector store."""
         store: AstraDBGraphVectorStore = request.getfixturevalue(store_name)
-        ss_response = await store.asimilarity_search(query="[2, 10]", k=2)
+        ss_response = await store.asimilarity_search(query="universe", k=2)
         ss_labels = [doc.metadata["label"] for doc in ss_response]
-        assert ss_labels == ["AR", "A0"]
+        assert ss_labels == ["A0", "AL"]
+
+        embedding = OpenAIEmbeddings().embed_query("nature")
         ss_by_v_response = await store.asimilarity_search_by_vector(
-            embedding=[2, 10], k=2
+            embedding=embedding, k=2
         )
         ss_by_v_labels = [doc.metadata["label"] for doc in ss_by_v_response]
-        assert ss_by_v_labels == ["AR", "A0"]
+        assert ss_by_v_labels == ["TL", "TR"]
         if is_autodetected:
             assert_all_flat_docs(store.vector_store.astra_env.collection)
 
     @pytest.mark.parametrize(
         ("store_name", "is_autodetected"),
         [
-            ("populated_graph_vector_store_d2", False),
-            ("autodetect_populated_graph_vector_store_d2", True),
+            ("populated_graph_vector_store_vz", False),
+            ("autodetect_populated_graph_vector_store_vz", True),
         ],
         ids=["native_store", "autodetected_store"],
     )
@@ -274,8 +269,8 @@ class TestAstraDBGraphVectorStore:
     @pytest.mark.parametrize(
         ("store_name", "is_autodetected"),
         [
-            ("populated_graph_vector_store_d2", False),
-            ("autodetect_populated_graph_vector_store_d2", True),
+            ("populated_graph_vector_store_vz", False),
+            ("autodetect_populated_graph_vector_store_vz", True),
         ],
         ids=["native_store", "autodetected_store"],
     )
@@ -289,7 +284,7 @@ class TestAstraDBGraphVectorStore:
         """Graph traversal search on a graph vector store."""
         store: AstraDBGraphVectorStore = request.getfixturevalue(store_name)
         ts_labels = set()
-        async for doc in store.atraversal_search(query="[2, 10]", k=2, depth=2):
+        async for doc in store.atraversal_search(query="universe", k=2, depth=2):
             ts_labels.add(doc.metadata["label"])
         # this is a set, as some of the internals of trav.search are set-driven
         # so ordering is not deterministic:
@@ -300,8 +295,8 @@ class TestAstraDBGraphVectorStore:
     @pytest.mark.parametrize(
         ("store_name", "is_autodetected"),
         [
-            ("populated_graph_vector_store_d2", False),
-            ("autodetect_populated_graph_vector_store_d2", True),
+            ("populated_graph_vector_store_vz", False),
+            ("autodetect_populated_graph_vector_store_vz", True),
         ],
         ids=["native_store", "autodetected_store"],
     )
@@ -315,7 +310,7 @@ class TestAstraDBGraphVectorStore:
         """MMR Graph traversal search on a graph vector store."""
         store: AstraDBGraphVectorStore = request.getfixturevalue(store_name)
         mt_response = store.mmr_traversal_search(
-            query="[2, 10]",
+            query="universe",
             k=2,
             depth=2,
             fetch_k=1,
@@ -331,8 +326,8 @@ class TestAstraDBGraphVectorStore:
     @pytest.mark.parametrize(
         ("store_name", "is_autodetected"),
         [
-            ("populated_graph_vector_store_d2", False),
-            ("autodetect_populated_graph_vector_store_d2", True),
+            ("populated_graph_vector_store_vz", False),
+            ("autodetect_populated_graph_vector_store_vz", True),
         ],
         ids=["native_store", "autodetected_store"],
     )
@@ -347,7 +342,7 @@ class TestAstraDBGraphVectorStore:
         store: AstraDBGraphVectorStore = request.getfixturevalue(store_name)
         mt_labels = set()
         async for doc in store.ammr_traversal_search(
-            query="[2, 10]",
+            query="universe",
             k=2,
             depth=2,
             fetch_k=1,
@@ -363,8 +358,8 @@ class TestAstraDBGraphVectorStore:
     @pytest.mark.parametrize(
         ("store_name"),
         [
-            ("populated_graph_vector_store_d2"),
-            ("autodetect_populated_graph_vector_store_d2"),
+            ("populated_graph_vector_store_vz"),
+            ("autodetect_populated_graph_vector_store_vz"),
         ],
         ids=["native_store", "autodetected_store"],
     )
@@ -381,7 +376,7 @@ class TestAstraDBGraphVectorStore:
             n=2,
         )
         doc: Document = next(iter(mt_response))
-        assert doc.page_content == "[-10, 0]"
+        assert doc.page_content == "a river runs deep"
         links = doc.metadata["links"]
         assert len(links) == 1
         link: Link = links.pop()
@@ -393,8 +388,8 @@ class TestAstraDBGraphVectorStore:
     @pytest.mark.parametrize(
         ("store_name"),
         [
-            ("populated_graph_vector_store_d2"),
-            ("autodetect_populated_graph_vector_store_d2"),
+            ("populated_graph_vector_store_vz"),
+            ("autodetect_populated_graph_vector_store_vz"),
         ],
         ids=["native_store", "autodetected_store"],
     )
@@ -411,7 +406,7 @@ class TestAstraDBGraphVectorStore:
             n=2,
         )
         doc: Document = next(iter(mt_response))
-        assert doc.page_content == "[-10, 0]"
+        assert doc.page_content == "a river runs deep"
         links: set[Link] = doc.metadata["links"]
         assert len(links) == 1
         link: Link = links.pop()
@@ -423,8 +418,8 @@ class TestAstraDBGraphVectorStore:
     @pytest.mark.parametrize(
         ("store_name"),
         [
-            ("populated_graph_vector_store_d2"),
-            ("autodetect_populated_graph_vector_store_d2"),
+            ("populated_graph_vector_store_vz"),
+            ("autodetect_populated_graph_vector_store_vz"),
         ],
         ids=["native_store", "autodetected_store"],
     )
@@ -453,8 +448,8 @@ class TestAstraDBGraphVectorStore:
     @pytest.mark.parametrize(
         ("store_name"),
         [
-            ("populated_graph_vector_store_d2"),
-            ("autodetect_populated_graph_vector_store_d2"),
+            ("populated_graph_vector_store_vz"),
+            ("autodetect_populated_graph_vector_store_vz"),
         ],
         ids=["native_store", "autodetected_store"],
     )
@@ -484,23 +479,23 @@ class TestAstraDBGraphVectorStore:
         self,
         *,
         astra_db_credentials: AstraDBCredentials,
-        empty_collection_d2: Collection,
-        embedding_d2: Embeddings,
+        empty_collection_vz: Collection,
+        openai_api_key: str,
     ) -> None:
         g_store = AstraDBGraphVectorStore.from_texts(
-            texts=["[1, 2]"],
-            embedding=embedding_d2,
+            texts=["varenyky, holubtsi, and deruny"],
+            collection_vector_service_options=OPENAI_VECTORIZE_OPTIONS_HEADER,
+            collection_embedding_api_key=openai_api_key,
             metadatas=[{"md": 1}],
             ids=["x_id"],
-            collection_name=empty_collection_d2.name,
+            collection_name=empty_collection_vz.name,
             token=StaticTokenProvider(astra_db_credentials["token"]),
             api_endpoint=astra_db_credentials["api_endpoint"],
             namespace=astra_db_credentials["namespace"],
             environment=astra_db_credentials["environment"],
-            content_field=CUSTOM_CONTENT_KEY,
             setup_mode=SetupMode.OFF,
         )
-        hits = g_store.similarity_search("[2, 1]", k=2)
+        hits = g_store.similarity_search("ukrainian food", k=2)
         assert len(hits) == 1
         assert hits[0].page_content == "[1, 2]"
         assert hits[0].id == "x_id"
@@ -511,36 +506,36 @@ class TestAstraDBGraphVectorStore:
         self,
         *,
         astra_db_credentials: AstraDBCredentials,
-        empty_collection_d2: Collection,
-        embedding_d2: Embeddings,
+        empty_collection_vz: Collection,
+        openai_api_key: str,
     ) -> None:
         the_document = Document(
-            page_content="[1, 2]",
+            page_content="tacos, tamales, and mole",
             metadata={"md": 1},
             id="x_id",
         )
         g_store = AstraDBGraphVectorStore.from_documents(
             documents=[the_document],
-            embedding=embedding_d2,
-            collection_name=empty_collection_d2.name,
+            collection_vector_service_options=OPENAI_VECTORIZE_OPTIONS_HEADER,
+            collection_embedding_api_key=openai_api_key,
+            collection_name=empty_collection_vz.name,
             token=StaticTokenProvider(astra_db_credentials["token"]),
             api_endpoint=astra_db_credentials["api_endpoint"],
             namespace=astra_db_credentials["namespace"],
             environment=astra_db_credentials["environment"],
-            content_field=CUSTOM_CONTENT_KEY,
             setup_mode=SetupMode.OFF,
         )
-        hits = g_store.similarity_search("[2, 1]", k=2)
+        hits = g_store.similarity_search("mexican food", k=2)
         assert len(hits) == 1
-        assert hits[0].page_content == "[1, 2]"
-        assert hits[0].id == "x_id"
+        assert hits[0].page_content == the_document.page_content
+        assert hits[0].id == the_document.id
         # there may be more re:graph structure.
         assert hits[0].metadata["md"] == 1
 
     def test_gvs_add_nodes_sync(
         self,
         *,
-        graph_vector_store_d2: AstraDBGraphVectorStore,
+        graph_vector_store_vz: AstraDBGraphVectorStore,
     ) -> None:
         links0 = [
             Link(kind="kA", direction="out", tag="tA"),
@@ -553,8 +548,8 @@ class TestAstraDBGraphVectorStore:
             Node(id="id0", text="[0, 2]", metadata={"m": 0}, links=links0),
             Node(text="[0, 1]", metadata={"m": 1}, links=links1),
         ]
-        graph_vector_store_d2.add_nodes(nodes)
-        hits = graph_vector_store_d2.similarity_search_by_vector([0, 3])
+        graph_vector_store_vz.add_nodes(nodes)
+        hits = graph_vector_store_vz.similarity_search_by_vector([0, 3])
         assert len(hits) == 2
         assert hits[0].id == "id0"
         assert hits[0].page_content == "[0, 2]"
@@ -570,7 +565,7 @@ class TestAstraDBGraphVectorStore:
     async def test_gvs_add_nodes_async(
         self,
         *,
-        graph_vector_store_d2: AstraDBGraphVectorStore,
+        graph_vector_store_vz: AstraDBGraphVectorStore,
     ) -> None:
         links0 = [
             Link(kind="kA", direction="out", tag="tA"),
@@ -583,10 +578,10 @@ class TestAstraDBGraphVectorStore:
             Node(id="id0", text="[0, 2]", metadata={"m": 0}, links=links0),
             Node(text="[0, 1]", metadata={"m": 1}, links=links1),
         ]
-        async for _ in graph_vector_store_d2.aadd_nodes(nodes):
+        async for _ in graph_vector_store_vz.aadd_nodes(nodes):
             pass
 
-        hits = await graph_vector_store_d2.asimilarity_search_by_vector([0, 3])
+        hits = await graph_vector_store_vz.asimilarity_search_by_vector([0, 3])
         assert len(hits) == 2
         assert hits[0].id == "id0"
         assert hits[0].page_content == "[0, 2]"
