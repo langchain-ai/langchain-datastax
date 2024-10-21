@@ -32,7 +32,6 @@ langchain = { git = "https://github.com/langchain-ai/langchain.git", subdirector
 langchain-text-splitters = { git = "https://github.com/langchain-ai/langchain.git", subdirectory = "libs/text-splitters" }
 langchain-core = { git = "https://github.com/langchain-ai/langchain.git", subdirectory = "libs/core" }
 langchain-community = { git = "https://github.com/langchain-ai/langchain.git", subdirectory = "libs/community" }
-langchain-openai = "^0.2.3"
 
 [tool.poetry.group.codespell]
 optional = true

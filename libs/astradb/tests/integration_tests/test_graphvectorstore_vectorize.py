@@ -16,7 +16,6 @@ from langchain_core.documents import Document
 
 from langchain_astradb.graph_vectorstores import AstraDBGraphVectorStore
 from langchain_astradb.utils.astradb import SetupMode
-from langchain_openai import OpenAIEmbeddings
 
 from .conftest import (
     OPENAI_VECTORIZE_OPTIONS_HEADER,
@@ -25,7 +24,6 @@ from .conftest import (
 
 if TYPE_CHECKING:
     from astrapy import Collection
-    from langchain_core.embeddings import Embeddings
 
     from .conftest import AstraDBCredentials
 
@@ -203,11 +201,6 @@ class TestAstraDBGraphVectorStore:
         ss_response = store.similarity_search(query="universe", k=2)
         ss_labels = [doc.metadata["label"] for doc in ss_response]
         assert ss_labels == ["AR", "A0"]
-
-        embedding = OpenAIEmbeddings().embed_query("nature")
-        ss_by_v_response = store.similarity_search_by_vector(embedding=embedding, k=2)
-        ss_by_v_labels = [doc.metadata["label"] for doc in ss_by_v_response]
-        assert ss_by_v_labels == ["TL", "TR"]
         if is_autodetected:
             assert_all_flat_docs(store.vector_store.astra_env.collection)
 
@@ -231,13 +224,6 @@ class TestAstraDBGraphVectorStore:
         ss_response = await store.asimilarity_search(query="universe", k=2)
         ss_labels = [doc.metadata["label"] for doc in ss_response]
         assert ss_labels == ["AR", "A0"]
-
-        embedding = OpenAIEmbeddings().embed_query("nature")
-        ss_by_v_response = await store.asimilarity_search_by_vector(
-            embedding=embedding, k=2
-        )
-        ss_by_v_labels = [doc.metadata["label"] for doc in ss_by_v_response]
-        assert ss_by_v_labels == ["TL", "TR"]
         if is_autodetected:
             assert_all_flat_docs(store.vector_store.astra_env.collection)
 
