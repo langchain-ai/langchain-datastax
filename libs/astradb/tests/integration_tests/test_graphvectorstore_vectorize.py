@@ -61,9 +61,9 @@ def graph_vector_store_docs_vz() -> list[Document]:
     """
 
     docs_a = [ # docs related to space and the universe
-        Document(id="AL", page_content="distant stars shine", metadata={"label": "AL"}),
-        Document(id="A0", page_content="nebulae swirl in space", metadata={"label": "A0"}),
-        Document(id="AR", page_content="planets orbit quietly", metadata={"label": "AR"}),
+        Document(id="AL", page_content="planets orbit quietly", metadata={"label": "AL"}),
+        Document(id="A0", page_content="distant stars shine", metadata={"label": "A0"}),
+        Document(id="AR", page_content="nebulae swirl in space", metadata={"label": "AR"}),
     ]
     docs_b = [ # docs related to emotions and relationships
         Document(id="BL", page_content="hearts intertwined", metadata={"label": "BL"}),
@@ -202,7 +202,7 @@ class TestAstraDBGraphVectorStore:
         store: AstraDBGraphVectorStore = request.getfixturevalue(store_name)
         ss_response = store.similarity_search(query="universe", k=2)
         ss_labels = [doc.metadata["label"] for doc in ss_response]
-        assert ss_labels == ["A0", "AL"]
+        assert ss_labels == ["AR", "A0"]
 
         embedding = OpenAIEmbeddings().embed_query("nature")
         ss_by_v_response = store.similarity_search_by_vector(embedding=embedding, k=2)
@@ -230,7 +230,7 @@ class TestAstraDBGraphVectorStore:
         store: AstraDBGraphVectorStore = request.getfixturevalue(store_name)
         ss_response = await store.asimilarity_search(query="universe", k=2)
         ss_labels = [doc.metadata["label"] for doc in ss_response]
-        assert ss_labels == ["A0", "AL"]
+        assert ss_labels == ["AR", "A0"]
 
         embedding = OpenAIEmbeddings().embed_query("nature")
         ss_by_v_response = await store.asimilarity_search_by_vector(
@@ -258,7 +258,7 @@ class TestAstraDBGraphVectorStore:
     ) -> None:
         """Graph traversal search on a graph vector store."""
         store: AstraDBGraphVectorStore = request.getfixturevalue(store_name)
-        ts_response = store.traversal_search(query="[2, 10]", k=2, depth=2)
+        ts_response = store.traversal_search(query="universe", k=2, depth=2)
         # this is a set, as some of the internals of trav.search are set-driven
         # so ordering is not deterministic:
         ts_labels = {doc.metadata["label"] for doc in ts_response}
@@ -433,7 +433,7 @@ class TestAstraDBGraphVectorStore:
         store: AstraDBGraphVectorStore = request.getfixturevalue(store_name)
         doc = store.get_by_document_id(document_id="FL")
         assert doc is not None
-        assert doc.page_content == "[1, -9]"
+        assert doc.page_content == "code compiles efficiently"
         links = doc.metadata["links"]
         assert len(links) == 1
         link: Link = links.pop()
@@ -463,7 +463,7 @@ class TestAstraDBGraphVectorStore:
         store: AstraDBGraphVectorStore = request.getfixturevalue(store_name)
         doc = await store.aget_by_document_id(document_id="FL")
         assert doc is not None
-        assert doc.page_content == "[1, -9]"
+        assert doc.page_content == "code compiles efficiently"
         links = doc.metadata["links"]
         assert len(links) == 1
         link: Link = links.pop()
@@ -497,7 +497,7 @@ class TestAstraDBGraphVectorStore:
         )
         hits = g_store.similarity_search("ukrainian food", k=2)
         assert len(hits) == 1
-        assert hits[0].page_content == "[1, 2]"
+        assert hits[0].page_content == "varenyky, holubtsi, and deruny"
         assert hits[0].id == "x_id"
         # there may be more re:graph structure.
         assert hits[0].metadata["md"] == 1
@@ -545,19 +545,19 @@ class TestAstraDBGraphVectorStore:
             Link(kind="kC", direction="in", tag="tC"),
         ]
         nodes = [
-            Node(id="id0", text="[0, 2]", metadata={"m": 0}, links=links0),
-            Node(text="[0, 1]", metadata={"m": 1}, links=links1),
+            Node(id="id0", text="lasagna", metadata={"m": 0}, links=links0),
+            Node(text="hamburger", metadata={"m": 1}, links=links1),
         ]
         graph_vector_store_vz.add_nodes(nodes)
-        hits = graph_vector_store_vz.similarity_search_by_vector([0, 3])
+        hits = graph_vector_store_vz.similarity_search("italian food")
         assert len(hits) == 2
         assert hits[0].id == "id0"
-        assert hits[0].page_content == "[0, 2]"
+        assert hits[0].page_content == "lasagna"
         md0 = hits[0].metadata
         assert md0["m"] == 0
         assert any(isinstance(v, set) for k, v in md0.items() if k != "m")
         assert hits[1].id != "id0"
-        assert hits[1].page_content == "[0, 1]"
+        assert hits[1].page_content == "hamburger"
         md1 = hits[1].metadata
         assert md1["m"] == 1
         assert any(isinstance(v, set) for k, v in md1.items() if k != "m")
@@ -575,21 +575,21 @@ class TestAstraDBGraphVectorStore:
             Link(kind="kC", direction="in", tag="tC"),
         ]
         nodes = [
-            Node(id="id0", text="[0, 2]", metadata={"m": 0}, links=links0),
-            Node(text="[0, 1]", metadata={"m": 1}, links=links1),
+            Node(id="id0", text="lasagna", metadata={"m": 0}, links=links0),
+            Node(text="hamburger", metadata={"m": 1}, links=links1),
         ]
         async for _ in graph_vector_store_vz.aadd_nodes(nodes):
             pass
 
-        hits = await graph_vector_store_vz.asimilarity_search_by_vector([0, 3])
+        hits = await graph_vector_store_vz.asimilarity_search("italian food")
         assert len(hits) == 2
         assert hits[0].id == "id0"
-        assert hits[0].page_content == "[0, 2]"
+        assert hits[0].page_content == "lasagna"
         md0 = hits[0].metadata
         assert md0["m"] == 0
         assert any(isinstance(v, set) for k, v in md0.items() if k != "m")
         assert hits[1].id != "id0"
-        assert hits[1].page_content == "[0, 1]"
+        assert hits[1].page_content == "hamburger"
         md1 = hits[1].metadata
         assert md1["m"] == 1
         assert any(isinstance(v, set) for k, v in md1.items() if k != "m")

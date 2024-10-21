@@ -731,10 +731,10 @@ class AstraDBGraphVectorStore(GraphVectorStore):
             filter: Optional metadata to filter the results.
             **kwargs: Additional keyword arguments.
         """
-        query_embedding = self.embedding.embed_query(query)
+        query_embedding = self.embedding.embed_query(query) #could pass in query text
         helper = MmrHelper(
             k=k,
-            query_embedding=query_embedding,
+            query_embedding=query_embedding, # could use initial output cursor???
             lambda_mult=lambda_mult,
             score_threshold=score_threshold,
         )
@@ -761,7 +761,7 @@ class AstraDBGraphVectorStore(GraphVectorStore):
             # Call `self._get_adjacent` to fetch the candidates.
             adjacent_nodes = await self._get_adjacent(
                 links=visited_links,
-                query_embedding=query_embedding,
+                query_embedding=query_embedding,  #could pass in query text
                 k_per_link=adjacent_k,
                 filter=filter,
                 retrieved_docs=retrieved_docs,
@@ -781,7 +781,7 @@ class AstraDBGraphVectorStore(GraphVectorStore):
 
             results = (
                 await self.vector_store.asimilarity_search_with_embedding_id_by_vector(
-                    embedding=query_embedding,
+                    embedding=query_embedding,  #could pass in query text
                     k=fetch_k,
                     filter=filter,
                 )
@@ -827,7 +827,7 @@ class AstraDBGraphVectorStore(GraphVectorStore):
                 # Find the nodes with incoming links from those links.
                 adjacent_nodes = await self._get_adjacent(
                     links=selected_outgoing_links,
-                    query_embedding=query_embedding,
+                    query_embedding=query_embedding,  #could pass in query text
                     k_per_link=adjacent_k,
                     filter=filter,
                     retrieved_docs=retrieved_docs,
