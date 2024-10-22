@@ -1787,7 +1787,7 @@ class AstraDBVectorStore(VectorStore):
             filter=filter,
         )
 
-    async def asimilarity_search_with_embedding_id_by_vector(
+    async def asimilarity_search_with_embedding_by_vector(
         self,
         embedding: list[float],
         k: int = 4,
@@ -1801,29 +1801,75 @@ class AstraDBVectorStore(VectorStore):
             filter: Filter on the metadata to apply.
 
         Returns:
-            List of (Document, embedding, id), the most similar to the query vector.
+            List of (Document, embedding) most similar to the query vector.
         """
         await self.astra_env.aensure_db_setup()
         metadata_parameter = self.filter_to_query(filter).copy()
-        results: list[tuple[Document, list[float], str]] = []
-        async for hit in self.astra_env.async_collection.find(
+        async_cursor = self.astra_env.async_collection.find(
+            filter=metadata_parameter,
+            projection=self.document_codec.full_projection,
+            limit=k,
+            sort=self.document_codec.encode_vector_sort(embedding),
+        )
+
+        return [
+            (doc, emb)
+            async for (doc, emb) in (
+                (
+                    self.document_codec.decode(hit),
+                    self.document_codec.decode_vector(hit),
+                )
+                async for hit in async_cursor
+            )
+            if doc is not None and emb is not None
+        ]
+
+    async def asimilarity_search_with_embedding_by_query(
+        self,
+        query: str,
+        k: int = 4,
+        filter: dict[str, Any] | None = None,  # noqa: A002
+    ) -> tuple[list[float], list[tuple[Document, list[float]]]]:
+        """Returns the embedded query and docs most similar to query.
+
+        Args:
+            query: Query to look up documents similar to.
+            k: Number of Documents to return. Defaults to 4.
+            filter: Filter on the metadata to apply.
+
+        Returns:
+            (query_embedding, List of (Document, embedding) most similar to the query string).
+        """
+        if not self.document_codec.server_side_embeddings:
+            query_embedding = self.embedding.embed_query(query)
+            results = await self.asimilarity_search_with_embedding_by_vector(embedding=query_embedding)
+            return query_embedding, results
+
+        sort = {"$vectorize": query}
+        await self.astra_env.aensure_db_setup()
+        metadata_parameter = self.filter_to_query(filter)
+        async_cursor = self.astra_env.async_collection.find(
             filter=metadata_parameter,
             projection=self.document_codec.full_projection,
             limit=k,
             include_similarity=True,
             include_sort_vector=True,
-            sort=self.document_codec.encode_vector_sort(embedding),
-        ):
-            doc = self.document_codec.decode(hit)
-            if doc is None or doc.id is None:
-                continue
+            sort=sort,
+        )
+        query_embedding = await async_cursor.get_sort_vector()
 
-            vector = self.document_codec.decode_vector(hit)
-            if vector is None:
-                continue
+        return (query_embedding, [
+            (doc, emb)
+            async for (doc, emb) in (
+                (
+                    self.document_codec.decode(hit),
+                    self.document_codec.decode_vector(hit),
+                )
+                async for hit in async_cursor
+            )
+            if doc is not None and emb is not None
+        ])
 
-            results.append((doc, vector, doc.id))
-        return results
 
     async def _asimilarity_search_with_score_id_by_sort(
         self,

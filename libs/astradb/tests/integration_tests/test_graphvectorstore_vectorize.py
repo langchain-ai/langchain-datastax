@@ -1,5 +1,5 @@
 """Test of Astra DB graph vector store class `AstraDBGraphVectorStore`
-using Vectorize.
+using Vectorize (server-side embedding).
 
 Refer to `test_vectorstores.py` for the requirements to run.
 """
@@ -201,6 +201,10 @@ class TestAstraDBGraphVectorStore:
         ss_response = store.similarity_search(query="universe", k=2)
         ss_labels = [doc.metadata["label"] for doc in ss_response]
         assert ss_labels == ["AR", "A0"]
+
+        with pytest.raises(ValueError):
+            store.similarity_search_by_vector(embedding=[2, 10], k=2)
+
         if is_autodetected:
             assert_all_flat_docs(store.vector_store.astra_env.collection)
 
@@ -224,6 +228,10 @@ class TestAstraDBGraphVectorStore:
         ss_response = await store.asimilarity_search(query="universe", k=2)
         ss_labels = [doc.metadata["label"] for doc in ss_response]
         assert ss_labels == ["AR", "A0"]
+
+        with pytest.raises(ValueError):
+            await store.asimilarity_search_by_vector(embedding=[2, 10], k=2)
+
         if is_autodetected:
             assert_all_flat_docs(store.vector_store.astra_env.collection)
 
