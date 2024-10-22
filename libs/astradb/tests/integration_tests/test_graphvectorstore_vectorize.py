@@ -27,6 +27,7 @@ if TYPE_CHECKING:
 
     from .conftest import AstraDBCredentials
 
+
 @pytest.fixture
 def graph_vector_store_docs_vz() -> list[Document]:
     """
@@ -58,25 +59,39 @@ def graph_vector_store_docs_vz() -> list[Document]:
     The links are like: L with L, 0 with 0 and R with R.
     """
 
-    docs_a = [ # docs related to space and the universe
-        Document(id="AL", page_content="planets orbit quietly", metadata={"label": "AL"}),
+    docs_a = [  # docs related to space and the universe
+        Document(
+            id="AL", page_content="planets orbit quietly", metadata={"label": "AL"}
+        ),
         Document(id="A0", page_content="distant stars shine", metadata={"label": "A0"}),
-        Document(id="AR", page_content="nebulae swirl in space", metadata={"label": "AR"}),
+        Document(
+            id="AR", page_content="nebulae swirl in space", metadata={"label": "AR"}
+        ),
     ]
-    docs_b = [ # docs related to emotions and relationships
+    docs_b = [  # docs related to emotions and relationships
         Document(id="BL", page_content="hearts intertwined", metadata={"label": "BL"}),
         Document(id="B0", page_content="a gentle embrace", metadata={"label": "B0"}),
         Document(id="BL", page_content="love conquers all", metadata={"label": "BR"}),
     ]
-    docs_f = [ # docs related to technology and programming
-        Document(id="FL", page_content="code compiles efficiently", metadata={"label": "FL"}),
-        Document(id="F0", page_content="a neural network learns", metadata={"label": "F0"}),
-        Document(id="FR", page_content="data structures organize", metadata={"label": "FR"}),
+    docs_f = [  # docs related to technology and programming
+        Document(
+            id="FL", page_content="code compiles efficiently", metadata={"label": "FL"}
+        ),
+        Document(
+            id="F0", page_content="a neural network learns", metadata={"label": "F0"}
+        ),
+        Document(
+            id="FR", page_content="data structures organize", metadata={"label": "FR"}
+        ),
     ]
-    docs_t = [ # docs related to nature and wildlife
-        Document(id="TL", page_content="trees sway in the wind", metadata={"label": "TL"}),
+    docs_t = [  # docs related to nature and wildlife
+        Document(
+            id="TL", page_content="trees sway in the wind", metadata={"label": "TL"}
+        ),
         Document(id="T0", page_content="a river runs deep", metadata={"label": "T0"}),
-        Document(id="TR", page_content="birds chirping at dawn", metadata={"label": "TR"}),
+        Document(
+            id="TR", page_content="birds chirping at dawn", metadata={"label": "TR"}
+        ),
     ]
     for doc_a, suffix in zip(docs_a, ["l", "0", "r"]):
         add_links(doc_a, Link.bidir(kind="ab_example", tag=f"tag_{suffix}"))
@@ -202,7 +217,9 @@ class TestAstraDBGraphVectorStore:
         ss_labels = [doc.metadata["label"] for doc in ss_response]
         assert ss_labels == ["AR", "A0"]
 
-        with pytest.raises(ValueError):
+        with pytest.raises(
+            ValueError, match=r"Searching by vector .* embeddings is not allowed"
+        ):
             store.similarity_search_by_vector(embedding=[2, 10], k=2)
 
         if is_autodetected:
@@ -229,7 +246,9 @@ class TestAstraDBGraphVectorStore:
         ss_labels = [doc.metadata["label"] for doc in ss_response]
         assert ss_labels == ["AR", "A0"]
 
-        with pytest.raises(ValueError):
+        with pytest.raises(
+            ValueError, match=r"Searching by vector .* embeddings is not allowed"
+        ):
             await store.asimilarity_search_by_vector(embedding=[2, 10], k=2)
 
         if is_autodetected:

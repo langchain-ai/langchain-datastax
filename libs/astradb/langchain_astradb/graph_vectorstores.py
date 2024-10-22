@@ -464,11 +464,11 @@ class AstraDBGraphVectorStore(GraphVectorStore):
     ) -> AstraDBGraphVectorStore:
         """Return AstraDBGraphVectorStore initialized from texts and embeddings."""
         store = cls(
-                embedding=embedding,
-                collection_vector_service_options=collection_vector_service_options,
-                collection_embedding_api_key=collection_embedding_api_key,
-                **kwargs
-            )
+            embedding=embedding,
+            collection_vector_service_options=collection_vector_service_options,
+            collection_embedding_api_key=collection_embedding_api_key,
+            **kwargs,
+        )
         store.add_texts(texts, metadatas, ids=ids)
         return store
 
@@ -485,11 +485,11 @@ class AstraDBGraphVectorStore(GraphVectorStore):
     ) -> AstraDBGraphVectorStore:
         """Return AstraDBGraphVectorStore initialized from docs and embeddings."""
         store = cls(
-                embedding=embedding,
-                collection_vector_service_options=collection_vector_service_options,
-                collection_embedding_api_key=collection_embedding_api_key,
-                **kwargs
-            )
+            embedding=embedding,
+            collection_vector_service_options=collection_vector_service_options,
+            collection_embedding_api_key=collection_embedding_api_key,
+            **kwargs,
+        )
         store.add_documents(documents, ids=ids)
         return store
 
@@ -732,7 +732,6 @@ class AstraDBGraphVectorStore(GraphVectorStore):
             filter: Optional metadata to filter the results.
             **kwargs: Additional keyword arguments.
         """
-
         # For each unselected node, stores the outgoing links.
         outgoing_links_map: dict[str, set[Link]] = {}
         visited_links: set[Link] = set()
@@ -745,13 +744,13 @@ class AstraDBGraphVectorStore(GraphVectorStore):
             candidates: dict[str, list[float]] = {}
             for node in nodes:
                 if node.id not in outgoing_links_map:
-                    outgoing_links_map[node.id] = _outgoing_links(
-                        node=node
-                    )
+                    outgoing_links_map[node.id] = _outgoing_links(node=node)
                     candidates[node.id] = node.embedding
             return candidates
 
-        async def fetch_initial_candidates() -> tuple[list[float], dict[str, list[float]]]:
+        async def fetch_initial_candidates() -> (
+            tuple[list[float], dict[str, list[float]]]
+        ):
             """Gets the embedded query and the set of initial candidates.
 
             If fetch_k is zero, there will be no initial candidates.
@@ -767,7 +766,9 @@ class AstraDBGraphVectorStore(GraphVectorStore):
 
             return query_embedding, get_candidates(nodes=initial_nodes)
 
-        async def fetch_neighborhood_candidates(neighborhood: Sequence[str]) -> dict[str, list[float]]:
+        async def fetch_neighborhood_candidates(
+            neighborhood: Sequence[str],
+        ) -> dict[str, list[float]]:
             nonlocal outgoing_links_map, visited_links, retrieved_docs
 
             # Put the neighborhood into the outgoing links, to avoid adding it
@@ -791,7 +792,6 @@ class AstraDBGraphVectorStore(GraphVectorStore):
 
             return get_candidates(nodes=adjacent_nodes)
 
-
         query_embedding, initial_candidates = await fetch_initial_candidates()
         helper = MmrHelper(
             k=k,
@@ -799,11 +799,11 @@ class AstraDBGraphVectorStore(GraphVectorStore):
             lambda_mult=lambda_mult,
             score_threshold=score_threshold,
         )
-        helper.add_candidates(initial_candidates)
+        helper.add_candidates(candidates=initial_candidates)
 
         if initial_roots:
-            helper.add_candidates(fetch_neighborhood_candidates(initial_roots))
-
+            neighborhood_candidates = await fetch_neighborhood_candidates(initial_roots)
+            helper.add_candidates(candidates=neighborhood_candidates)
 
         # Tracks the depth of each candidate.
         depths = {candidate_id: 0 for candidate_id in helper.candidate_ids()}
@@ -1162,20 +1162,22 @@ class AstraDBGraphVectorStore(GraphVectorStore):
         self,
         query: str,
         retrieved_docs: dict[str, Document],
-        fetch_k: int | None = None,
-        filter: dict[str, Any] | None = None,
-    ) -> Iterable[EmbeddedNode]:
-        query_embedding, result = (
-                await self.vector_store.asimilarity_search_with_embedding_by_query(
-                    query=query,
-                    k=fetch_k,
-                    filter=filter,
-                )
-            )
+        fetch_k: int,
+        filter: dict[str, Any] | None = None,  # noqa: A002
+    ) -> tuple[list[float], list[EmbeddedNode]]:
+        (
+            query_embedding,
+            result,
+        ) = await self.vector_store.asimilarity_search_with_embedding_by_query(
+            query=query,
+            k=fetch_k,
+            filter=filter,
+        )
 
         initial_nodes: list[EmbeddedNode] = []
         for doc, embedding in result:
-            retrieved_docs[doc.id] = doc
+            if doc.id is not None:
+                retrieved_docs[doc.id] = doc
             initial_nodes.append(EmbeddedNode(doc=doc, embedding=embedding))
 
         return query_embedding, initial_nodes
@@ -1217,13 +1219,14 @@ class AstraDBGraphVectorStore(GraphVectorStore):
                 )
             )
 
-        results = await asyncio.gather(*tasks)
+        results: list[list[tuple[Document, list[float]]]] = await asyncio.gather(*tasks)
 
         for result in results:
             for doc, embedding in result:
-                retrieved_docs[doc.id] = doc
-                if doc.id not in targets:
-                    targets[doc.id] = EmbeddedNode(doc=doc, embedding=embedding)
+                if doc.id is not None:
+                    retrieved_docs[doc.id] = doc
+                    if doc.id not in targets:
+                        targets[doc.id] = EmbeddedNode(doc=doc, embedding=embedding)
 
         # TODO: Consider a combined limit based on the similarity and/or
         # predicated MMR score?

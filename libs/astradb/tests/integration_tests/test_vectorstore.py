@@ -858,14 +858,15 @@ class TestAstraDBVectorStore:
             assert doc.page_content == expected_text_by_id[doc_id]
         expected_embedding_by_id = dict(zip(all_ids, all_embeddings))
         full_results_with_embeddings = (
-            await vector_store_d2.asimilarity_search_with_embedding_id_by_vector(
+            await vector_store_d2.asimilarity_search_with_embedding_by_vector(
                 embedding=[1.0, 1.0],
                 k=full_size,
             )
         )
-        for doc, embedding, doc_id in full_results_with_embeddings:
-            assert doc.page_content == expected_text_by_id[doc_id]
-            assert embedding == expected_embedding_by_id[doc_id]
+        for doc, embedding in full_results_with_embeddings:
+            assert doc.id is not None
+            assert doc.page_content == expected_text_by_id[doc.id]
+            assert embedding == expected_embedding_by_id[doc.id]
 
     def test_astradb_vectorstore_delete_by_metadata_sync(
         self,

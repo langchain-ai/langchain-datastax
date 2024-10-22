@@ -1792,7 +1792,7 @@ class AstraDBVectorStore(VectorStore):
         embedding: list[float],
         k: int = 4,
         filter: dict[str, Any] | None = None,  # noqa: A002
-    ) -> list[tuple[Document, list[float], str]]:
+    ) -> list[tuple[Document, list[float]]]:
         """Return docs most similar to embedding vector.
 
         Args:
@@ -1838,11 +1838,16 @@ class AstraDBVectorStore(VectorStore):
             filter: Filter on the metadata to apply.
 
         Returns:
-            (query_embedding, List of (Document, embedding) most similar to the query string).
+            (query_embedding, List of (Document, embedding) most similar to the query).
         """
-        if not self.document_codec.server_side_embeddings:
+        if (
+            not self.document_codec.server_side_embeddings
+            and self.embedding is not None
+        ):
             query_embedding = self.embedding.embed_query(query)
-            results = await self.asimilarity_search_with_embedding_by_vector(embedding=query_embedding)
+            results = await self.asimilarity_search_with_embedding_by_vector(
+                embedding=query_embedding
+            )
             return query_embedding, results
 
         sort = {"$vectorize": query}
@@ -1856,20 +1861,25 @@ class AstraDBVectorStore(VectorStore):
             include_sort_vector=True,
             sort=sort,
         )
-        query_embedding = await async_cursor.get_sort_vector()
+        sort_vector = await async_cursor.get_sort_vector()
+        if sort_vector is None:
+            msg = "Unable to retrieve the server-side embedding of the query."
+            raise ValueError(msg)
 
-        return (query_embedding, [
-            (doc, emb)
-            async for (doc, emb) in (
-                (
-                    self.document_codec.decode(hit),
-                    self.document_codec.decode_vector(hit),
+        return (
+            sort_vector,
+            [
+                (doc, emb)
+                async for (doc, emb) in (
+                    (
+                        self.document_codec.decode(hit),
+                        self.document_codec.decode_vector(hit),
+                    )
+                    async for hit in async_cursor
                 )
-                async for hit in async_cursor
-            )
-            if doc is not None and emb is not None
-        ])
-
+                if doc is not None and emb is not None
+            ],
+        )
 
     async def _asimilarity_search_with_score_id_by_sort(
         self,
