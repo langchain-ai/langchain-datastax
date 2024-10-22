@@ -1,5 +1,4 @@
 """Test of Astra DB graph vector store class `AstraDBGraphVectorStore`
-using client-side embedding.
 
 Refer to `test_vectorstores.py` for the requirements to run.
 """
@@ -155,25 +154,34 @@ def graph_vector_store_docs_vz() -> list[Document]:
 
 
 @pytest.fixture
-def graph_vector_store_d2(
+def auth_kwargs(
     astra_db_credentials: AstraDBCredentials,
+) -> dict[str, Any]:
+    return {
+        "token": StaticTokenProvider(astra_db_credentials["token"]),
+        "api_endpoint": astra_db_credentials["api_endpoint"],
+        "namespace": astra_db_credentials["namespace"],
+        "environment": astra_db_credentials["environment"],
+    }
+
+
+@pytest.fixture
+def graph_vector_store_d2(
+    auth_kwargs: dict[str, Any],
     empty_collection_d2: Collection,
     embedding_d2: Embeddings,
 ) -> AstraDBGraphVectorStore:
     return AstraDBGraphVectorStore(
         embedding=embedding_d2,
         collection_name=empty_collection_d2.name,
-        token=StaticTokenProvider(astra_db_credentials["token"]),
-        api_endpoint=astra_db_credentials["api_endpoint"],
-        namespace=astra_db_credentials["namespace"],
-        environment=astra_db_credentials["environment"],
         setup_mode=SetupMode.OFF,
+        **auth_kwargs,
     )
 
 
 @pytest.fixture
 def graph_vector_store_vz(
-    astra_db_credentials: AstraDBCredentials,
+    auth_kwargs: dict[str, Any],
     openai_api_key: str,
     empty_collection_vz: Collection,
 ) -> AstraDBGraphVectorStore:
@@ -181,11 +189,8 @@ def graph_vector_store_vz(
         collection_vector_service_options=OPENAI_VECTORIZE_OPTIONS_HEADER,
         collection_embedding_api_key=openai_api_key,
         collection_name=empty_collection_vz.name,
-        token=StaticTokenProvider(astra_db_credentials["token"]),
-        api_endpoint=astra_db_credentials["api_endpoint"],
-        namespace=astra_db_credentials["namespace"],
-        environment=astra_db_credentials["environment"],
         setup_mode=SetupMode.OFF,
+        **auth_kwargs,
     )
 
 
@@ -209,7 +214,7 @@ def populated_graph_vector_store_vz(
 
 @pytest.fixture
 def autodetect_populated_graph_vector_store_d2(
-    astra_db_credentials: AstraDBCredentials,
+    auth_kwargs: dict[str, Any],
     database: Database,
     embedding_d2: Embeddings,
     graph_vector_store_docs: list[Document],
@@ -248,24 +253,21 @@ def autodetect_populated_graph_vector_store_d2(
             },
         ]
     )
-    gstore = AstraDBGraphVectorStore(
+    g_store = AstraDBGraphVectorStore(
         embedding=embedding_d2,
         collection_name=ephemeral_collection_cleaner_idxall_d2,
         metadata_incoming_links_key="x_link_to_x",
-        token=StaticTokenProvider(astra_db_credentials["token"]),
-        api_endpoint=astra_db_credentials["api_endpoint"],
-        namespace=astra_db_credentials["namespace"],
-        environment=astra_db_credentials["environment"],
         content_field="*",
         autodetect_collection=True,
+        **auth_kwargs,
     )
-    gstore.add_documents(graph_vector_store_docs)
-    return gstore
+    g_store.add_documents(graph_vector_store_docs)
+    return g_store
 
 
 @pytest.fixture
 def autodetect_populated_graph_vector_store_vz(
-    astra_db_credentials: AstraDBCredentials,
+    auth_kwargs: dict[str, Any],
     openai_api_key: str,
     graph_vector_store_docs_vz: list[Document],
     empty_collection_idxall_vz: Collection,
@@ -297,18 +299,15 @@ def autodetect_populated_graph_vector_store_vz(
             },
         ]
     )
-    gstore = AstraDBGraphVectorStore(
+    g_store = AstraDBGraphVectorStore(
         collection_embedding_api_key=openai_api_key,
         collection_name=empty_collection_idxall_vz.name,
         metadata_incoming_links_key="x_link_to_x",
-        token=StaticTokenProvider(astra_db_credentials["token"]),
-        api_endpoint=astra_db_credentials["api_endpoint"],
-        namespace=astra_db_credentials["namespace"],
-        environment=astra_db_credentials["environment"],
         autodetect_collection=True,
+        **auth_kwargs,
     )
-    gstore.add_documents(graph_vector_store_docs_vz)
-    return gstore
+    g_store.add_documents(graph_vector_store_docs_vz)
+    return g_store
 
 
 def assert_all_flat_docs(collection: Collection, is_vectorize: bool) -> None:  # noqa: FBT001
@@ -352,11 +351,11 @@ class TestAstraDBGraphVectorStore:
         request: pytest.FixtureRequest,
     ) -> None:
         """Simple (non-graph) similarity search on a graph vector store."""
-        store: AstraDBGraphVectorStore = request.getfixturevalue(store_name)
+        g_store: AstraDBGraphVectorStore = request.getfixturevalue(store_name)
         query = "universe" if is_vectorize else "[2, 10]"
         embedding = [2.0, 10.0]
 
-        ss_response = store.similarity_search(query=query, k=2)
+        ss_response = g_store.similarity_search(query=query, k=2)
         ss_labels = [doc.metadata["label"] for doc in ss_response]
         assert ss_labels == ["AR", "A0"]
 
@@ -364,9 +363,9 @@ class TestAstraDBGraphVectorStore:
             with pytest.raises(
                 ValueError, match=r"Searching by vector .* embeddings is not allowed"
             ):
-                store.similarity_search_by_vector(embedding=embedding, k=2)
+                g_store.similarity_search_by_vector(embedding=embedding, k=2)
         else:
-            ss_by_v_response = store.similarity_search_by_vector(
+            ss_by_v_response = g_store.similarity_search_by_vector(
                 embedding=embedding, k=2
             )
             ss_by_v_labels = [doc.metadata["label"] for doc in ss_by_v_response]
@@ -374,7 +373,7 @@ class TestAstraDBGraphVectorStore:
 
         if is_autodetected:
             assert_all_flat_docs(
-                store.vector_store.astra_env.collection, is_vectorize=is_vectorize
+                g_store.vector_store.astra_env.collection, is_vectorize=is_vectorize
             )
 
     @pytest.mark.parametrize(
@@ -401,11 +400,11 @@ class TestAstraDBGraphVectorStore:
         request: pytest.FixtureRequest,
     ) -> None:
         """Simple (non-graph) similarity search on a graph vector store."""
-        store: AstraDBGraphVectorStore = request.getfixturevalue(store_name)
+        g_store: AstraDBGraphVectorStore = request.getfixturevalue(store_name)
         query = "universe" if is_vectorize else "[2, 10]"
         embedding = [2.0, 10.0]
 
-        ss_response = await store.asimilarity_search(query=query, k=2)
+        ss_response = await g_store.asimilarity_search(query=query, k=2)
         ss_labels = [doc.metadata["label"] for doc in ss_response]
         assert ss_labels == ["AR", "A0"]
 
@@ -413,9 +412,9 @@ class TestAstraDBGraphVectorStore:
             with pytest.raises(
                 ValueError, match=r"Searching by vector .* embeddings is not allowed"
             ):
-                await store.asimilarity_search_by_vector(embedding=embedding, k=2)
+                await g_store.asimilarity_search_by_vector(embedding=embedding, k=2)
         else:
-            ss_by_v_response = await store.asimilarity_search_by_vector(
+            ss_by_v_response = await g_store.asimilarity_search_by_vector(
                 embedding=embedding, k=2
             )
             ss_by_v_labels = [doc.metadata["label"] for doc in ss_by_v_response]
@@ -423,7 +422,7 @@ class TestAstraDBGraphVectorStore:
 
         if is_autodetected:
             assert_all_flat_docs(
-                store.vector_store.astra_env.collection, is_vectorize=is_vectorize
+                g_store.vector_store.astra_env.collection, is_vectorize=is_vectorize
             )
 
     @pytest.mark.parametrize(
@@ -450,19 +449,19 @@ class TestAstraDBGraphVectorStore:
         request: pytest.FixtureRequest,
     ) -> None:
         """Graph traversal search on a graph vector store."""
-        store: AstraDBGraphVectorStore = request.getfixturevalue(store_name)
+        g_store: AstraDBGraphVectorStore = request.getfixturevalue(store_name)
         query = "universe" if is_vectorize else "[2, 10]"
 
         # this is a set, as some of the internals of trav.search are set-driven
         # so ordering is not deterministic:
         ts_labels = {
             doc.metadata["label"]
-            for doc in store.traversal_search(query=query, k=2, depth=2)
+            for doc in g_store.traversal_search(query=query, k=2, depth=2)
         }
         assert ts_labels == {"AR", "A0", "BR", "B0", "TR", "T0"}
         if is_autodetected:
             assert_all_flat_docs(
-                store.vector_store.astra_env.collection, is_vectorize=is_vectorize
+                g_store.vector_store.astra_env.collection, is_vectorize=is_vectorize
             )
 
     @pytest.mark.parametrize(
@@ -489,19 +488,19 @@ class TestAstraDBGraphVectorStore:
         request: pytest.FixtureRequest,
     ) -> None:
         """Graph traversal search on a graph vector store."""
-        store: AstraDBGraphVectorStore = request.getfixturevalue(store_name)
+        g_store: AstraDBGraphVectorStore = request.getfixturevalue(store_name)
         query = "universe" if is_vectorize else "[2, 10]"
 
         # this is a set, as some of the internals of trav.search are set-driven
         # so ordering is not deterministic:
         ts_labels = {
             doc.metadata["label"]
-            async for doc in store.atraversal_search(query=query, k=2, depth=2)
+            async for doc in g_store.atraversal_search(query=query, k=2, depth=2)
         }
         assert ts_labels == {"AR", "A0", "BR", "B0", "TR", "T0"}
         if is_autodetected:
             assert_all_flat_docs(
-                store.vector_store.astra_env.collection, is_vectorize=is_vectorize
+                g_store.vector_store.astra_env.collection, is_vectorize=is_vectorize
             )
 
     @pytest.mark.parametrize(
@@ -528,12 +527,12 @@ class TestAstraDBGraphVectorStore:
         request: pytest.FixtureRequest,
     ) -> None:
         """MMR Graph traversal search on a graph vector store."""
-        store: AstraDBGraphVectorStore = request.getfixturevalue(store_name)
+        g_store: AstraDBGraphVectorStore = request.getfixturevalue(store_name)
         query = "universe" if is_vectorize else "[2, 10]"
 
         mt_labels = [
             doc.metadata["label"]
-            for doc in store.mmr_traversal_search(
+            for doc in g_store.mmr_traversal_search(
                 query=query,
                 k=2,
                 depth=2,
@@ -546,7 +545,7 @@ class TestAstraDBGraphVectorStore:
         assert mt_labels == ["AR", "BR"]
         if is_autodetected:
             assert_all_flat_docs(
-                store.vector_store.astra_env.collection, is_vectorize=is_vectorize
+                g_store.vector_store.astra_env.collection, is_vectorize=is_vectorize
             )
 
     @pytest.mark.parametrize(
@@ -573,12 +572,12 @@ class TestAstraDBGraphVectorStore:
         request: pytest.FixtureRequest,
     ) -> None:
         """MMR Graph traversal search on a graph vector store."""
-        store: AstraDBGraphVectorStore = request.getfixturevalue(store_name)
+        g_store: AstraDBGraphVectorStore = request.getfixturevalue(store_name)
         query = "universe" if is_vectorize else "[2, 10]"
 
         mt_labels = [
             doc.metadata["label"]
-            async for doc in store.ammr_traversal_search(
+            async for doc in g_store.ammr_traversal_search(
                 query=query,
                 k=2,
                 depth=2,
@@ -591,7 +590,7 @@ class TestAstraDBGraphVectorStore:
         assert mt_labels == ["AR", "BR"]
         if is_autodetected:
             assert_all_flat_docs(
-                store.vector_store.astra_env.collection, is_vectorize=is_vectorize
+                g_store.vector_store.astra_env.collection, is_vectorize=is_vectorize
             )
 
     @pytest.mark.parametrize(
@@ -616,8 +615,8 @@ class TestAstraDBGraphVectorStore:
         request: pytest.FixtureRequest,
     ) -> None:
         """Metadata search on a graph vector store."""
-        store: AstraDBGraphVectorStore = request.getfixturevalue(store_name)
-        mt_response = store.metadata_search(
+        g_store: AstraDBGraphVectorStore = request.getfixturevalue(store_name)
+        mt_response = g_store.metadata_search(
             filter={"label": "T0"},
             n=2,
         )
@@ -653,8 +652,8 @@ class TestAstraDBGraphVectorStore:
         request: pytest.FixtureRequest,
     ) -> None:
         """Metadata search on a graph vector store."""
-        store: AstraDBGraphVectorStore = request.getfixturevalue(store_name)
-        mt_response = await store.ametadata_search(
+        g_store: AstraDBGraphVectorStore = request.getfixturevalue(store_name)
+        mt_response = await g_store.ametadata_search(
             filter={"label": "T0"},
             n=2,
         )
@@ -690,8 +689,8 @@ class TestAstraDBGraphVectorStore:
         request: pytest.FixtureRequest,
     ) -> None:
         """Get by document_id on a graph vector store."""
-        store: AstraDBGraphVectorStore = request.getfixturevalue(store_name)
-        doc = store.get_by_document_id(document_id="FL")
+        g_store: AstraDBGraphVectorStore = request.getfixturevalue(store_name)
+        doc = g_store.get_by_document_id(document_id="FL")
         assert doc is not None
         assert doc.metadata["label"] == "FL"
         links = doc.metadata["links"]
@@ -702,7 +701,7 @@ class TestAstraDBGraphVectorStore:
         assert link.kind == "af_example"
         assert link.tag == "tag_l"
 
-        invalid_doc = store.get_by_document_id(document_id="invalid")
+        invalid_doc = g_store.get_by_document_id(document_id="invalid")
         assert invalid_doc is None
 
     @pytest.mark.parametrize(
@@ -727,8 +726,8 @@ class TestAstraDBGraphVectorStore:
         request: pytest.FixtureRequest,
     ) -> None:
         """Get by document_id on a graph vector store."""
-        store: AstraDBGraphVectorStore = request.getfixturevalue(store_name)
-        doc = await store.aget_by_document_id(document_id="FL")
+        g_store: AstraDBGraphVectorStore = request.getfixturevalue(store_name)
+        doc = await g_store.aget_by_document_id(document_id="FL")
         assert doc is not None
         assert doc.metadata["label"] == "FL"
         links = doc.metadata["links"]
@@ -739,7 +738,7 @@ class TestAstraDBGraphVectorStore:
         assert link.kind == "af_example"
         assert link.tag == "tag_l"
 
-        invalid_doc = await store.aget_by_document_id(document_id="invalid")
+        invalid_doc = await g_store.aget_by_document_id(document_id="invalid")
         assert invalid_doc is None
 
     @pytest.mark.parametrize(
@@ -753,7 +752,7 @@ class TestAstraDBGraphVectorStore:
     def test_gvs_from_texts(
         self,
         *,
-        astra_db_credentials: AstraDBCredentials,
+        auth_kwargs: dict[str, Any],
         openai_api_key: str,
         embedding_d2: Embeddings,
         is_vectorize: bool,
@@ -778,12 +777,9 @@ class TestAstraDBGraphVectorStore:
             metadatas=[{"md": 1}],
             ids=["x_id"],
             collection_name=collection.name,
-            token=StaticTokenProvider(astra_db_credentials["token"]),
-            api_endpoint=astra_db_credentials["api_endpoint"],
-            namespace=astra_db_credentials["namespace"],
-            environment=astra_db_credentials["environment"],
             content_field=content_field,
             setup_mode=SetupMode.OFF,
+            **auth_kwargs,
             **init_kwargs,
         )
 
@@ -805,7 +801,7 @@ class TestAstraDBGraphVectorStore:
     def test_gvs_from_documents_containing_ids(
         self,
         *,
-        astra_db_credentials: AstraDBCredentials,
+        auth_kwargs: dict[str, Any],
         openai_api_key: str,
         embedding_d2: Embeddings,
         is_vectorize: bool,
@@ -833,12 +829,9 @@ class TestAstraDBGraphVectorStore:
         g_store = AstraDBGraphVectorStore.from_documents(
             documents=[the_document],
             collection_name=collection.name,
-            token=StaticTokenProvider(astra_db_credentials["token"]),
-            api_endpoint=astra_db_credentials["api_endpoint"],
-            namespace=astra_db_credentials["namespace"],
-            environment=astra_db_credentials["environment"],
             content_field=content_field,
             setup_mode=SetupMode.OFF,
+            **auth_kwargs,
             **init_kwargs,
         )
 
