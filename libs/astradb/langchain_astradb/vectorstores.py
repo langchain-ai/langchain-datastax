@@ -1787,87 +1787,66 @@ class AstraDBVectorStore(VectorStore):
             filter=filter,
         )
 
-    async def asimilarity_search_with_embedding_by_vector(
+    async def asimilarity_search_with_embedding(
         self,
-        embedding: list[float],
-        k: int = 4,
-        filter: dict[str, Any] | None = None,  # noqa: A002
-    ) -> list[tuple[Document, list[float]]]:
-        """Return docs most similar to embedding vector.
-
-        Args:
-            embedding: Embedding to look up documents similar to.
-            k: Number of Documents to return. Defaults to 4.
-            filter: Filter on the metadata to apply.
-
-        Returns:
-            List of (Document, embedding) most similar to the query vector.
-        """
-        await self.astra_env.aensure_db_setup()
-        metadata_parameter = self.filter_to_query(filter).copy()
-        async_cursor = self.astra_env.async_collection.find(
-            filter=metadata_parameter,
-            projection=self.document_codec.full_projection,
-            limit=k,
-            sort=self.document_codec.encode_vector_sort(embedding),
-        )
-
-        return [
-            (doc, emb)
-            async for (doc, emb) in (
-                (
-                    self.document_codec.decode(hit),
-                    self.document_codec.decode_vector(hit),
-                )
-                async for hit in async_cursor
-            )
-            if doc is not None and emb is not None
-        ]
-
-    async def asimilarity_search_with_embedding_by_query(
-        self,
-        query: str,
+        query_or_embedding: str | list[float],
         k: int = 4,
         filter: dict[str, Any] | None = None,  # noqa: A002
     ) -> tuple[list[float], list[tuple[Document, list[float]]]]:
         """Returns the embedded query and docs most similar to query.
 
         Args:
-            query: Query to look up documents similar to.
+            query_or_embedding: Query or Embedding to look up
+                documents similar to.
             k: Number of Documents to return. Defaults to 4.
             filter: Filter on the metadata to apply.
+
+        Notes:
+            Either 'query' or 'query_embedding' must be set.
 
         Returns:
             (query_embedding, List of (Document, embedding) most similar to the query).
         """
-        if (
-            not self.document_codec.server_side_embeddings
-            and self.embedding is not None
-        ):
-            query_embedding = self.embedding.embed_query(query)
-            results = await self.asimilarity_search_with_embedding_by_vector(
-                embedding=query_embedding
-            )
-            return query_embedding, results
-
-        sort = {"$vectorize": query}
         await self.astra_env.aensure_db_setup()
-        metadata_parameter = self.filter_to_query(filter)
+
+        sort: dict[str, Any] = {}
+        include_sort_vector: bool = False
+        query_embedding: list[float] = []
+
+        if isinstance(query_or_embedding, str):
+            query: str = query_or_embedding
+            if self.document_codec.server_side_embeddings:
+                include_sort_vector = True
+                sort = {"$vectorize": query}
+            else:
+                query_embedding = self._get_safe_embedding().embed_query(text=query)
+                sort = self.document_codec.encode_vector_sort(vector=query_embedding)
+        elif isinstance(query_or_embedding, list):
+            query_embedding = query_or_embedding
+            sort = self.document_codec.encode_vector_sort(vector=query_embedding)
+        else:
+            msg = (
+                "Expected a 'str' or a 'list[float]' for 'query_or_embedding', ",
+                f"got {type(query_or_embedding)} instead.",
+            )
+            raise TypeError(msg)
+
         async_cursor = self.astra_env.async_collection.find(
-            filter=metadata_parameter,
+            filter=self.filter_to_query(filter),
             projection=self.document_codec.full_projection,
             limit=k,
-            include_similarity=True,
-            include_sort_vector=True,
+            include_sort_vector=include_sort_vector,
             sort=sort,
         )
-        sort_vector = await async_cursor.get_sort_vector()
-        if sort_vector is None:
-            msg = "Unable to retrieve the server-side embedding of the query."
-            raise ValueError(msg)
+        if include_sort_vector:
+            sort_vector = await async_cursor.get_sort_vector()
+            if sort_vector is None:
+                msg = "Unable to retrieve the server-side embedding of the query."
+                raise ValueError(msg)
+            query_embedding = sort_vector
 
         return (
-            sort_vector,
+            query_embedding,
             [
                 (doc, emb)
                 async for (doc, emb) in (

@@ -263,7 +263,6 @@ class AstraDBGraphVectorStore(GraphVectorStore):
             :meth:`~add_texts` and :meth:`~add_documents` as well.
         """
         self.metadata_incoming_links_key = metadata_incoming_links_key
-        self.embedding = embedding
 
         # update indexing policy to ensure incoming_links are indexed
         if metadata_indexing_include is not None:
@@ -363,7 +362,7 @@ class AstraDBGraphVectorStore(GraphVectorStore):
     @property
     @override
     def embeddings(self) -> Embeddings | None:
-        return self.embedding
+        return self.vector_store.embedding
 
     def _get_metadata_filter(
         self,
@@ -1168,8 +1167,8 @@ class AstraDBGraphVectorStore(GraphVectorStore):
         (
             query_embedding,
             result,
-        ) = await self.vector_store.asimilarity_search_with_embedding_by_query(
-            query=query,
+        ) = await self.vector_store.asimilarity_search_with_embedding(
+            query_or_embedding=query,
             k=fetch_k,
             filter=filter,
         )
@@ -1212,16 +1211,18 @@ class AstraDBGraphVectorStore(GraphVectorStore):
             )
 
             tasks.append(
-                self.vector_store.asimilarity_search_with_embedding_by_vector(
-                    embedding=query_embedding,
+                self.vector_store.asimilarity_search_with_embedding(
+                    query_or_embedding=query_embedding,
                     k=k_per_link or 10,
                     filter=metadata_filter,
                 )
             )
 
-        results: list[list[tuple[Document, list[float]]]] = await asyncio.gather(*tasks)
+        results: list[
+            tuple[list[float], list[tuple[Document, list[float]]]]
+        ] = await asyncio.gather(*tasks)
 
-        for result in results:
+        for _, result in results:
             for doc, embedding in result:
                 if doc.id is not None:
                     retrieved_docs[doc.id] = doc

@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import math
 import os
+import random
 from typing import TYPE_CHECKING, Any
 
 import pytest
@@ -824,7 +825,6 @@ class TestAstraDBVectorStore:
 
         all_ids = [f"doc_{idx}" for idx in range(full_size)]
         all_texts = [f"[0,{idx + 1}]" for idx in range(full_size)]
-        all_embeddings = [[0, idx + 1] for idx in range(full_size)]
 
         # massive insertion on empty
         group0_ids = all_ids[0:first_group_size]
@@ -856,17 +856,6 @@ class TestAstraDBVectorStore:
         )
         for doc, _, doc_id in full_results:
             assert doc.page_content == expected_text_by_id[doc_id]
-        expected_embedding_by_id = dict(zip(all_ids, all_embeddings))
-        full_results_with_embeddings = (
-            await vector_store_d2.asimilarity_search_with_embedding_by_vector(
-                embedding=[1.0, 1.0],
-                k=full_size,
-            )
-        )
-        for doc, embedding in full_results_with_embeddings:
-            assert doc.id is not None
-            assert doc.page_content == expected_text_by_id[doc.id]
-            assert embedding == expected_embedding_by_id[doc.id]
 
     def test_astradb_vectorstore_delete_by_metadata_sync(
         self,
@@ -1419,6 +1408,73 @@ class TestAstraDBVectorStore:
         if not is_vectorize:
             assert abs(1 - sco_near) < MATCH_EPSILON
             assert sco_far < EUCLIDEAN_MIN_SIM_UNIT_VECTORS + MATCH_EPSILON
+
+    @pytest.mark.parametrize(
+        ("is_vectorize", "vector_store", "query_or_embedding_mode"),
+        [
+            (False, "vector_store_d2", "query"),
+            (False, "vector_store_d2", "embedding"),
+            (False, "vector_store_d2", "other"),
+            (True, "vector_store_vz", "query"),
+            (True, "vector_store_vz", "embedding"),
+            (True, "vector_store_vz", "other"),
+        ],
+        ids=[
+            "nonvectorize_store_with_query",
+            "nonvectorize_store_with_embedding",
+            "nonvectorize_store_with_other",
+            "vectorize_store_with_query",
+            "vectorize_store_with_embedding",
+            "vectorize_store_with_other",
+        ],
+    )
+    async def test_astradb_vectorstore_asimilarity_search_with_embedding(
+        self,
+        *,
+        is_vectorize: bool,
+        vector_store: str,
+        query_or_embedding_mode: str,
+        metadata_documents: list[Document],
+        request: pytest.FixtureRequest,
+    ) -> None:
+        """asimilarity_search_with_embedding is used as the building
+        block for other components (like AstraDBGraphVectorStore).
+        """
+        vstore: AstraDBVectorStore = request.getfixturevalue(vector_store)
+        await vstore.aadd_documents(metadata_documents)
+
+        def assert_list_of_numeric(value: list[float]) -> None:
+            assert isinstance(value, list)
+            assert all(isinstance(item, (float, int)) for item in value)
+
+        if query_or_embedding_mode == "query":
+            query_embedding, results = await vstore.asimilarity_search_with_embedding(
+                query_or_embedding="[-1,2]"
+            )
+        elif query_or_embedding_mode == "embedding":
+            vector_dimensions = 1536 if is_vectorize else 2
+            query_embedding, results = await vstore.asimilarity_search_with_embedding(
+                query_or_embedding=[
+                    random.uniform(0.0, 1.0)  # noqa: S311
+                    for _ in range(vector_dimensions)
+                ]
+            )
+        else:
+            with pytest.raises(
+                TypeError,
+                match=r"Expected a",
+            ):
+                await vstore.asimilarity_search_with_embedding(
+                    query_or_embedding={"test": "error"}  # type: ignore # noqa: PGH003
+                )
+            return
+
+        assert_list_of_numeric(query_embedding)
+        assert isinstance(results, list)
+        assert len(results) > 0
+        (doc, embedding) = results[0]
+        assert isinstance(doc, Document)
+        assert_list_of_numeric(embedding)
 
     @pytest.mark.parametrize(
         "vector_store",
