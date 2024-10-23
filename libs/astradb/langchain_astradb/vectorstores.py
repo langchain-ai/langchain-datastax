@@ -1801,9 +1801,6 @@ class AstraDBVectorStore(VectorStore):
             k: Number of Documents to return. Defaults to 4.
             filter: Filter on the metadata to apply.
 
-        Notes:
-            Either 'query' or 'query_embedding' must be set.
-
         Returns:
             (query_embedding, List of (Document, embedding) most similar to the query).
         """
@@ -1830,6 +1827,10 @@ class AstraDBVectorStore(VectorStore):
                 f"got {type(query_or_embedding)} instead.",
             )
             raise TypeError(msg)
+
+        # shortcut return if query isn't needed.
+        if k == 0 and len(query_embedding) > 0:
+            return (query_embedding, [])
 
         async_cursor = self.astra_env.async_collection.find(
             filter=self.filter_to_query(filter),
