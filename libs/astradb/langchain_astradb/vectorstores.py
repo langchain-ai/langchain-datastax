@@ -90,7 +90,7 @@ def _normalize_content_field(
 ) -> str:
     if has_vectorize:
         if content_field is not None:
-            msg = "content_field is not configurable for vectorize collections."
+            msg = "`content_field` is not configurable for vectorize collections."
             raise ValueError(msg)
         return "$vectorize"
 
