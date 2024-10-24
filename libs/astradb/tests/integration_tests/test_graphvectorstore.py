@@ -794,6 +794,54 @@ class TestAstraDBGraphVectorStore:
         ("is_vectorize", "page_contents", "collection_fixture_name"),
         [
             (False, ["[1, 2]"], "empty_collection_d2"),
+            (True, ["varenyky, holubtsi, and deruny"], "empty_collection_vz"),
+        ],
+        ids=["nonvectorize_store", "vectorize_store"],
+    )
+    async def test_gvs_from_texts_async(
+        self,
+        *,
+        auth_kwargs: dict[str, Any],
+        openai_api_key: str,
+        embedding_d2: Embeddings,
+        is_vectorize: bool,
+        page_contents: list[str],
+        collection_fixture_name: str,
+        request: pytest.FixtureRequest,
+    ) -> None:
+        collection: Collection = request.getfixturevalue(collection_fixture_name)
+        init_kwargs: dict[str, Any]
+        if is_vectorize:
+            init_kwargs = {
+                "collection_vector_service_options": OPENAI_VECTORIZE_OPTIONS_HEADER,
+                "collection_embedding_api_key": openai_api_key,
+            }
+        else:
+            init_kwargs = {"embedding": embedding_d2}
+
+        content_field = CUSTOM_CONTENT_KEY if not is_vectorize else None
+
+        g_store = await AstraDBGraphVectorStore.afrom_texts(
+            texts=page_contents,
+            metadatas=[{"md": 1}],
+            ids=["x_id"],
+            collection_name=collection.name,
+            content_field=content_field,
+            **auth_kwargs,
+            **init_kwargs,
+        )
+
+        query = "ukrainian food" if is_vectorize else "[2, 1]"
+        hits = g_store.similarity_search(query=query, k=2)
+        assert len(hits) == 1
+        assert hits[0].page_content == page_contents[0]
+        assert hits[0].id == "x_id"
+        assert hits[0].metadata["md"] == 1
+
+    @pytest.mark.parametrize(
+        ("is_vectorize", "page_contents", "collection_fixture_name"),
+        [
+            (False, ["[1, 2]"], "empty_collection_d2"),
             (True, ["tacos, tamales, and mole"], "empty_collection_vz"),
         ],
         ids=["nonvectorize_store", "vectorize_store"],
@@ -831,6 +879,57 @@ class TestAstraDBGraphVectorStore:
             collection_name=collection.name,
             content_field=content_field,
             setup_mode=SetupMode.OFF,
+            **auth_kwargs,
+            **init_kwargs,
+        )
+
+        query = "mexican food" if is_vectorize else "[2, 1]"
+        hits = g_store.similarity_search(query=query, k=2)
+        assert len(hits) == 1
+        assert hits[0].page_content == page_contents[0]
+        assert hits[0].id == "x_id"
+        assert hits[0].metadata["md"] == 1
+
+    @pytest.mark.parametrize(
+        ("is_vectorize", "page_contents", "collection_fixture_name"),
+        [
+            (False, ["[1, 2]"], "empty_collection_d2"),
+            (True, ["tacos, tamales, and mole"], "empty_collection_vz"),
+        ],
+        ids=["nonvectorize_store", "vectorize_store"],
+    )
+    async def test_gvs_from_documents_containing_ids_async(
+        self,
+        *,
+        auth_kwargs: dict[str, Any],
+        openai_api_key: str,
+        embedding_d2: Embeddings,
+        is_vectorize: bool,
+        page_contents: list[str],
+        collection_fixture_name: str,
+        request: pytest.FixtureRequest,
+    ) -> None:
+        collection: Collection = request.getfixturevalue(collection_fixture_name)
+        init_kwargs: dict[str, Any]
+        if is_vectorize:
+            init_kwargs = {
+                "collection_vector_service_options": OPENAI_VECTORIZE_OPTIONS_HEADER,
+                "collection_embedding_api_key": openai_api_key,
+            }
+        else:
+            init_kwargs = {"embedding": embedding_d2}
+
+        content_field = CUSTOM_CONTENT_KEY if not is_vectorize else None
+
+        the_document = Document(
+            page_content=page_contents[0],
+            metadata={"md": 1},
+            id="x_id",
+        )
+        g_store = await AstraDBGraphVectorStore.afrom_documents(
+            documents=[the_document],
+            collection_name=collection.name,
+            content_field=content_field,
             **auth_kwargs,
             **init_kwargs,
         )
