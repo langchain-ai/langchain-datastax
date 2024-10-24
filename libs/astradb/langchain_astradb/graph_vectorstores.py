@@ -1168,7 +1168,7 @@ class AstraDBGraphVectorStore(GraphVectorStore):
             query_embedding,
             result,
         ) = await self.vector_store.asimilarity_search_with_embedding(
-            query_or_embedding=query,
+            query=query,
             k=fetch_k,
             filter=filter,
         )
@@ -1211,18 +1211,16 @@ class AstraDBGraphVectorStore(GraphVectorStore):
             )
 
             tasks.append(
-                self.vector_store.asimilarity_search_with_embedding(
-                    query_or_embedding=query_embedding,
+                self.vector_store.asimilarity_search_with_embedding_by_vector(
+                    embedding=query_embedding,
                     k=k_per_link or 10,
                     filter=metadata_filter,
                 )
             )
 
-        results: list[
-            tuple[list[float], list[tuple[Document, list[float]]]]
-        ] = await asyncio.gather(*tasks)
+        results: list[list[tuple[Document, list[float]]]] = await asyncio.gather(*tasks)
 
-        for _, result in results:
+        for result in results:
             for doc, embedding in result:
                 if doc.id is not None:
                     retrieved_docs[doc.id] = doc
