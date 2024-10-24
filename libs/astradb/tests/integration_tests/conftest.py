@@ -398,7 +398,7 @@ def collection_vz(
     """A general-purpose $vectorize collection for per-test reuse."""
     collection = database.create_collection(
         COLLECTION_NAME_VZ,
-        dimension=16,
+        dimension=1536,
         check_exists=False,
         indexing=DEFAULT_INDEXING_OPTIONS,
         metric="euclidean",
@@ -464,7 +464,7 @@ def collection_idxall_vz(
     """
     collection = database.create_collection(
         COLLECTION_NAME_IDXALL_VZ,
-        dimension=16,
+        dimension=1536,
         check_exists=False,
         metric="euclidean",
         service=OPENAI_VECTORIZE_OPTIONS_HEADER,
