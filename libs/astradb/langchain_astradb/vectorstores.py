@@ -1787,13 +1787,13 @@ class AstraDBVectorStore(VectorStore):
             filter=filter,
         )
 
-    async def asimilarity_search_with_embedding_id_by_vector(
+    def similarity_search_with_embedding_by_vector(
         self,
         embedding: list[float],
         k: int = 4,
         filter: dict[str, Any] | None = None,  # noqa: A002
-    ) -> list[tuple[Document, list[float], str]]:
-        """Return docs most similar to embedding vector.
+    ) -> list[tuple[Document, list[float]]]:
+        """Return docs most similar to embedding vector with embedding.
 
         Args:
             embedding: Embedding to look up documents similar to.
@@ -1801,29 +1801,181 @@ class AstraDBVectorStore(VectorStore):
             filter: Filter on the metadata to apply.
 
         Returns:
-            List of (Document, embedding, id), the most similar to the query vector.
+            (The query embedding vector, The list of (Document, embedding),
+            the most similar to the query vector.).
+        """
+        sort = self.document_codec.encode_vector_sort(vector=embedding)
+        _, doc_emb_list = self._similarity_search_with_embedding_by_sort(
+            sort=sort, k=k, filter=filter
+        )
+        return doc_emb_list
+
+    async def asimilarity_search_with_embedding_by_vector(
+        self,
+        embedding: list[float],
+        k: int = 4,
+        filter: dict[str, Any] | None = None,  # noqa: A002
+    ) -> list[tuple[Document, list[float]]]:
+        """Return docs most similar to embedding vector with embedding.
+
+        Args:
+            embedding: Embedding to look up documents similar to.
+            k: Number of Documents to return. Defaults to 4.
+            filter: Filter on the metadata to apply.
+
+        Returns:
+            (The query embedding vector, The list of (Document, embedding),
+            the most similar to the query vector.).
+        """
+        sort = self.document_codec.encode_vector_sort(vector=embedding)
+        _, doc_emb_list = await self._asimilarity_search_with_embedding_by_sort(
+            sort=sort, k=k, filter=filter
+        )
+        return doc_emb_list
+
+    def similarity_search_with_embedding(
+        self,
+        query: str,
+        k: int = 4,
+        filter: dict[str, Any] | None = None,  # noqa: A002
+    ) -> tuple[list[float], list[tuple[Document, list[float]]]]:
+        """Return docs most similar to the query with embedding.
+
+        Also includes the query embedding vector.
+
+        Args:
+            query: Query to look up documents similar to.
+            k: Number of Documents to return. Defaults to 4.
+            filter: Filter on the metadata to apply.
+
+        Returns:
+            (The query embedding vector, The list of (Document, embedding),
+            the most similar to the query vector.).
+        """
+        if self.document_codec.server_side_embeddings:
+            sort = {"$vectorize": query}
+        else:
+            query_embedding = self._get_safe_embedding().embed_query(text=query)
+            # shortcut return if query isn't needed.
+            if k == 0:
+                return (query_embedding, [])
+            sort = self.document_codec.encode_vector_sort(vector=query_embedding)
+
+        return self._similarity_search_with_embedding_by_sort(
+            sort=sort, k=k, filter=filter
+        )
+
+    async def asimilarity_search_with_embedding(
+        self,
+        query: str,
+        k: int = 4,
+        filter: dict[str, Any] | None = None,  # noqa: A002
+    ) -> tuple[list[float], list[tuple[Document, list[float]]]]:
+        """Return docs most similar to the query with embedding.
+
+        Also includes the query embedding vector.
+
+        Args:
+            query: Query to look up documents similar to.
+            k: Number of Documents to return. Defaults to 4.
+            filter: Filter on the metadata to apply.
+
+        Returns:
+            (The query embedding vector, The list of (Document, embedding),
+            the most similar to the query vector.).
+        """
+        if self.document_codec.server_side_embeddings:
+            sort = {"$vectorize": query}
+        else:
+            query_embedding = self._get_safe_embedding().embed_query(text=query)
+            # shortcut return if query isn't needed.
+            if k == 0:
+                return (query_embedding, [])
+            sort = self.document_codec.encode_vector_sort(vector=query_embedding)
+
+        return await self._asimilarity_search_with_embedding_by_sort(
+            sort=sort, k=k, filter=filter
+        )
+
+    async def _asimilarity_search_with_embedding_by_sort(
+        self,
+        sort: dict[str, Any],
+        k: int = 4,
+        filter: dict[str, Any] | None = None,  # noqa: A002
+    ) -> tuple[list[float], list[tuple[Document, list[float]]]]:
+        """Run ANN search with a provided sort clause.
+
+        Returns:
+            (query_embedding, List of (Document, embedding) most similar to the query).
         """
         await self.astra_env.aensure_db_setup()
-        metadata_parameter = self.filter_to_query(filter).copy()
-        results: list[tuple[Document, list[float], str]] = []
-        async for hit in self.astra_env.async_collection.find(
-            filter=metadata_parameter,
+        async_cursor = self.astra_env.async_collection.find(
+            filter=self.filter_to_query(filter),
             projection=self.document_codec.full_projection,
             limit=k,
-            include_similarity=True,
             include_sort_vector=True,
-            sort=self.document_codec.encode_vector_sort(embedding),
-        ):
-            doc = self.document_codec.decode(hit)
-            if doc is None or doc.id is None:
-                continue
+            sort=sort,
+        )
+        sort_vector = await async_cursor.get_sort_vector()
+        if sort_vector is None:
+            msg = "Unable to retrieve the server-side embedding of the query."
+            raise ValueError(msg)
+        query_embedding = sort_vector
 
-            vector = self.document_codec.decode_vector(hit)
-            if vector is None:
-                continue
+        return (
+            query_embedding,
+            [
+                (doc, emb)
+                async for (doc, emb) in (
+                    (
+                        self.document_codec.decode(hit),
+                        self.document_codec.decode_vector(hit),
+                    )
+                    async for hit in async_cursor
+                )
+                if doc is not None and emb is not None
+            ],
+        )
 
-            results.append((doc, vector, doc.id))
-        return results
+    def _similarity_search_with_embedding_by_sort(
+        self,
+        sort: dict[str, Any],
+        k: int = 4,
+        filter: dict[str, Any] | None = None,  # noqa: A002
+    ) -> tuple[list[float], list[tuple[Document, list[float]]]]:
+        """Run ANN search with a provided sort clause.
+
+        Returns:
+            (query_embedding, List of (Document, embedding) most similar to the query).
+        """
+        self.astra_env.ensure_db_setup()
+        cursor = self.astra_env.collection.find(
+            filter=self.filter_to_query(filter),
+            projection=self.document_codec.full_projection,
+            limit=k,
+            include_sort_vector=True,
+            sort=sort,
+        )
+        sort_vector = cursor.get_sort_vector()
+        if sort_vector is None:
+            msg = "Unable to retrieve the server-side embedding of the query."
+            raise ValueError(msg)
+        query_embedding = sort_vector
+
+        return (
+            query_embedding,
+            [
+                (doc, emb)
+                for (doc, emb) in (
+                    (
+                        self.document_codec.decode(hit),
+                        self.document_codec.decode_vector(hit),
+                    )
+                    for hit in cursor
+                )
+                if doc is not None and emb is not None
+            ],
+        )
 
     async def _asimilarity_search_with_score_id_by_sort(
         self,
