@@ -744,8 +744,12 @@ class TestAstraDBGraphVectorStore:
     @pytest.mark.parametrize(
         ("is_vectorize", "page_contents", "collection_fixture_name"),
         [
-            (False, ["[1, 2]"], "empty_collection_d2"),
-            (True, ["varenyky, holubtsi, and deruny"], "empty_collection_vz"),
+            (False, ["[1, 2]"], "ephemeral_collection_cleaner_d2"),
+            (
+                True,
+                ["varenyky, holubtsi, and deruny"],
+                "ephemeral_collection_cleaner_vz",
+            ),
         ],
         ids=["nonvectorize_store", "vectorize_store"],
     )
@@ -760,7 +764,7 @@ class TestAstraDBGraphVectorStore:
         collection_fixture_name: str,
         request: pytest.FixtureRequest,
     ) -> None:
-        collection: Collection = request.getfixturevalue(collection_fixture_name)
+        collection_name: str = request.getfixturevalue(collection_fixture_name)
         init_kwargs: dict[str, Any]
         if is_vectorize:
             init_kwargs = {
@@ -776,9 +780,8 @@ class TestAstraDBGraphVectorStore:
             texts=page_contents,
             metadatas=[{"md": 1}],
             ids=["x_id"],
-            collection_name=collection.name,
+            collection_name=collection_name,
             content_field=content_field,
-            setup_mode=SetupMode.OFF,
             **auth_kwargs,
             **init_kwargs,
         )
@@ -793,8 +796,12 @@ class TestAstraDBGraphVectorStore:
     @pytest.mark.parametrize(
         ("is_vectorize", "page_contents", "collection_fixture_name"),
         [
-            (False, ["[1, 2]"], "empty_collection_d2"),
-            (True, ["varenyky, holubtsi, and deruny"], "empty_collection_vz"),
+            (False, ["[1, 2]"], "ephemeral_collection_cleaner_d2"),
+            (
+                True,
+                ["varenyky, holubtsi, and deruny"],
+                "ephemeral_collection_cleaner_vz",
+            ),
         ],
         ids=["nonvectorize_store", "vectorize_store"],
     )
@@ -809,7 +816,7 @@ class TestAstraDBGraphVectorStore:
         collection_fixture_name: str,
         request: pytest.FixtureRequest,
     ) -> None:
-        collection: Collection = request.getfixturevalue(collection_fixture_name)
+        collection_name: str = request.getfixturevalue(collection_fixture_name)
         init_kwargs: dict[str, Any]
         if is_vectorize:
             init_kwargs = {
@@ -825,7 +832,7 @@ class TestAstraDBGraphVectorStore:
             texts=page_contents,
             metadatas=[{"md": 1}],
             ids=["x_id"],
-            collection_name=collection.name,
+            collection_name=collection_name,
             content_field=content_field,
             **auth_kwargs,
             **init_kwargs,
@@ -841,8 +848,8 @@ class TestAstraDBGraphVectorStore:
     @pytest.mark.parametrize(
         ("is_vectorize", "page_contents", "collection_fixture_name"),
         [
-            (False, ["[1, 2]"], "empty_collection_d2"),
-            (True, ["tacos, tamales, and mole"], "empty_collection_vz"),
+            (False, ["[1, 2]"], "ephemeral_collection_cleaner_d2"),
+            (True, ["tacos, tamales, and mole"], "ephemeral_collection_cleaner_vz"),
         ],
         ids=["nonvectorize_store", "vectorize_store"],
     )
@@ -857,7 +864,7 @@ class TestAstraDBGraphVectorStore:
         collection_fixture_name: str,
         request: pytest.FixtureRequest,
     ) -> None:
-        collection: Collection = request.getfixturevalue(collection_fixture_name)
+        collection_name: str = request.getfixturevalue(collection_fixture_name)
         init_kwargs: dict[str, Any]
         if is_vectorize:
             init_kwargs = {
@@ -876,9 +883,8 @@ class TestAstraDBGraphVectorStore:
         )
         g_store = AstraDBGraphVectorStore.from_documents(
             documents=[the_document],
-            collection_name=collection.name,
+            collection_name=collection_name,
             content_field=content_field,
-            setup_mode=SetupMode.OFF,
             **auth_kwargs,
             **init_kwargs,
         )
@@ -893,8 +899,8 @@ class TestAstraDBGraphVectorStore:
     @pytest.mark.parametrize(
         ("is_vectorize", "page_contents", "collection_fixture_name"),
         [
-            (False, ["[1, 2]"], "empty_collection_d2"),
-            (True, ["tacos, tamales, and mole"], "empty_collection_vz"),
+            (False, ["[1, 2]"], "ephemeral_collection_cleaner_d2"),
+            (True, ["tacos, tamales, and mole"], "ephemeral_collection_cleaner_vz"),
         ],
         ids=["nonvectorize_store", "vectorize_store"],
     )
@@ -909,7 +915,7 @@ class TestAstraDBGraphVectorStore:
         collection_fixture_name: str,
         request: pytest.FixtureRequest,
     ) -> None:
-        collection: Collection = request.getfixturevalue(collection_fixture_name)
+        collection_name: str = request.getfixturevalue(collection_fixture_name)
         init_kwargs: dict[str, Any]
         if is_vectorize:
             init_kwargs = {
@@ -928,7 +934,7 @@ class TestAstraDBGraphVectorStore:
         )
         g_store = await AstraDBGraphVectorStore.afrom_documents(
             documents=[the_document],
-            collection_name=collection.name,
+            collection_name=collection_name,
             content_field=content_field,
             **auth_kwargs,
             **init_kwargs,
