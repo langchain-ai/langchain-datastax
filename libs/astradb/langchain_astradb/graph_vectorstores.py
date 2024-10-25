@@ -77,7 +77,6 @@ def _deserialize_links(json_blob: str | None) -> set[Link]:
 def _metadata_link_key(link: Link) -> str:
     return f"link:{link.kind}:{link.tag}"
 
-
 def _doc_to_node(doc: Document) -> Node:
     metadata = doc.metadata.copy()
     links = _deserialize_links(metadata.get(METADATA_LINKS_KEY))
@@ -90,13 +89,12 @@ def _doc_to_node(doc: Document) -> Node:
         links=list(links),
     )
 
+def _incoming_links(links: set[Link]) -> set[Link]:
+    return {link for link in links if link.direction in ["in", "bidir"]}
 
-def _incoming_links(node: Node | EmbeddedNode) -> set[Link]:
-    return {link for link in node.links if link.direction in ["in", "bidir"]}
 
-
-def _outgoing_links(node: Node | EmbeddedNode) -> set[Link]:
-    return {link for link in node.links if link.direction in ["out", "bidir"]}
+def _outgoing_links(links: set[Link]) -> set[Link]:
+    return {link for link in links if link.direction in ["out", "bidir"]}
 
 
 @beta()
@@ -393,11 +391,12 @@ class AstraDBGraphVectorStore(GraphVectorStore):
             del doc.metadata[self.metadata_incoming_links_key]
         return doc
 
-    def _get_node_metadata_for_insertion(self, node: Node) -> dict[str, Any]:
-        metadata = node.metadata.copy()
-        metadata[METADATA_LINKS_KEY] = _serialize_links(node.links)
+    def _get_metadata_for_insertion(self, metadata: dict[str, Any]) -> dict[str, Any]:
+        links: set[Link] = metadata.get(METADATA_LINKS_KEY, set())
+        metadata = metadata.copy()
+        metadata[METADATA_LINKS_KEY] = _serialize_links(links)
         metadata[self.metadata_incoming_links_key] = [
-            _metadata_link_key(link=link) for link in _incoming_links(node=node)
+            _metadata_link_key(link=link) for link in _incoming_links(links=links)
         ]
         return metadata
 
@@ -411,7 +410,7 @@ class AstraDBGraphVectorStore(GraphVectorStore):
 
             doc = Document(
                 page_content=node.text,
-                metadata=self._get_node_metadata_for_insertion(node=node),
+                metadata=self._get_metadata_for_insertion(metadata=node.metadata),
                 id=node_id,
             )
             docs.append(doc)
@@ -491,6 +490,80 @@ class AstraDBGraphVectorStore(GraphVectorStore):
         )
         store.add_documents(documents, ids=ids)
         return store
+
+
+    # TODO: This should properly handle links
+    def update_metadata(
+        self,
+        id_to_metadata: dict[str, dict],
+        *,
+        overwrite_concurrency: int | None = None,
+    ) -> int:
+        """Add/overwrite the metadata of existing documents.
+
+        For each document to update, the new metadata dictionary is appended
+        to the existing metadata, overwriting individual keys that existed already.
+
+        Args:
+            id_to_metadata: map from the Document IDs to modify to the
+                new metadata for updating. Keys in this dictionary that
+                do not correspond to an existing document will be silently ignored.
+                The values of this map are metadata dictionaries for updating
+                the documents. Any pre-existing metadata will be merged with
+                these entries, which take precedence on a key-by-key basis.
+            overwrite_concurrency: number of threads to process the updates.
+                Defaults to the vector-store overall setting if not provided.
+
+        Returns:
+            the number of documents successfully updated (i.e. found to exist,
+            since even an update with `{}` as the new metadata counts as successful.)
+        """
+
+        prepared_id_to_metadata = {
+            id: self._get_metadata_for_insertion(metadata=metadata)
+            for (id, metadata) in id_to_metadata.items()
+        }
+
+        return self.vector_store.update_metadata(
+            id_to_metadata=prepared_id_to_metadata,
+            overwrite_concurrency=overwrite_concurrency,
+        )
+
+    async def aupdate_metadata(
+        self,
+        id_to_metadata: dict[str, dict],
+        *,
+        overwrite_concurrency: int | None = None,
+    ) -> int:
+        """Add/overwrite the metadata of existing documents.
+
+        For each document to update, the new metadata dictionary is appended
+        to the existing metadata, overwriting individual keys that existed already.
+
+        Args:
+            id_to_metadata: map from the Document IDs to modify to the
+                new metadata for updating. Keys in this dictionary that
+                do not correspond to an existing document will be silently ignored.
+                The values of this map are metadata dictionaries for updating
+                the documents. Any pre-existing metadata will be merged with
+                these entries, which take precedence on a key-by-key basis.
+            overwrite_concurrency: number of asynchronous tasks to process the updates.
+                Defaults to the vector-store overall setting if not provided.
+
+        Returns:
+            the number of documents successfully updated (i.e. found to exist,
+            since even an update with `{}` as the new metadata counts as successful.)
+        """
+
+        prepared_id_to_metadata = {
+            id: self._get_metadata_for_insertion(metadata=metadata)
+            for (id, metadata) in id_to_metadata.items()
+        }
+
+        return await self.vector_store.aupdate_metadata(
+            id_to_metadata=prepared_id_to_metadata,
+            overwrite_concurrency=overwrite_concurrency,
+        )
 
     @override
     def similarity_search(
@@ -743,7 +816,7 @@ class AstraDBGraphVectorStore(GraphVectorStore):
             candidates: dict[str, list[float]] = {}
             for node in nodes:
                 if node.id not in outgoing_links_map:
-                    outgoing_links_map[node.id] = _outgoing_links(node=node)
+                    outgoing_links_map[node.id] = _outgoing_links(links=node.links)
                     candidates[node.id] = node.embedding
             return candidates
 
@@ -841,7 +914,7 @@ class AstraDBGraphVectorStore(GraphVectorStore):
                 for adjacent_node in adjacent_nodes:
                     if adjacent_node.id not in outgoing_links_map:
                         outgoing_links_map[adjacent_node.id] = _outgoing_links(
-                            node=adjacent_node
+                            links=adjacent_node.links,
                         )
                         new_candidates[adjacent_node.id] = adjacent_node.embedding
                         if next_depth < depths.get(adjacent_node.id, depth + 1):
@@ -1006,7 +1079,7 @@ class AstraDBGraphVectorStore(GraphVectorStore):
                             node = _doc_to_node(doc=doc)
                             # Record any new (or newly discovered at a lower depth)
                             # links to the set to traverse.
-                            for link in _outgoing_links(node=node):
+                            for link in _outgoing_links(links=node.links):
                                 if d <= visited_links.get(link, depth):
                                     # Record that we'll query this link at the
                                     # given depth, so we don't fetch it again
@@ -1153,7 +1226,7 @@ class AstraDBGraphVectorStore(GraphVectorStore):
         for doc in docs:
             if doc is not None:
                 node = _doc_to_node(doc=doc)
-                links.update(_outgoing_links(node=node))
+                links.update(_outgoing_links(links=node.links))
 
         return links
 
