@@ -473,6 +473,29 @@ class AstraDBGraphVectorStore(GraphVectorStore):
 
     @classmethod
     @override
+    async def afrom_texts(
+        cls: type[AstraDBGraphVectorStore],
+        texts: Iterable[str],
+        embedding: Embeddings | None = None,
+        metadatas: list[dict] | None = None,
+        ids: Iterable[str] | None = None,
+        collection_vector_service_options: CollectionVectorServiceOptions | None = None,
+        collection_embedding_api_key: str | EmbeddingHeadersProvider | None = None,
+        **kwargs: Any,
+    ) -> AstraDBGraphVectorStore:
+        """Return AstraDBGraphVectorStore initialized from texts and embeddings."""
+        store = cls(
+            embedding=embedding,
+            collection_vector_service_options=collection_vector_service_options,
+            collection_embedding_api_key=collection_embedding_api_key,
+            setup_mode=SetupMode.ASYNC,
+            **kwargs,
+        )
+        await store.aadd_texts(texts, metadatas, ids=ids)
+        return store
+
+    @classmethod
+    @override
     def from_documents(
         cls: type[AstraDBGraphVectorStore],
         documents: Iterable[Document],
@@ -490,6 +513,28 @@ class AstraDBGraphVectorStore(GraphVectorStore):
             **kwargs,
         )
         store.add_documents(documents, ids=ids)
+        return store
+
+    @classmethod
+    @override
+    async def afrom_documents(
+        cls: type[AstraDBGraphVectorStore],
+        documents: Iterable[Document],
+        embedding: Embeddings | None = None,
+        ids: Iterable[str] | None = None,
+        collection_vector_service_options: CollectionVectorServiceOptions | None = None,
+        collection_embedding_api_key: str | EmbeddingHeadersProvider | None = None,
+        **kwargs: Any,
+    ) -> AstraDBGraphVectorStore:
+        """Return AstraDBGraphVectorStore initialized from docs and embeddings."""
+        store = cls(
+            embedding=embedding,
+            collection_vector_service_options=collection_vector_service_options,
+            collection_embedding_api_key=collection_embedding_api_key,
+            setup_mode=SetupMode.ASYNC,
+            **kwargs,
+        )
+        await store.aadd_documents(documents, ids=ids)
         return store
 
     @override
@@ -684,6 +729,20 @@ class AstraDBGraphVectorStore(GraphVectorStore):
             return None
         return _doc_to_node(doc=doc)
 
+    async def aget_node(self, node_id: str) -> Node | None:
+        """Retrieve a single node from the store, given its ID.
+
+        Args:
+            node_id: The node ID
+
+        Returns:
+            The the node if it exists. Otherwise None.
+        """
+        doc = await self.vector_store.aget_by_document_id(document_id=node_id)
+        if doc is None:
+            return None
+        return _doc_to_node(doc=doc)
+
     @override
     async def ammr_traversal_search(  # noqa: C901
         self,
@@ -756,7 +815,7 @@ class AstraDBGraphVectorStore(GraphVectorStore):
             """
             nonlocal retrieved_docs
 
-            query_embedding, initial_nodes = await self._get_initial(
+            query_embedding, initial_nodes = await self._aget_initial(
                 query=query,
                 retrieved_docs=retrieved_docs,
                 fetch_k=fetch_k,
@@ -778,10 +837,10 @@ class AstraDBGraphVectorStore(GraphVectorStore):
 
             # Initialize the visited_links with the set of outgoing links from the
             # neighborhood. This prevents re-visiting them.
-            visited_links = await self._get_outgoing_links(neighborhood)
+            visited_links = await self._aget_outgoing_links(neighborhood)
 
-            # Call `self._get_adjacent` to fetch the candidates.
-            adjacent_nodes = await self._get_adjacent(
+            # Call `self._aget_adjacent` to fetch the candidates.
+            adjacent_nodes = await self._aget_adjacent(
                 links=visited_links,
                 query_embedding=query_embedding,
                 k_per_link=adjacent_k,
@@ -826,7 +885,7 @@ class AstraDBGraphVectorStore(GraphVectorStore):
                 selected_outgoing_links.difference_update(visited_links)
 
                 # Find the nodes with incoming links from those links.
-                adjacent_nodes = await self._get_adjacent(
+                adjacent_nodes = await self._aget_adjacent(
                     links=selected_outgoing_links,
                     query_embedding=query_embedding,
                     k_per_link=adjacent_k,
@@ -873,7 +932,7 @@ class AstraDBGraphVectorStore(GraphVectorStore):
                 raise RuntimeError(msg)
 
     @override
-    def mmr_traversal_search(
+    def mmr_traversal_search(  # noqa: C901
         self,
         query: str,
         *,
@@ -919,23 +978,144 @@ class AstraDBGraphVectorStore(GraphVectorStore):
             filter: Optional metadata to filter the results.
             **kwargs: Additional keyword arguments.
         """
+        # For each unselected node, stores the outgoing links.
+        outgoing_links_map: dict[str, set[Link]] = {}
+        visited_links: set[Link] = set()
+        # Map from id to Document, used as a cache
+        retrieved_docs: dict[str, Document] = {}
 
-        async def collect_docs() -> Iterable[Document]:
-            async_iter = self.ammr_traversal_search(
+        def get_candidates(nodes: Iterable[EmbeddedNode]) -> dict[str, list[float]]:
+            nonlocal outgoing_links_map
+
+            candidates: dict[str, list[float]] = {}
+            for node in nodes:
+                if node.id not in outgoing_links_map:
+                    outgoing_links_map[node.id] = _outgoing_links(node=node)
+                    candidates[node.id] = node.embedding
+            return candidates
+
+        def fetch_initial_candidates() -> tuple[list[float], dict[str, list[float]]]:
+            """Gets the embedded query and the set of initial candidates.
+
+            If fetch_k is zero, there will be no initial candidates.
+            """
+            nonlocal retrieved_docs
+
+            query_embedding, initial_nodes = self._get_initial(
                 query=query,
-                initial_roots=initial_roots,
-                k=k,
-                depth=depth,
+                retrieved_docs=retrieved_docs,
                 fetch_k=fetch_k,
-                adjacent_k=adjacent_k,
-                lambda_mult=lambda_mult,
-                score_threshold=score_threshold,
                 filter=filter,
-                **kwargs,
             )
-            return [doc async for doc in async_iter]
 
-        return asyncio.run(collect_docs())
+            return query_embedding, get_candidates(nodes=initial_nodes)
+
+        def fetch_neighborhood_candidates(
+            neighborhood: Sequence[str],
+        ) -> dict[str, list[float]]:
+            nonlocal outgoing_links_map, visited_links, retrieved_docs
+
+            # Put the neighborhood into the outgoing links, to avoid adding it
+            # to the candidate set in the future.
+            outgoing_links_map.update(
+                {content_id: set() for content_id in neighborhood}
+            )
+
+            # Initialize the visited_links with the set of outgoing links from the
+            # neighborhood. This prevents re-visiting them.
+            visited_links = self._get_outgoing_links(neighborhood)
+
+            # Call `self._get_adjacent` to fetch the candidates.
+            adjacent_nodes = self._get_adjacent(
+                links=visited_links,
+                query_embedding=query_embedding,
+                k_per_link=adjacent_k,
+                filter=filter,
+                retrieved_docs=retrieved_docs,
+            )
+
+            return get_candidates(nodes=adjacent_nodes)
+
+        query_embedding, initial_candidates = fetch_initial_candidates()
+        helper = MmrHelper(
+            k=k,
+            query_embedding=query_embedding,
+            lambda_mult=lambda_mult,
+            score_threshold=score_threshold,
+        )
+        helper.add_candidates(candidates=initial_candidates)
+
+        if initial_roots:
+            neighborhood_candidates = fetch_neighborhood_candidates(initial_roots)
+            helper.add_candidates(candidates=neighborhood_candidates)
+
+        # Tracks the depth of each candidate.
+        depths = {candidate_id: 0 for candidate_id in helper.candidate_ids()}
+
+        # Select the best item, K times.
+        for _ in range(k):
+            selected_id = helper.pop_best()
+
+            if selected_id is None:
+                break
+
+            next_depth = depths[selected_id] + 1
+            if next_depth < depth:
+                # If the next nodes would not exceed the depth limit, find the
+                # adjacent nodes.
+
+                # Find the links linked to from the selected ID.
+                selected_outgoing_links = outgoing_links_map.pop(selected_id)
+
+                # Don't re-visit already visited links.
+                selected_outgoing_links.difference_update(visited_links)
+
+                # Find the nodes with incoming links from those links.
+                adjacent_nodes = self._get_adjacent(
+                    links=selected_outgoing_links,
+                    query_embedding=query_embedding,
+                    k_per_link=adjacent_k,
+                    filter=filter,
+                    retrieved_docs=retrieved_docs,
+                )
+
+                # Record the selected_outgoing_links as visited.
+                visited_links.update(selected_outgoing_links)
+
+                new_candidates = {}
+                for adjacent_node in adjacent_nodes:
+                    if adjacent_node.id not in outgoing_links_map:
+                        outgoing_links_map[adjacent_node.id] = _outgoing_links(
+                            node=adjacent_node
+                        )
+                        new_candidates[adjacent_node.id] = adjacent_node.embedding
+                        if next_depth < depths.get(adjacent_node.id, depth + 1):
+                            # If this is a new shortest depth, or there was no
+                            # previous depth, update the depths. This ensures that
+                            # when we discover a node we will have the shortest
+                            # depth available.
+                            #
+                            # NOTE: No effort is made to traverse from nodes that
+                            # were previously selected if they become reachable via
+                            # a shorter path via nodes selected later. This is
+                            # currently "intended", but may be worth experimenting
+                            # with.
+                            depths[adjacent_node.id] = next_depth
+                helper.add_candidates(new_candidates)
+
+        for doc_id, similarity_score, mmr_score in zip(
+            helper.selected_ids,
+            helper.selected_similarity_scores,
+            helper.selected_mmr_scores,
+        ):
+            if doc_id in retrieved_docs:
+                doc = self._restore_links(retrieved_docs[doc_id])
+                doc.metadata["similarity_score"] = similarity_score
+                doc.metadata["mmr_score"] = mmr_score
+                yield doc
+            else:
+                msg = f"retrieved_docs should contain id: {doc_id}"
+                raise RuntimeError(msg)
 
     @override
     async def atraversal_search(  # noqa: C901
@@ -1090,7 +1270,7 @@ class AstraDBGraphVectorStore(GraphVectorStore):
                 raise RuntimeError(msg)
 
     @override
-    def traversal_search(
+    def traversal_search(  # noqa: C901
         self,
         query: str,
         *,
@@ -1116,20 +1296,129 @@ class AstraDBGraphVectorStore(GraphVectorStore):
         Returns:
             Collection of retrieved documents.
         """
+        # Depth 0:
+        #   Query for `k` nodes similar to the question.
+        #   Retrieve `content_id` and `outgoing_links()`.
+        #
+        # Depth 1:
+        #   Query for nodes that have an incoming link in the `outgoing_links()` set.
+        #   Combine node IDs.
+        #   Query for `outgoing_links()` of those "new" node IDs.
+        #
+        # ...
 
-        async def collect_docs() -> Iterable[Document]:
-            async_iter = self.atraversal_search(
-                query=query,
-                k=k,
-                depth=depth,
-                filter=filter,
-                **kwargs,
-            )
-            return [doc async for doc in async_iter]
+        # Map from visited ID to depth
+        visited_ids: dict[str, int] = {}
 
-        return asyncio.run(collect_docs())
+        # Map from visited link to depth
+        visited_links: dict[Link, int] = {}
 
-    async def _get_outgoing_links(self, source_ids: Iterable[str]) -> set[Link]:
+        # Map from id to Document
+        retrieved_docs: dict[str, Document] = {}
+
+        def visit_nodes(d: int, docs: Iterable[Document]) -> None:
+            """Recursively visit nodes and their outgoing links."""
+            nonlocal visited_ids, visited_links, retrieved_docs
+
+            # Iterate over nodes, tracking the *new* outgoing links for this
+            # depth. These are links that are either new, or newly discovered at a
+            # lower depth.
+            outgoing_links: set[Link] = set()
+            for doc in docs:
+                if doc.id is not None:
+                    if doc.id not in retrieved_docs:
+                        retrieved_docs[doc.id] = doc
+
+                    # If this node is at a closer depth, update visited_ids
+                    if d <= visited_ids.get(doc.id, depth):
+                        visited_ids[doc.id] = d
+
+                        # If we can continue traversing from this node,
+                        if d < depth:
+                            node = _doc_to_node(doc=doc)
+                            # Record any new (or newly discovered at a lower depth)
+                            # links to the set to traverse.
+                            for link in _outgoing_links(node=node):
+                                if d <= visited_links.get(link, depth):
+                                    # Record that we'll query this link at the
+                                    # given depth, so we don't fetch it again
+                                    # (unless we find it an earlier depth)
+                                    visited_links[link] = d
+                                    outgoing_links.add(link)
+
+            if outgoing_links:
+                for outgoing_link in outgoing_links:
+                    metadata_filter = self._get_metadata_filter(
+                        metadata=filter,
+                        outgoing_link=outgoing_link,
+                    )
+
+                    docs = self.vector_store.metadata_search(
+                        filter=metadata_filter, n=1000
+                    )
+
+                    visit_targets(d=d + 1, docs=docs)
+
+        def visit_targets(d: int, docs: Iterable[Document]) -> None:
+            """Visit target nodes retrieved from outgoing links."""
+            nonlocal visited_ids, retrieved_docs
+
+            new_ids_at_next_depth = set()
+            for doc in docs:
+                if doc.id is not None:
+                    if doc.id not in retrieved_docs:
+                        retrieved_docs[doc.id] = doc
+
+                    if d <= visited_ids.get(doc.id, depth):
+                        new_ids_at_next_depth.add(doc.id)
+
+            if new_ids_at_next_depth:
+                for doc_id in new_ids_at_next_depth:
+                    if doc_id in retrieved_docs:
+                        visit_nodes(d=d, docs=[retrieved_docs[doc_id]])
+                    else:
+                        new_doc = self.vector_store.get_by_document_id(
+                            document_id=doc_id
+                        )
+                        if new_doc is not None:
+                            visit_nodes(d=d, docs=[new_doc])
+
+        # Start the traversal
+        initial_docs = self.vector_store.similarity_search(
+            query=query,
+            k=k,
+            filter=filter,
+        )
+        visit_nodes(d=0, docs=initial_docs)
+
+        for doc_id in visited_ids:
+            if doc_id in retrieved_docs:
+                yield self._restore_links(retrieved_docs[doc_id])
+            else:
+                msg = f"retrieved_docs should contain id: {doc_id}"
+                raise RuntimeError(msg)
+
+    def _get_outgoing_links(self, source_ids: Iterable[str]) -> set[Link]:
+        """Return the set of outgoing links for the given source IDs synchronously.
+
+        Args:
+            source_ids: The IDs of the source nodes to retrieve outgoing links for.
+
+        Returns:
+            A set of `Link` objects representing the outgoing links from the source
+            nodes.
+        """
+        links = set()
+
+        for source_id in source_ids:
+            doc = self.vector_store.get_by_document_id(document_id=source_id)
+            if doc is not None:
+                node = _doc_to_node(doc=doc)
+                links.update(_outgoing_links(node=node))
+
+        return links
+
+    async def _aget_outgoing_links(self, source_ids: Iterable[str]) -> set[Link]:
         """Return the set of outgoing links for the given source IDs asynchronously.
 
         Args:
@@ -1157,7 +1446,31 @@ class AstraDBGraphVectorStore(GraphVectorStore):
 
         return links
 
-    async def _get_initial(
+    def _get_initial(
+        self,
+        query: str,
+        retrieved_docs: dict[str, Document],
+        fetch_k: int,
+        filter: dict[str, Any] | None = None,  # noqa: A002
+    ) -> tuple[list[float], list[EmbeddedNode]]:
+        (
+            query_embedding,
+            result,
+        ) = self.vector_store.similarity_search_with_embedding(
+            query=query,
+            k=fetch_k,
+            filter=filter,
+        )
+
+        initial_nodes: list[EmbeddedNode] = []
+        for doc, embedding in result:
+            if doc.id is not None:
+                retrieved_docs[doc.id] = doc
+            initial_nodes.append(EmbeddedNode(doc=doc, embedding=embedding))
+
+        return query_embedding, initial_nodes
+
+    async def _aget_initial(
         self,
         query: str,
         retrieved_docs: dict[str, Document],
@@ -1181,7 +1494,51 @@ class AstraDBGraphVectorStore(GraphVectorStore):
 
         return query_embedding, initial_nodes
 
-    async def _get_adjacent(
+    def _get_adjacent(
+        self,
+        links: set[Link],
+        query_embedding: list[float],
+        retrieved_docs: dict[str, Document],
+        k_per_link: int | None = None,
+        filter: dict[str, Any] | None = None,  # noqa: A002
+    ) -> Iterable[EmbeddedNode]:
+        """Return the target nodes with incoming links from any of the given links.
+
+        Args:
+            links: The links to look for.
+            query_embedding: The query embedding. Used to rank target nodes.
+            retrieved_docs: A cache of retrieved docs. This will be added to.
+            k_per_link: The number of target nodes to fetch for each link.
+            filter: Optional metadata to filter the results.
+
+        Returns:
+            Iterable of adjacent edges.
+        """
+        targets: dict[str, EmbeddedNode] = {}
+
+        for link in links:
+            metadata_filter = self._get_metadata_filter(
+                metadata=filter,
+                outgoing_link=link,
+            )
+
+            result = self.vector_store.similarity_search_with_embedding_by_vector(
+                embedding=query_embedding,
+                k=k_per_link or 10,
+                filter=metadata_filter,
+            )
+
+            for doc, embedding in result:
+                if doc.id is not None:
+                    retrieved_docs[doc.id] = doc
+                    if doc.id not in targets:
+                        targets[doc.id] = EmbeddedNode(doc=doc, embedding=embedding)
+
+        # TODO: Consider a combined limit based on the similarity and/or
+        # predicated MMR score?
+        return targets.values()
+
+    async def _aget_adjacent(
         self,
         links: set[Link],
         query_embedding: list[float],
