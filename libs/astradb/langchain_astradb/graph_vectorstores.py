@@ -12,12 +12,13 @@ from typing import (
     Any,
     AsyncIterable,
     Iterable,
+    Optional,
     Sequence,
     cast,
 )
 
 from langchain_community.graph_vectorstores.base import GraphVectorStore, Node
-from langchain_community.graph_vectorstores.links import METADATA_LINKS_KEY, Link
+from langchain_community.graph_vectorstores.links import METADATA_LINKS_KEY, METADATA_EMBEDDING_KEY, Link
 from langchain_core._api import beta
 from langchain_core.documents import Document
 from typing_extensions import override
@@ -37,19 +38,6 @@ DEFAULT_INDEXING_OPTIONS = {"allow": ["metadata"]}
 
 
 logger = logging.getLogger(__name__)
-
-
-class EmbeddedNode:
-    id: str
-    links: list[Link]
-    embedding: list[float]
-
-    def __init__(self, doc: Document, embedding: list[float]) -> None:
-        """Create an Embedded Node."""
-        node = _doc_to_node(doc=doc)
-        self.id = node.id or ""
-        self.links = node.links
-        self.embedding = embedding
 
 
 def _serialize_links(links: list[Link]) -> str:
@@ -77,26 +65,20 @@ def _deserialize_links(json_blob: str | None) -> set[Link]:
 def _metadata_link_key(link: Link) -> str:
     return f"link:{link.kind}:{link.tag}"
 
+def _embedding(doc: Document) -> list[float]:
+    embedding: list[float] = doc.metadata.get(METADATA_EMBEDDING_KEY, [])
+    return embedding
 
-def _doc_to_node(doc: Document) -> Node:
-    metadata = doc.metadata.copy()
-    links = _deserialize_links(metadata.get(METADATA_LINKS_KEY))
-    metadata[METADATA_LINKS_KEY] = links
+def _links(doc: Document) -> set[Link]:
+    links: set[Link] = doc.metadata.get(METADATA_LINKS_KEY, {})
+    return links
 
-    return Node(
-        id=doc.id,
-        text=doc.page_content,
-        metadata=metadata,
-        links=list(links),
-    )
+def _incoming_links(links: set[Link]) -> set[Link]:
+    return {link for link in links if link.direction in ["in", "bidir"]}
 
 
-def _incoming_links(node: Node | EmbeddedNode) -> set[Link]:
-    return {link for link in node.links if link.direction in ["in", "bidir"]}
-
-
-def _outgoing_links(node: Node | EmbeddedNode) -> set[Link]:
-    return {link for link in node.links if link.direction in ["out", "bidir"]}
+def _outgoing_links(links: set[Link]) -> set[Link]:
+    return {link for link in links if link.direction in ["out", "bidir"]}
 
 
 @beta()
@@ -393,30 +375,241 @@ class AstraDBGraphVectorStore(GraphVectorStore):
             del doc.metadata[self.metadata_incoming_links_key]
         return doc
 
-    def _get_node_metadata_for_insertion(self, node: Node) -> dict[str, Any]:
-        metadata = node.metadata.copy()
-        metadata[METADATA_LINKS_KEY] = _serialize_links(node.links)
+    def _get_metadata_for_insertion(self, metadata: dict[str, Any]) -> dict[str, Any]:
+        metadata = metadata.copy()
+        links: set[Link] = metadata[METADATA_LINKS_KEY]
+        metadata[METADATA_LINKS_KEY] = _serialize_links(links=links)
         metadata[self.metadata_incoming_links_key] = [
-            _metadata_link_key(link=link) for link in _incoming_links(node=node)
+            _metadata_link_key(link=link) for link in _incoming_links(links=links)
         ]
         return metadata
 
     def _get_docs_for_insertion(
-        self, nodes: Iterable[Node]
-    ) -> tuple[list[Document], list[str]]:
-        docs = []
-        ids = []
-        for node in nodes:
-            node_id = secrets.token_hex(8) if not node.id else node.id
+        self, docs: list[Document]
+    ) -> list[Document]:
 
-            doc = Document(
-                page_content=node.text,
-                metadata=self._get_node_metadata_for_insertion(node=node),
-                id=node_id,
+        for doc in docs:
+            if doc.id is None:
+                doc.id = secrets.token_hex(8)
+
+            doc.metadata = self._get_metadata_for_insertion(doc.metadata)
+        return docs
+
+    @override
+    def add_texts(
+        self,
+        texts: Iterable[str],
+        metadatas: Optional[Iterable[dict]] = None,
+        *,
+        ids: Optional[Iterable[str]] = None,
+        **kwargs: Any,
+    ) -> list[str]:
+        """Run more texts through the embeddings and add to the vectorstore.
+
+        The Links present in the metadata field `links` will be extracted to create
+        the `Node` links.
+
+        Eg if nodes `a` and `b` are connected over a hyperlink `https://some-url`, the
+        function call would look like:
+
+        .. code-block:: python
+
+            store.add_texts(
+                ids=["a", "b"],
+                texts=["some text a", "some text b"],
+                metadatas=[
+                    {
+                        "links": [
+                            Link.incoming(kind="hyperlink", tag="https://some-url")
+                        ]
+                    },
+                    {
+                        "links": [
+                            Link.outgoing(kind="hyperlink", tag="https://some-url")
+                        ]
+                    },
+                ],
             )
-            docs.append(doc)
-            ids.append(node_id)
-        return (docs, ids)
+
+        Args:
+            texts: Iterable of strings to add to the vectorstore.
+            metadatas: Optional list of metadatas associated with the texts.
+                The metadata key `links` shall be an iterable of
+                :py:class:`~langchain_community.graph_vectorstores.links.Link`.
+            ids: Optional list of IDs associated with the texts.
+            **kwargs: vectorstore specific parameters.
+
+        Returns:
+            List of ids from adding the texts into the vectorstore.
+        """
+        docs: list[Document] = []
+        for i, text in enumerate(texts):
+            metadata = metadatas[i] if metadatas is not None else None
+            doc_id = ids[i] if ids is not None else None
+            docs.append(Document(
+                page_content=text,
+                id=doc_id,
+                metadata=metadata,
+            ))
+        return self.add_documents(documents=docs)
+
+    @override
+    async def aadd_texts(
+        self,
+        texts: Iterable[str],
+        metadatas: Optional[Iterable[dict]] = None,
+        *,
+        ids: Optional[Iterable[str]] = None,
+        **kwargs: Any,
+    ) -> list[str]:
+        """Run more texts through the embeddings and add to the vectorstore.
+
+        The Links present in the metadata field `links` will be extracted to create
+        the `Node` links.
+
+        Eg if nodes `a` and `b` are connected over a hyperlink `https://some-url`, the
+        function call would look like:
+
+        .. code-block:: python
+
+            await store.aadd_texts(
+                ids=["a", "b"],
+                texts=["some text a", "some text b"],
+                metadatas=[
+                    {
+                        "links": [
+                            Link.incoming(kind="hyperlink", tag="https://some-url")
+                        ]
+                    },
+                    {
+                        "links": [
+                            Link.outgoing(kind="hyperlink", tag="https://some-url")
+                        ]
+                    },
+                ],
+            )
+
+        Args:
+            texts: Iterable of strings to add to the vectorstore.
+            metadatas: Optional list of metadatas associated with the texts.
+                The metadata key `links` shall be an iterable of
+                :py:class:`~langchain_community.graph_vectorstores.links.Link`.
+            ids: Optional list of IDs associated with the texts.
+            **kwargs: vectorstore specific parameters.
+
+        Returns:
+            List of ids from adding the texts into the vectorstore.
+        """
+        docs: list[Document] = []
+        for i, text in enumerate(texts):
+            metadata = metadatas[i] if metadatas is not None else None
+            doc_id = ids[i] if ids is not None else None
+            docs.append(Document(
+                page_content=text,
+                id=doc_id,
+                metadata=metadata,
+            ))
+        return await self.aadd_documents(documents=docs)
+
+    def add_documents(
+        self,
+        documents: Iterable[Document],
+        **kwargs: Any,
+    ) -> list[str]:
+        """Run more documents through the embeddings and add to the vectorstore.
+
+        The Links present in the document metadata field `links` will be extracted to
+        create the `Node` links.
+
+        Eg if nodes `a` and `b` are connected over a hyperlink `https://some-url`, the
+        function call would look like:
+
+        .. code-block:: python
+
+            store.add_documents(
+                [
+                    Document(
+                        id="a",
+                        page_content="some text a",
+                        metadata={
+                            "links": [
+                                Link.incoming(kind="hyperlink", tag="http://some-url")
+                            ]
+                        }
+                    ),
+                    Document(
+                        id="b",
+                        page_content="some text b",
+                        metadata={
+                            "links": [
+                                Link.outgoing(kind="hyperlink", tag="http://some-url")
+                            ]
+                        }
+                    ),
+                ]
+
+            )
+
+        Args:
+            documents: Documents to add to the vectorstore.
+                The document's metadata key `links` shall be an iterable of
+                :py:class:`~langchain_community.graph_vectorstores.links.Link`.
+
+        Returns:
+            List of IDs of the added texts.
+        """
+        documents = self._get_docs_for_insertion(docs=documents)
+        return self.vector_store.add_documents(documents=documents)
+
+    async def aadd_documents(
+        self,
+        documents: Iterable[Document],
+        **kwargs: Any,
+    ) -> list[str]:
+        """Run more documents through the embeddings and add to the vectorstore.
+
+        The Links present in the document metadata field `links` will be extracted to
+        create the `Node` links.
+
+        Eg if nodes `a` and `b` are connected over a hyperlink `https://some-url`, the
+        function call would look like:
+
+        .. code-block:: python
+
+            store.add_documents(
+                [
+                    Document(
+                        id="a",
+                        page_content="some text a",
+                        metadata={
+                            "links": [
+                                Link.incoming(kind="hyperlink", tag="http://some-url")
+                            ]
+                        }
+                    ),
+                    Document(
+                        id="b",
+                        page_content="some text b",
+                        metadata={
+                            "links": [
+                                Link.outgoing(kind="hyperlink", tag="http://some-url")
+                            ]
+                        }
+                    ),
+                ]
+
+            )
+
+        Args:
+            documents: Documents to add to the vectorstore.
+                The document's metadata key `links` shall be an iterable of
+                :py:class:`~langchain_community.graph_vectorstores.links.Link`.
+
+        Returns:
+            List of IDs of the added texts.
+        """
+        documents = self._get_docs_for_insertion(docs=documents)
+        return await self.vector_store.aadd_documents(documents=documents)
 
     @override
     def add_nodes(
@@ -430,8 +623,15 @@ class AstraDBGraphVectorStore(GraphVectorStore):
             nodes: the nodes to add.
             **kwargs: Additional keyword arguments.
         """
-        (docs, ids) = self._get_docs_for_insertion(nodes=nodes)
-        return self.vector_store.add_documents(docs, ids=ids)
+        docs = []
+        for node in nodes:
+            metadata = metadata.copy()
+            metadata[METADATA_LINKS_KEY] = node.links
+            metadata = self._get_metadata_for_insertion(metadata=metadata)
+            docs.append(Document(
+                page_content=node.text, id=node.id, metadata = metadata,
+            ))
+        return self.add_documents(documents=docs)
 
     @override
     async def aadd_nodes(
@@ -445,9 +645,17 @@ class AstraDBGraphVectorStore(GraphVectorStore):
             nodes: the nodes to add.
             **kwargs: Additional keyword arguments.
         """
-        (docs, ids) = self._get_docs_for_insertion(nodes=nodes)
-        for inserted_id in await self.vector_store.aadd_documents(docs, ids=ids):
+        docs = []
+        for node in nodes:
+            metadata = metadata.copy()
+            metadata[METADATA_LINKS_KEY] = node.links
+            metadata = self._get_metadata_for_insertion(metadata=metadata)
+            docs.append(Document(
+                page_content=node.text, id=node.id, metadata = metadata,
+            ))
+        for inserted_id in await self.vector_store.aadd_documents(docs):
             yield inserted_id
+
 
     @classmethod
     @override
@@ -715,34 +923,6 @@ class AstraDBGraphVectorStore(GraphVectorStore):
         doc = await self.vector_store.aget_by_document_id(document_id=document_id)
         return self._restore_links(doc) if doc is not None else None
 
-    def get_node(self, node_id: str) -> Node | None:
-        """Retrieve a single node from the store, given its ID.
-
-        Args:
-            node_id: The node ID
-
-        Returns:
-            The the node if it exists. Otherwise None.
-        """
-        doc = self.vector_store.get_by_document_id(document_id=node_id)
-        if doc is None:
-            return None
-        return _doc_to_node(doc=doc)
-
-    async def aget_node(self, node_id: str) -> Node | None:
-        """Retrieve a single node from the store, given its ID.
-
-        Args:
-            node_id: The node ID
-
-        Returns:
-            The the node if it exists. Otherwise None.
-        """
-        doc = await self.vector_store.aget_by_document_id(document_id=node_id)
-        if doc is None:
-            return None
-        return _doc_to_node(doc=doc)
-
     @override
     async def ammr_traversal_search(  # noqa: C901
         self,
@@ -796,14 +976,14 @@ class AstraDBGraphVectorStore(GraphVectorStore):
         # Map from id to Document, used as a cache
         retrieved_docs: dict[str, Document] = {}
 
-        def get_candidates(nodes: Iterable[EmbeddedNode]) -> dict[str, list[float]]:
+        def get_candidates(docs: Iterable[Document]) -> dict[str, list[float]]:
             nonlocal outgoing_links_map
 
             candidates: dict[str, list[float]] = {}
-            for node in nodes:
-                if node.id not in outgoing_links_map:
-                    outgoing_links_map[node.id] = _outgoing_links(node=node)
-                    candidates[node.id] = node.embedding
+            for doc in docs:
+                if doc.id not in outgoing_links_map:
+                    outgoing_links_map[doc.id] = _outgoing_links(links=_links(doc=doc))
+                    candidates[doc.id] = _embedding(doc=doc)
             return candidates
 
         async def fetch_initial_candidates() -> (
@@ -984,14 +1164,14 @@ class AstraDBGraphVectorStore(GraphVectorStore):
         # Map from id to Document, used as a cache
         retrieved_docs: dict[str, Document] = {}
 
-        def get_candidates(nodes: Iterable[EmbeddedNode]) -> dict[str, list[float]]:
+        def get_candidates(docs: Iterable[Document]) -> dict[str, list[float]]:
             nonlocal outgoing_links_map
 
             candidates: dict[str, list[float]] = {}
-            for node in nodes:
-                if node.id not in outgoing_links_map:
-                    outgoing_links_map[node.id] = _outgoing_links(node=node)
-                    candidates[node.id] = node.embedding
+            for doc in docs:
+                if doc.id not in outgoing_links_map:
+                    outgoing_links_map[doc.id] = _outgoing_links(links=_links(doc=doc))
+                    candidates[doc.id] = _embedding(doc=doc)
             return candidates
 
         def fetch_initial_candidates() -> tuple[list[float], dict[str, list[float]]]:
@@ -1001,14 +1181,14 @@ class AstraDBGraphVectorStore(GraphVectorStore):
             """
             nonlocal retrieved_docs
 
-            query_embedding, initial_nodes = self._get_initial(
+            query_embedding, initial_docs = self._get_initial(
                 query=query,
                 retrieved_docs=retrieved_docs,
                 fetch_k=fetch_k,
                 filter=filter,
             )
 
-            return query_embedding, get_candidates(nodes=initial_nodes)
+            return query_embedding, get_candidates(docs=initial_docs)
 
         def fetch_neighborhood_candidates(
             neighborhood: Sequence[str],
@@ -1026,7 +1206,7 @@ class AstraDBGraphVectorStore(GraphVectorStore):
             visited_links = self._get_outgoing_links(neighborhood)
 
             # Call `self._get_adjacent` to fetch the candidates.
-            adjacent_nodes = self._get_adjacent(
+            adjacent_docs = self._get_adjacent(
                 links=visited_links,
                 query_embedding=query_embedding,
                 k_per_link=adjacent_k,
@@ -1034,7 +1214,7 @@ class AstraDBGraphVectorStore(GraphVectorStore):
                 retrieved_docs=retrieved_docs,
             )
 
-            return get_candidates(nodes=adjacent_nodes)
+            return get_candidates(docs=adjacent_docs)
 
         query_embedding, initial_candidates = fetch_initial_candidates()
         helper = MmrHelper(
@@ -1070,8 +1250,8 @@ class AstraDBGraphVectorStore(GraphVectorStore):
                 # Don't re-visit already visited links.
                 selected_outgoing_links.difference_update(visited_links)
 
-                # Find the nodes with incoming links from those links.
-                adjacent_nodes = self._get_adjacent(
+                # Find the docs with incoming links from those links.
+                adjacent_docs = self._get_adjacent(
                     links=selected_outgoing_links,
                     query_embedding=query_embedding,
                     k_per_link=adjacent_k,
@@ -1083,13 +1263,13 @@ class AstraDBGraphVectorStore(GraphVectorStore):
                 visited_links.update(selected_outgoing_links)
 
                 new_candidates = {}
-                for adjacent_node in adjacent_nodes:
-                    if adjacent_node.id not in outgoing_links_map:
-                        outgoing_links_map[adjacent_node.id] = _outgoing_links(
-                            node=adjacent_node
-                        )
-                        new_candidates[adjacent_node.id] = adjacent_node.embedding
-                        if next_depth < depths.get(adjacent_node.id, depth + 1):
+                for adjacent_doc in adjacent_docs:
+                    if adjacent_doc.id not in outgoing_links_map:
+                        links = _links(doc=adjacent_doc)
+
+                        outgoing_links_map[adjacent_doc.id] = _outgoing_links(links=links)
+                        new_candidates[adjacent_doc.id] = _embedding(doc=adjacent_doc)
+                        if next_depth < depths.get(adjacent_doc.id, depth + 1):
                             # If this is a new shortest depth, or there was no
                             # previous depth, update the depths. This ensures that
                             # when we discover a node we will have the shortest
@@ -1100,7 +1280,7 @@ class AstraDBGraphVectorStore(GraphVectorStore):
                             # a shorter path via nodes selected later. This is
                             # currently "intended", but may be worth experimenting
                             # with.
-                            depths[adjacent_node.id] = next_depth
+                            depths[adjacent_doc.id] = next_depth
                 helper.add_candidates(new_candidates)
 
         for doc_id, similarity_score, mmr_score in zip(
@@ -1164,11 +1344,11 @@ class AstraDBGraphVectorStore(GraphVectorStore):
         # Map from id to Document
         retrieved_docs: dict[str, Document] = {}
 
-        async def visit_nodes(d: int, docs: Iterable[Document]) -> None:
-            """Recursively visit nodes and their outgoing links."""
+        async def visit_docs(d: int, docs: Iterable[Document]) -> None:
+            """Recursively visit docs and their outgoing links."""
             nonlocal visited_ids, visited_links, retrieved_docs
 
-            # Iterate over nodes, tracking the *new* outgoing links for this
+            # Iterate over docs, tracking the *new* outgoing links for this
             # depth. These are links that are either new, or newly discovered at a
             # lower depth.
             outgoing_links: set[Link] = set()
@@ -1183,10 +1363,10 @@ class AstraDBGraphVectorStore(GraphVectorStore):
 
                         # If we can continue traversing from this node,
                         if d < depth:
-                            node = _doc_to_node(doc=doc)
+                            links = _links(doc=doc)
                             # Record any new (or newly discovered at a lower depth)
                             # links to the set to traverse.
-                            for link in _outgoing_links(node=node):
+                            for link in _outgoing_links(links=links):
                                 if d <= visited_links.get(link, depth):
                                     # Record that we'll query this link at the
                                     # given depth, so we don't fetch it again
@@ -1231,7 +1411,7 @@ class AstraDBGraphVectorStore(GraphVectorStore):
 
             if new_ids_at_next_depth:
                 visit_node_tasks = [
-                    visit_nodes(d=d, docs=[retrieved_docs[doc_id]])
+                    visit_docs(d=d, docs=[retrieved_docs[doc_id]])
                     for doc_id in new_ids_at_next_depth
                     if doc_id in retrieved_docs
                 ]
@@ -1247,7 +1427,7 @@ class AstraDBGraphVectorStore(GraphVectorStore):
                 new_docs: list[Document | None] = await asyncio.gather(*fetch_tasks)
 
                 visit_node_tasks.extend(
-                    visit_nodes(d=d, docs=[new_doc])
+                    visit_docs(d=d, docs=[new_doc])
                     for new_doc in new_docs
                     if new_doc is not None
                 )
@@ -1260,7 +1440,7 @@ class AstraDBGraphVectorStore(GraphVectorStore):
             k=k,
             filter=filter,
         )
-        await visit_nodes(d=0, docs=initial_docs)
+        await visit_docs(d=0, docs=initial_docs)
 
         for doc_id in visited_ids:
             if doc_id in retrieved_docs:
@@ -1281,9 +1461,9 @@ class AstraDBGraphVectorStore(GraphVectorStore):
     ) -> Iterable[Document]:
         """Retrieve documents from this knowledge store.
 
-        First, `k` nodes are retrieved using a vector search for the `query` string.
-        Then, additional nodes are discovered up to the given `depth` from those
-        starting nodes.
+        First, `k` docs are retrieved using a vector search for the `query` string.
+        Then, additional docs are discovered up to the given `depth` from those
+        starting docs.
 
         Args:
             query: The query string.
@@ -1297,11 +1477,11 @@ class AstraDBGraphVectorStore(GraphVectorStore):
             Collection of retrieved documents.
         """
         # Depth 0:
-        #   Query for `k` nodes similar to the question.
+        #   Query for `k` docs similar to the question.
         #   Retrieve `content_id` and `outgoing_links()`.
         #
         # Depth 1:
-        #   Query for nodes that have an incoming link in the `outgoing_links()` set.
+        #   Query for docs that have an incoming link in the `outgoing_links()` set.
         #   Combine node IDs.
         #   Query for `outgoing_links()` of those "new" node IDs.
         #
@@ -1316,11 +1496,11 @@ class AstraDBGraphVectorStore(GraphVectorStore):
         # Map from id to Document
         retrieved_docs: dict[str, Document] = {}
 
-        def visit_nodes(d: int, docs: Iterable[Document]) -> None:
-            """Recursively visit nodes and their outgoing links."""
+        def visit_docs(d: int, docs: Iterable[Document]) -> None:
+            """Recursively visit docs and their outgoing links."""
             nonlocal visited_ids, visited_links, retrieved_docs
 
-            # Iterate over nodes, tracking the *new* outgoing links for this
+            # Iterate over docs, tracking the *new* outgoing links for this
             # depth. These are links that are either new, or newly discovered at a
             # lower depth.
             outgoing_links: set[Link] = set()
@@ -1335,10 +1515,10 @@ class AstraDBGraphVectorStore(GraphVectorStore):
 
                         # If we can continue traversing from this node,
                         if d < depth:
-                            node = _doc_to_node(doc=doc)
+                            links = _links(doc=doc)
                             # Record any new (or newly discovered at a lower depth)
                             # links to the set to traverse.
-                            for link in _outgoing_links(node=node):
+                            for link in _outgoing_links(links=links):
                                 if d <= visited_links.get(link, depth):
                                     # Record that we'll query this link at the
                                     # given depth, so we don't fetch it again
@@ -1360,7 +1540,7 @@ class AstraDBGraphVectorStore(GraphVectorStore):
                     visit_targets(d=d + 1, docs=docs)
 
         def visit_targets(d: int, docs: Iterable[Document]) -> None:
-            """Visit target nodes retrieved from outgoing links."""
+            """Visit target docs retrieved from outgoing links."""
             nonlocal visited_ids, retrieved_docs
 
             new_ids_at_next_depth = set()
@@ -1375,13 +1555,13 @@ class AstraDBGraphVectorStore(GraphVectorStore):
             if new_ids_at_next_depth:
                 for doc_id in new_ids_at_next_depth:
                     if doc_id in retrieved_docs:
-                        visit_nodes(d=d, docs=[retrieved_docs[doc_id]])
+                        visit_docs(d=d, docs=[retrieved_docs[doc_id]])
                     else:
                         new_doc = self.vector_store.get_by_document_id(
                             document_id=doc_id
                         )
                         if new_doc is not None:
-                            visit_nodes(d=d, docs=[new_doc])
+                            visit_docs(d=d, docs=[new_doc])
 
         # Start the traversal
         initial_docs = self.vector_store.similarity_search(
@@ -1389,7 +1569,7 @@ class AstraDBGraphVectorStore(GraphVectorStore):
             k=k,
             filter=filter,
         )
-        visit_nodes(d=0, docs=initial_docs)
+        visit_docs(d=0, docs=initial_docs)
 
         for doc_id in visited_ids:
             if doc_id in retrieved_docs:
@@ -1413,8 +1593,7 @@ class AstraDBGraphVectorStore(GraphVectorStore):
         for source_id in source_ids:
             doc = self.vector_store.get_by_document_id(document_id=source_id)
             if doc is not None:
-                node = _doc_to_node(doc=doc)
-                links.update(_outgoing_links(node=node))
+                links.update(_outgoing_links(links=_links(doc=doc)))
 
         return links
 
@@ -1441,8 +1620,7 @@ class AstraDBGraphVectorStore(GraphVectorStore):
 
         for doc in docs:
             if doc is not None:
-                node = _doc_to_node(doc=doc)
-                links.update(_outgoing_links(node=node))
+                links.update(_outgoing_links(links=_links(doc=doc)))
 
         return links
 
@@ -1452,7 +1630,7 @@ class AstraDBGraphVectorStore(GraphVectorStore):
         retrieved_docs: dict[str, Document],
         fetch_k: int,
         filter: dict[str, Any] | None = None,  # noqa: A002
-    ) -> tuple[list[float], list[EmbeddedNode]]:
+    ) -> tuple[list[float], list[Document]]:
         (
             query_embedding,
             result,
@@ -1462,13 +1640,14 @@ class AstraDBGraphVectorStore(GraphVectorStore):
             filter=filter,
         )
 
-        initial_nodes: list[EmbeddedNode] = []
+        initial_docs: list[Document] = []
         for doc, embedding in result:
             if doc.id is not None:
                 retrieved_docs[doc.id] = doc
-            initial_nodes.append(EmbeddedNode(doc=doc, embedding=embedding))
+            doc.metadata[METADATA_EMBEDDING_KEY] = embedding
+            initial_docs.append(doc)
 
-        return query_embedding, initial_nodes
+        return query_embedding, initial_docs
 
     async def _aget_initial(
         self,
@@ -1476,7 +1655,7 @@ class AstraDBGraphVectorStore(GraphVectorStore):
         retrieved_docs: dict[str, Document],
         fetch_k: int,
         filter: dict[str, Any] | None = None,  # noqa: A002
-    ) -> tuple[list[float], list[EmbeddedNode]]:
+    ) -> tuple[list[float], list[Document]]:
         (
             query_embedding,
             result,
@@ -1486,13 +1665,14 @@ class AstraDBGraphVectorStore(GraphVectorStore):
             filter=filter,
         )
 
-        initial_nodes: list[EmbeddedNode] = []
+        initial_docs: list[Document] = []
         for doc, embedding in result:
             if doc.id is not None:
                 retrieved_docs[doc.id] = doc
-            initial_nodes.append(EmbeddedNode(doc=doc, embedding=embedding))
+            doc.metadata[METADATA_EMBEDDING_KEY] = embedding
+            initial_docs.append(doc)
 
-        return query_embedding, initial_nodes
+        return query_embedding, initial_docs
 
     def _get_adjacent(
         self,
@@ -1501,20 +1681,20 @@ class AstraDBGraphVectorStore(GraphVectorStore):
         retrieved_docs: dict[str, Document],
         k_per_link: int | None = None,
         filter: dict[str, Any] | None = None,  # noqa: A002
-    ) -> Iterable[EmbeddedNode]:
-        """Return the target nodes with incoming links from any of the given links.
+    ) -> Iterable[Document]:
+        """Return the target docs with incoming links from any of the given links.
 
         Args:
             links: The links to look for.
-            query_embedding: The query embedding. Used to rank target nodes.
+            query_embedding: The query embedding. Used to rank target docs.
             retrieved_docs: A cache of retrieved docs. This will be added to.
-            k_per_link: The number of target nodes to fetch for each link.
+            k_per_link: The number of target docs to fetch for each link.
             filter: Optional metadata to filter the results.
 
         Returns:
             Iterable of adjacent edges.
         """
-        targets: dict[str, EmbeddedNode] = {}
+        targets: dict[str, Document] = {}
 
         for link in links:
             metadata_filter = self._get_metadata_filter(
@@ -1529,10 +1709,11 @@ class AstraDBGraphVectorStore(GraphVectorStore):
             )
 
             for doc, embedding in result:
+                doc.metadata[METADATA_EMBEDDING_KEY] = embedding
                 if doc.id is not None:
                     retrieved_docs[doc.id] = doc
                     if doc.id not in targets:
-                        targets[doc.id] = EmbeddedNode(doc=doc, embedding=embedding)
+                        targets[doc.id] = doc
 
         # TODO: Consider a combined limit based on the similarity and/or
         # predicated MMR score?
@@ -1545,20 +1726,20 @@ class AstraDBGraphVectorStore(GraphVectorStore):
         retrieved_docs: dict[str, Document],
         k_per_link: int | None = None,
         filter: dict[str, Any] | None = None,  # noqa: A002
-    ) -> Iterable[EmbeddedNode]:
-        """Return the target nodes with incoming links from any of the given links.
+    ) -> Iterable[Document]:
+        """Return the target docs with incoming links from any of the given links.
 
         Args:
             links: The links to look for.
-            query_embedding: The query embedding. Used to rank target nodes.
+            query_embedding: The query embedding. Used to rank target docs.
             retrieved_docs: A cache of retrieved docs. This will be added to.
-            k_per_link: The number of target nodes to fetch for each link.
+            k_per_link: The number of target docs to fetch for each link.
             filter: Optional metadata to filter the results.
 
         Returns:
             Iterable of adjacent edges.
         """
-        targets: dict[str, EmbeddedNode] = {}
+        targets: dict[str, Document] = {}
 
         tasks = []
         for link in links:
@@ -1579,10 +1760,11 @@ class AstraDBGraphVectorStore(GraphVectorStore):
 
         for result in results:
             for doc, embedding in result:
+                doc.metadata[METADATA_EMBEDDING_KEY] = embedding
                 if doc.id is not None:
                     retrieved_docs[doc.id] = doc
                     if doc.id not in targets:
-                        targets[doc.id] = EmbeddedNode(doc=doc, embedding=embedding)
+                        targets[doc.id] = doc
 
         # TODO: Consider a combined limit based on the similarity and/or
         # predicated MMR score?
