@@ -18,7 +18,7 @@ from typing import (
 )
 
 from langchain_community.graph_vectorstores.base import GraphVectorStore, Node
-from langchain_community.graph_vectorstores.links import METADATA_LINKS_KEY, METADATA_EMBEDDING_KEY, Link
+from langchain_community.graph_vectorstores.links import METADATA_LINKS_KEY, METADATA_EMBEDDING_KEY, Link, get_links
 from langchain_core._api import beta
 from langchain_core.documents import Document
 from typing_extensions import override
@@ -375,7 +375,8 @@ class AstraDBGraphVectorStore(GraphVectorStore):
             del doc.metadata[self.metadata_incoming_links_key]
         return doc
 
-    def _get_metadata_for_insertion(self, metadata: dict[str, Any]) -> dict[str, Any]:
+    def _get_metadata_for_insertion(self, doc: Document) -> dict[str, Any]:
+        links = get_links(doc=doc)
         metadata = metadata.copy()
         links: set[Link] = metadata[METADATA_LINKS_KEY]
         metadata[METADATA_LINKS_KEY] = _serialize_links(links=links)
@@ -753,7 +754,7 @@ class AstraDBGraphVectorStore(GraphVectorStore):
         filter: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> list[Document]:
-        """Retrieve documents from this graph store.
+        """Retrieve document nodes from this graph vector store.
 
         Args:
             query: The query string.
@@ -782,7 +783,7 @@ class AstraDBGraphVectorStore(GraphVectorStore):
         filter: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> list[Document]:
-        """Retrieve documents from this graph store.
+        """Retrieve documents nodes from this graph vector store.
 
         Args:
             query: The query string.
@@ -811,7 +812,7 @@ class AstraDBGraphVectorStore(GraphVectorStore):
         filter: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> list[Document]:
-        """Return docs most similar to embedding vector.
+        """Return document nodes most similar to embedding vector.
 
         Args:
             embedding: Embedding to look up documents similar to.
@@ -820,7 +821,7 @@ class AstraDBGraphVectorStore(GraphVectorStore):
             **kwargs: Additional arguments are ignored.
 
         Returns:
-            The list of Documents most similar to the query vector.
+            The list of Documents most similar to the embedding vector.
         """
         return [
             self._restore_links(doc)
@@ -840,7 +841,7 @@ class AstraDBGraphVectorStore(GraphVectorStore):
         filter: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> list[Document]:
-        """Return docs most similar to embedding vector.
+        """Return document nodes most similar to the embedding vector.
 
         Args:
             embedding: Embedding to look up documents similar to.
@@ -849,7 +850,7 @@ class AstraDBGraphVectorStore(GraphVectorStore):
             **kwargs: Additional arguments are ignored.
 
         Returns:
-            The list of Documents most similar to the query vector.
+            The list of Documents most similar to the embedding vector.
         """
         return [
             self._restore_links(doc)
@@ -866,7 +867,7 @@ class AstraDBGraphVectorStore(GraphVectorStore):
         filter: dict[str, Any] | None = None,  # noqa: A002
         n: int = 5,
     ) -> Iterable[Document]:
-        """Get documents via a metadata search.
+        """Get document nodes via a metadata search.
 
         Args:
             filter: the metadata to query for.
@@ -885,7 +886,7 @@ class AstraDBGraphVectorStore(GraphVectorStore):
         filter: dict[str, Any] | None = None,  # noqa: A002
         n: int = 5,
     ) -> Iterable[Document]:
-        """Get documents via a metadata search.
+        """Get document nodes via a metadata search.
 
         Args:
             filter: the metadata to query for.
@@ -900,10 +901,10 @@ class AstraDBGraphVectorStore(GraphVectorStore):
         ]
 
     def get_by_document_id(self, document_id: str) -> Document | None:
-        """Retrieve a single document from the store, given its document ID.
+        """Retrieve a single document node from the graph vector store, given its id.
 
         Args:
-            document_id: The document ID
+            document_id: The document id
 
         Returns:
             The the document if it exists. Otherwise None.
@@ -912,10 +913,10 @@ class AstraDBGraphVectorStore(GraphVectorStore):
         return self._restore_links(doc) if doc is not None else None
 
     async def aget_by_document_id(self, document_id: str) -> Document | None:
-        """Retrieve a single document from the store, given its document ID.
+        """Retrieve a single document node from the store, given its id.
 
         Args:
-            document_id: The document ID
+            document_id: The document id
 
         Returns:
             The the document if it exists. Otherwise None.
@@ -1344,11 +1345,11 @@ class AstraDBGraphVectorStore(GraphVectorStore):
         # Map from id to Document
         retrieved_docs: dict[str, Document] = {}
 
-        async def visit_docs(d: int, docs: Iterable[Document]) -> None:
-            """Recursively visit docs and their outgoing links."""
+        async def visit_nodes(d: int, docs: Iterable[Document]) -> None:
+            """Recursively visit nodes and their outgoing links."""
             nonlocal visited_ids, visited_links, retrieved_docs
 
-            # Iterate over docs, tracking the *new* outgoing links for this
+            # Iterate over nodes, tracking the *new* outgoing links for this
             # depth. These are links that are either new, or newly discovered at a
             # lower depth.
             outgoing_links: set[Link] = set()
@@ -1411,7 +1412,7 @@ class AstraDBGraphVectorStore(GraphVectorStore):
 
             if new_ids_at_next_depth:
                 visit_node_tasks = [
-                    visit_docs(d=d, docs=[retrieved_docs[doc_id]])
+                    visit_nodes(d=d, docs=[retrieved_docs[doc_id]])
                     for doc_id in new_ids_at_next_depth
                     if doc_id in retrieved_docs
                 ]
@@ -1427,7 +1428,7 @@ class AstraDBGraphVectorStore(GraphVectorStore):
                 new_docs: list[Document | None] = await asyncio.gather(*fetch_tasks)
 
                 visit_node_tasks.extend(
-                    visit_docs(d=d, docs=[new_doc])
+                    visit_nodes(d=d, docs=[new_doc])
                     for new_doc in new_docs
                     if new_doc is not None
                 )
@@ -1440,7 +1441,7 @@ class AstraDBGraphVectorStore(GraphVectorStore):
             k=k,
             filter=filter,
         )
-        await visit_docs(d=0, docs=initial_docs)
+        await visit_nodes(d=0, docs=initial_docs)
 
         for doc_id in visited_ids:
             if doc_id in retrieved_docs:
@@ -1461,9 +1462,9 @@ class AstraDBGraphVectorStore(GraphVectorStore):
     ) -> Iterable[Document]:
         """Retrieve documents from this knowledge store.
 
-        First, `k` docs are retrieved using a vector search for the `query` string.
-        Then, additional docs are discovered up to the given `depth` from those
-        starting docs.
+        First, `k` nodes are retrieved using a vector search for the `query` string.
+        Then, additional nodes are discovered up to the given `depth` from those
+        starting nodes.
 
         Args:
             query: The query string.
@@ -1667,9 +1668,9 @@ class AstraDBGraphVectorStore(GraphVectorStore):
 
         initial_docs: list[Document] = []
         for doc, embedding in result:
+            _set_embedding(doc=doc, embedding=embedding)
             if doc.id is not None:
                 retrieved_docs[doc.id] = doc
-            doc.metadata[METADATA_EMBEDDING_KEY] = embedding
             initial_docs.append(doc)
 
         return query_embedding, initial_docs
@@ -1727,13 +1728,13 @@ class AstraDBGraphVectorStore(GraphVectorStore):
         k_per_link: int | None = None,
         filter: dict[str, Any] | None = None,  # noqa: A002
     ) -> Iterable[Document]:
-        """Return the target docs with incoming links from any of the given links.
+        """Return the target document nodes with incoming links from any of the given links.
 
         Args:
             links: The links to look for.
-            query_embedding: The query embedding. Used to rank target docs.
+            query_embedding: The query embedding. Used to rank target nodes.
             retrieved_docs: A cache of retrieved docs. This will be added to.
-            k_per_link: The number of target docs to fetch for each link.
+            k_per_link: The number of target nodes to fetch for each link.
             filter: Optional metadata to filter the results.
 
         Returns:
@@ -1760,7 +1761,7 @@ class AstraDBGraphVectorStore(GraphVectorStore):
 
         for result in results:
             for doc, embedding in result:
-                doc.metadata[METADATA_EMBEDDING_KEY] = embedding
+                _set_embedding(doc=doc, embedding=embedding)
                 if doc.id is not None:
                     retrieved_docs[doc.id] = doc
                     if doc.id not in targets:
