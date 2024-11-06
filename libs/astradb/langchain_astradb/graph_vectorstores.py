@@ -329,7 +329,7 @@ class AstraDBGraphVectorStore(CassandraGraphVectorStoreBase):
 
         self.astra_env = self.vector_store.astra_env
 
-    def get_metadata_for_insertion(self, doc: Document) -> dict[str, Any]:
+    def _get_metadata_for_insertion(self, doc: Document) -> dict[str, Any]:
         """Prepares the links in a document by serializing them to metadata.
 
         Args:
@@ -346,7 +346,7 @@ class AstraDBGraphVectorStore(CassandraGraphVectorStoreBase):
         ]
         return metadata
 
-    def restore_links(self, doc: Document) -> Document:
+    def _restore_links(self, doc: Document) -> Document:
         """Restores links in a document by deserializing them from metadata.
 
         Args:
@@ -360,7 +360,7 @@ class AstraDBGraphVectorStore(CassandraGraphVectorStoreBase):
         doc.metadata.pop(self.metadata_incoming_links_key)
         return doc
 
-    def get_metadata_filter(
+    def _get_metadata_filter(
         self,
         metadata: dict[str, Any] | None = None,
         outgoing_link: Link | None = None,
@@ -446,7 +446,10 @@ class AstraDBGraphVectorStore(CassandraGraphVectorStoreBase):
             collection_embedding_api_key=collection_embedding_api_key,
             **kwargs,
         )
-        store.add_documents(documents, ids=ids)
+        if ids is None:
+            store.add_documents(documents)
+        else:
+            store.add_documents(documents, ids=ids)
         return store
 
     @classmethod
@@ -468,5 +471,8 @@ class AstraDBGraphVectorStore(CassandraGraphVectorStoreBase):
             setup_mode=SetupMode.ASYNC,
             **kwargs,
         )
-        await store.aadd_documents(documents, ids=ids)
+        if ids is None:
+            await store.aadd_documents(documents)
+        else:
+            await store.aadd_documents(documents, ids=ids)
         return store

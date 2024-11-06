@@ -853,7 +853,7 @@ tenacity = ">=8.1.0,!=8.4.0,<10"
 type = "git"
 url = "https://github.com/epinzur/langchain.git"
 reference = "remove_nodes"
-resolved_reference = "fa8d3231253f7be9b16d9df50f679519d53a639e"
+resolved_reference = "137825f55a39e5dd1b33e13451743636c08fcb62"
 subdirectory = "libs/community"
 
 [[package]]
