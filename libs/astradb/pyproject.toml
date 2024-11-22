@@ -31,7 +31,7 @@ pytest-asyncio = "^0.21.1"
 langchain = { git = "https://github.com/langchain-ai/langchain.git", subdirectory = "libs/langchain" }
 langchain-text-splitters = { git = "https://github.com/langchain-ai/langchain.git", subdirectory = "libs/text-splitters" }
 langchain-core = { git = "https://github.com/langchain-ai/langchain.git", subdirectory = "libs/core" }
-langchain-community = { git = "https://github.com/langchain-ai/langchain.git", subdirectory = "libs/community" }
+langchain-community = { git = "https://github.com/epinzur/langchain.git", subdirectory = "libs/community", branch="remove_nodes" }
 
 [tool.poetry.group.codespell]
 optional = true
@@ -117,7 +117,7 @@ build-backend = "poetry.core.masonry.api"
 #
 # https://github.com/tophat/syrupy
 # --snapshot-warn-unused    Prints a warning on unused snapshots rather than fail the test suite.
-addopts = "--snapshot-warn-unused --strict-markers --strict-config --durations=5 -vv"
+addopts = "--strict-markers --strict-config --durations=5 -vv"
 # Registering custom markers.
 # https://docs.pytest.org/en/7.1.x/example/markers.html#registering-markers
 markers = [
