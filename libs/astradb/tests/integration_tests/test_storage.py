@@ -44,7 +44,7 @@ async def astra_db_empty_store_async(
     astra_db_credentials: AstraDBCredentials,
     collection_idxid: Collection,
 ) -> AstraDBStore:
-    collection_idxid.delete_many({})
+    await collection_idxid.to_async().delete_many({})
     return AstraDBStore(
         collection_name=collection_idxid.name,
         token=StaticTokenProvider(astra_db_credentials["token"]),
@@ -364,7 +364,7 @@ class TestAstraDBStore:
         database: Database,
     ) -> None:
         """Test of instantiation against a legacy collection, async version."""
-        database.create_collection(
+        await database.to_async().create_collection(
             EPHEMERAL_LEGACY_IDX_NAME,
             indexing=None,
             check_exists=False,
@@ -413,7 +413,7 @@ class TestAstraDBStore:
         database: Database,
     ) -> None:
         """Test of instantiation against a legacy collection, async version."""
-        database.create_collection(
+        await database.to_async().create_collection(
             EPHEMERAL_CUSTOM_IDX_NAME,
             indexing={"deny": ["useless", "forgettable"]},
             check_exists=False,
