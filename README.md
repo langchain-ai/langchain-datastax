@@ -1,5 +1,5 @@
 # 🦜️🔗 LangChain DataStax
 
-This repository contains 1 package with Datastax integrations with LangChain:
+This repository contains 1 package with DataStax integrations with LangChain:
 
-- [langchain-astradb](https://pypi.org/project/langchain-astradb/) integrates [AstraDB](https://www.datastax.com/products/datastax-astra).
+- [langchain-astradb](https://pypi.org/project/langchain-astradb/) integrates [Astra DB](https://www.datastax.com/products/datastax-astra).
