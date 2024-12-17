@@ -219,6 +219,20 @@ tests = ["cloudpickle", "hypothesis", "mypy (>=1.11.1)", "pympler", "pytest (>=4
 tests-mypy = ["mypy (>=1.11.1)", "pytest-mypy-plugins"]
 
 [[package]]
+name = "blockbuster"
+version = "1.2.0"
+description = "Utility to detect blocking calls in the async event loop"
+optional = false
+python-versions = ">=3.8"
+files = [
+    {file = "blockbuster-1.2.0-py3-none-any.whl", hash = "sha256:5210faccc22695bd3c338d3de2ec0581d5a270729e1b18d98d78eefd95eea2c5"},
+    {file = "blockbuster-1.2.0.tar.gz", hash = "sha256:c54f5184debf708488447fec53205274518ec806b9fb551d9e6d489b5a26b703"},
+]
+
+[package.dependencies]
+forbiddenfruit = ">=0.1.4"
+
+[[package]]
 name = "certifi"
 version = "2024.8.30"
 description = "Python package for providing Mozilla's CA Bundle."
@@ -418,6 +432,16 @@ files = [
 
 [package.extras]
 test = ["pytest (>=6)"]
+
+[[package]]
+name = "forbiddenfruit"
+version = "0.1.4"
+description = "Patch python built-in objects"
+optional = false
+python-versions = "*"
+files = [
+    {file = "forbiddenfruit-0.1.4.tar.gz", hash = "sha256:e3f7e66561a29ae129aac139a85d610dbf3dd896128187ed5454b6421f624253"},
+]
 
 [[package]]
 name = "freezegun"
@@ -2240,4 +2264,4 @@ propcache = ">=0.2.0"
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.9,<4.0"
-content-hash = "6041fa7043d4f92cd9beedece338a472b725f110a12f1b6ff5510bf1bf3f2c1b"
+content-hash = "dda1c3c1d1d906f1ea5d68c186e200ba3e6c82798f8c2750ef35a25b0cef6dca"

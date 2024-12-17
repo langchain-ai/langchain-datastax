@@ -5,6 +5,7 @@ Refer to `test_vectorstores.py` for the requirements to run.
 
 from __future__ import annotations
 
+import asyncio
 from typing import TYPE_CHECKING, Any
 
 import pytest
@@ -400,7 +401,9 @@ class TestAstraDBGraphVectorStore:
         request: pytest.FixtureRequest,
     ) -> None:
         """Simple (non-graph) similarity search on a graph vector store."""
-        g_store: AstraDBGraphVectorStore = request.getfixturevalue(store_name)
+        g_store: AstraDBGraphVectorStore = await asyncio.to_thread(
+            request.getfixturevalue, store_name
+        )
         query = "universe" if is_vectorize else "[2, 10]"
         embedding = [2.0, 10.0]
 
@@ -421,8 +424,10 @@ class TestAstraDBGraphVectorStore:
             assert ss_by_v_labels == ["AR", "A0"]
 
         if is_autodetected:
-            assert_all_flat_docs(
-                g_store.vector_store.astra_env.collection, is_vectorize=is_vectorize
+            await asyncio.to_thread(
+                assert_all_flat_docs,
+                g_store.vector_store.astra_env.collection,
+                is_vectorize=is_vectorize,
             )
 
     @pytest.mark.parametrize(
@@ -488,7 +493,9 @@ class TestAstraDBGraphVectorStore:
         request: pytest.FixtureRequest,
     ) -> None:
         """Graph traversal search on a graph vector store."""
-        g_store: AstraDBGraphVectorStore = request.getfixturevalue(store_name)
+        g_store: AstraDBGraphVectorStore = await asyncio.to_thread(
+            request.getfixturevalue, store_name
+        )
         query = "universe" if is_vectorize else "[2, 10]"
 
         # this is a set, as some of the internals of trav.search are set-driven
@@ -499,8 +506,10 @@ class TestAstraDBGraphVectorStore:
         }
         assert ts_labels == {"AR", "A0", "BR", "B0", "TR", "T0"}
         if is_autodetected:
-            assert_all_flat_docs(
-                g_store.vector_store.astra_env.collection, is_vectorize=is_vectorize
+            await asyncio.to_thread(
+                assert_all_flat_docs,
+                g_store.vector_store.astra_env.collection,
+                is_vectorize=is_vectorize,
             )
 
     @pytest.mark.parametrize(
@@ -572,7 +581,9 @@ class TestAstraDBGraphVectorStore:
         request: pytest.FixtureRequest,
     ) -> None:
         """MMR Graph traversal search on a graph vector store."""
-        g_store: AstraDBGraphVectorStore = request.getfixturevalue(store_name)
+        g_store: AstraDBGraphVectorStore = await asyncio.to_thread(
+            request.getfixturevalue, store_name
+        )
         query = "universe" if is_vectorize else "[2, 10]"
 
         mt_labels = [
@@ -589,8 +600,10 @@ class TestAstraDBGraphVectorStore:
 
         assert mt_labels == ["AR", "BR"]
         if is_autodetected:
-            assert_all_flat_docs(
-                g_store.vector_store.astra_env.collection, is_vectorize=is_vectorize
+            await asyncio.to_thread(
+                assert_all_flat_docs,
+                g_store.vector_store.astra_env.collection,
+                is_vectorize=is_vectorize,
             )
 
     @pytest.mark.parametrize(
@@ -652,7 +665,9 @@ class TestAstraDBGraphVectorStore:
         request: pytest.FixtureRequest,
     ) -> None:
         """Metadata search on a graph vector store."""
-        g_store: AstraDBGraphVectorStore = request.getfixturevalue(store_name)
+        g_store: AstraDBGraphVectorStore = await asyncio.to_thread(
+            request.getfixturevalue, store_name
+        )
         mt_response = await g_store.ametadata_search(
             filter={"label": "T0"},
             n=2,
@@ -726,7 +741,9 @@ class TestAstraDBGraphVectorStore:
         request: pytest.FixtureRequest,
     ) -> None:
         """Get by document_id on a graph vector store."""
-        g_store: AstraDBGraphVectorStore = request.getfixturevalue(store_name)
+        g_store: AstraDBGraphVectorStore = await asyncio.to_thread(
+            request.getfixturevalue, store_name
+        )
         doc = await g_store.aget_by_document_id(document_id="FL")
         assert doc is not None
         assert doc.metadata["label"] == "FL"
@@ -816,7 +833,9 @@ class TestAstraDBGraphVectorStore:
         collection_fixture_name: str,
         request: pytest.FixtureRequest,
     ) -> None:
-        collection_name: str = request.getfixturevalue(collection_fixture_name)
+        collection_name: str = await asyncio.to_thread(
+            request.getfixturevalue, collection_fixture_name
+        )
         init_kwargs: dict[str, Any]
         if is_vectorize:
             init_kwargs = {
@@ -839,7 +858,7 @@ class TestAstraDBGraphVectorStore:
         )
 
         query = "ukrainian food" if is_vectorize else "[2, 1]"
-        hits = g_store.similarity_search(query=query, k=2)
+        hits = await g_store.asimilarity_search(query=query, k=2)
         assert len(hits) == 1
         assert hits[0].page_content == page_contents[0]
         assert hits[0].id == "x_id"
@@ -915,7 +934,9 @@ class TestAstraDBGraphVectorStore:
         collection_fixture_name: str,
         request: pytest.FixtureRequest,
     ) -> None:
-        collection_name: str = request.getfixturevalue(collection_fixture_name)
+        collection_name: str = await asyncio.to_thread(
+            request.getfixturevalue, collection_fixture_name
+        )
         init_kwargs: dict[str, Any]
         if is_vectorize:
             init_kwargs = {
@@ -941,7 +962,7 @@ class TestAstraDBGraphVectorStore:
         )
 
         query = "mexican food" if is_vectorize else "[2, 1]"
-        hits = g_store.similarity_search(query=query, k=2)
+        hits = await g_store.asimilarity_search(query=query, k=2)
         assert len(hits) == 1
         assert hits[0].page_content == page_contents[0]
         assert hits[0].id == "x_id"
@@ -1005,7 +1026,9 @@ class TestAstraDBGraphVectorStore:
         store_name: str,
         request: pytest.FixtureRequest,
     ) -> None:
-        g_store: AstraDBGraphVectorStore = request.getfixturevalue(store_name)
+        g_store: AstraDBGraphVectorStore = await asyncio.to_thread(
+            request.getfixturevalue, store_name
+        )
         links0 = [
             Link(kind="kA", direction="out", tag="tA"),
             Link(kind="kB", direction="bidir", tag="tB"),
