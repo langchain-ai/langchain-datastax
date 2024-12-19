@@ -5,14 +5,32 @@
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Iterator
 
+import pytest
+from blockbuster import BlockBuster, blockbuster_ctx
 from langchain_core.embeddings import Embeddings
 from langchain_core.language_models import LLM
 from typing_extensions import override
 
 if TYPE_CHECKING:
     from langchain_core.callbacks import CallbackManagerForLLMRun
+
+
+@pytest.fixture(autouse=True)
+def blockbuster() -> Iterator[BlockBuster]:
+    with blockbuster_ctx() as bb:
+        # TODO: GraphVectorStore init is blocking. Should be fixed.
+        for method in (
+            "socket.socket.connect",
+            "ssl.SSLSocket.send",
+            "ssl.SSLSocket.recv",
+            "ssl.SSLSocket.read",
+        ):
+            bb.functions[method].can_block_functions.append(
+                ("langchain_astradb/graph_vectorstores.py", {"__init__"}),
+            )
+        yield bb
 
 
 class ParserEmbeddings(Embeddings):

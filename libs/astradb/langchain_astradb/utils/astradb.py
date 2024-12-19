@@ -425,9 +425,9 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
         except DataAPIException as data_api_exception:
             # possibly the collection is preexisting and may have legacy,
             # or custom, indexing settings: verify
-            collection_descriptors = [
-                coll_desc async for coll_desc in self.async_database.list_collections()
-            ]
+            collection_descriptors = list(
+                await asyncio.to_thread(self.database.list_collections)
+            )
             try:
                 if not self._validate_indexing_policy(
                     collection_descriptors=collection_descriptors,
