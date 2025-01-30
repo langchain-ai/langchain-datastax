@@ -21,7 +21,9 @@ from typing import (
 )
 
 import numpy as np
+from astrapy.constants import Environment
 from astrapy.exceptions import InsertManyException
+from astrapy.info import CollectionVectorServiceOptions
 from langchain_community.vectorstores.utils import maximal_marginal_relevance
 from langchain_core.runnables.utils import gather_with_concurrency
 from langchain_core.vectorstores import VectorStore
@@ -54,7 +56,6 @@ if TYPE_CHECKING:
     from astrapy.db import (
         AsyncAstraDB as AsyncAstraDBClient,
     )
-    from astrapy.info import CollectionVectorServiceOptions
     from astrapy.results import UpdateResult
     from langchain_core.documents import Document
     from langchain_core.embeddings import Embeddings
@@ -722,6 +723,45 @@ class AstraDBVectorStore(VectorStore):
         # i.e. one in [0, 1] where higher means more *similar*,
         # so here the final score transformation is not reversing the interval.
         return lambda score: score
+
+    def with_component_name(self, component_name: str) -> AstraDBVectorStore:
+        """Create a copy of this vector store with just the 'component name' changed.
+
+        Attributes:
+            component_name: the new value, which replaces the current one in the copy.
+        """
+        copy = AstraDBVectorStore(
+            collection_name="moot",
+            api_endpoint="http://moot",
+            environment=Environment.OTHER,
+            namespace="moot",
+            setup_mode=SetupMode.OFF,
+            collection_vector_service_options=CollectionVectorServiceOptions(
+                provider="moot",
+                model_name="moot",
+            ),
+        )
+        copy.collection_name = self.collection_name
+        copy.token = self.token
+        copy.api_endpoint = self.api_endpoint
+        copy.environment = self.environment
+        copy.namespace = self.namespace
+        copy.indexing_policy = self.indexing_policy
+        copy.autodetect_collection = self.autodetect_collection
+        copy.embedding_dimension = self.embedding_dimension
+        copy.embedding = self.embedding
+        copy.metric = self.metric
+        copy.collection_embedding_api_key = self.collection_embedding_api_key
+        copy.collection_vector_service_options = self.collection_vector_service_options
+        copy.document_codec = self.document_codec
+        copy.batch_size = self.batch_size
+        copy.bulk_insert_batch_concurrency = self.bulk_insert_batch_concurrency
+        copy.bulk_insert_overwrite_concurrency = self.bulk_insert_overwrite_concurrency
+        copy.bulk_delete_concurrency = self.bulk_delete_concurrency
+        # Now the .astra_env attribute:
+        copy.astra_env = self.astra_env.with_component_name(component_name)
+
+        return copy
 
     def clear(self) -> None:
         """Empty the collection of all its stored entries."""

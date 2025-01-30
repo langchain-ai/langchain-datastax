@@ -294,6 +294,64 @@ class TestCallers:
             ext_callers=[("ec0", "ev0")],
         )
 
+    def test_callers_vectorstore_withcomponentname(
+        self, httpserver: HTTPServer
+    ) -> None:
+        """
+        Test of "with_component_name" for the vectorstore.
+        """
+        base_endpoint = httpserver.url_for("/")
+        base_path = "/v1/ks"
+        coll_name = "my_coll"
+        new_component_name = "NEW_COMPONENT_NAME"
+        no_results_json: dict[str, Any] = {
+            "data": {
+                "documents": [],
+                "nextPageState": None,
+            }
+        }
+
+        httpserver.expect_oneshot_request(
+            base_path,
+            method="POST",
+            headers={
+                "User-Agent": "ec0/ev0",
+            },
+            header_value_matcher=hv_prefix_matcher_factory(COMPONENT_NAME_VECTORSTORE),
+        ).respond_with_json({})
+
+        vs0 = AstraDBVectorStore(
+            collection_name=coll_name,
+            api_endpoint=base_endpoint,
+            environment=Environment.OTHER,
+            namespace="ks",
+            embedding=ParserEmbeddings(2),
+            ext_callers=[("ec0", "ev0")],
+        )
+
+        # a clone with different component name:
+        vs1 = vs0.with_component_name(new_component_name)
+        httpserver.expect_oneshot_request(
+            base_path + "/" + coll_name,
+            method="POST",
+            headers={
+                "User-Agent": "ec0/ev0",
+            },
+            header_value_matcher=hv_prefix_matcher_factory(new_component_name),
+        ).respond_with_json(no_results_json)
+        vs1.similarity_search("[0,1]")
+
+        # the original one is untouched:
+        httpserver.expect_oneshot_request(
+            base_path + "/" + coll_name,
+            method="POST",
+            headers={
+                "User-Agent": "ec0/ev0",
+            },
+            header_value_matcher=hv_prefix_matcher_factory(COMPONENT_NAME_VECTORSTORE),
+        ).respond_with_json(no_results_json)
+        vs0.similarity_search("[0,1]")
+
     def test_callers_component_graphvectorstore(self, httpserver: HTTPServer) -> None:
         """
         End-to-end testing of callers passed through the components.

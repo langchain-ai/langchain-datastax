@@ -283,18 +283,20 @@ class _AstraDBEnvironment:
         # - a single ("langchain", <version of langchain_core>)
         # - if such is provided, a (component_name, <version of langchain_astradb>)
         #   (note: if component_name is None, astrapy strips it out automatically)
+        self.ext_callers = ext_callers
+        self.component_name = component_name
         norm_ext_callers = [
             cpair
             for cpair in (
                 _raw_caller if isinstance(_raw_caller, tuple) else (_raw_caller, None)
-                for _raw_caller in (ext_callers or [])
+                for _raw_caller in (self.ext_callers or [])
             )
             if cpair[0] is not None or cpair[1] is not None
         ]
         full_callers = [
             *norm_ext_callers,
             LC_CORE_CALLER,
-            (component_name, LC_ASTRADB_VERSION),
+            (self.component_name, LC_ASTRADB_VERSION),
         ]
 
         # create the callers
@@ -343,9 +345,10 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
             async_astra_db_client=async_astra_db_client,
         )
         self.collection_name = collection_name
+        self.collection_embedding_api_key = collection_embedding_api_key
         self.collection = self.database.get_collection(
             name=self.collection_name,
-            embedding_api_key=collection_embedding_api_key,
+            embedding_api_key=self.collection_embedding_api_key,
         )
         self.async_collection = self.collection.to_async()
 
@@ -394,6 +397,24 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
                         raise data_api_exception  # noqa: TRY201
                 except ValueError as validation_error:
                     raise validation_error from data_api_exception
+
+    def with_component_name(self, component_name: str) -> _AstraDBCollectionEnvironment:
+        """Create a copy of this environment with just the 'component name' changed.
+
+        Attributes:
+            component_name: the new value, which replaces the current one in the copy.
+        """
+        return _AstraDBCollectionEnvironment(
+            collection_name=self.collection_name,
+            token=self.token,
+            api_endpoint=self.api_endpoint,
+            keyspace=self.keyspace,
+            environment=self.environment,
+            ext_callers=self.ext_callers,
+            component_name=component_name,
+            setup_mode=SetupMode.OFF,
+            collection_embedding_api_key=self.collection_embedding_api_key,
+        )
 
     async def _asetup_db(
         self,
