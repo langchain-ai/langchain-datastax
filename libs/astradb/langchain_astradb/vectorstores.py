@@ -67,6 +67,8 @@ DocDict = Dict[str, Any]  # dicts expressing entries to insert
 DEFAULT_INDEXING_OPTIONS = {"allow": ["metadata"]}
 # error code to check for during bulk insertions
 DOCUMENT_ALREADY_EXISTS_API_ERROR_CODE = "DOCUMENT_ALREADY_EXISTS"
+# max number of errors shown in full insertion error messages
+MAX_SHOWN_INSERTION_ERRORS = 8
 
 logger = logging.getLogger(__name__)
 
@@ -1065,15 +1067,27 @@ class AstraDBVectorStore(VectorStore):
                 # Raise a non-astrapy error with a message covering all errors
                 # except the DOCUMENT_ALREADY_EXISTS_API_ERROR_CODE, which this
                 # method can handle (if they were the only error)
-                all_err_descs = "; ".join(
-                    edesc.message
+                filtered_error_descs = [
+                    edesc
                     for edesc in err.error_descriptors
                     if edesc.error_code != DOCUMENT_ALREADY_EXISTS_API_ERROR_CODE
                     if edesc.message
+                ]
+                all_err_descs = "; ".join(
+                    edesc.message or ""
+                    for edesc in filtered_error_descs[:MAX_SHOWN_INSERTION_ERRORS]
                 )
+                there_s_more: str
+                if len(filtered_error_descs) > MAX_SHOWN_INSERTION_ERRORS:
+                    num_residual = (
+                        len(filtered_error_descs) - MAX_SHOWN_INSERTION_ERRORS
+                    )
+                    there_s_more = f". (Note: {num_residual} further errors omitted.)"
+                else:
+                    there_s_more = ""
                 full_err_message = (
                     "Cannot insert documents. The Data API returned the "
-                    f"following error(s): {all_err_descs}"
+                    f"following error(s): {all_err_descs}{there_s_more}"
                 )
                 raise ValueError(full_err_message) from err
 
@@ -1207,15 +1221,27 @@ class AstraDBVectorStore(VectorStore):
                 # Raise a non-astrapy error with a message covering all errors
                 # except the DOCUMENT_ALREADY_EXISTS_API_ERROR_CODE, which this
                 # method can handle (if they were the only error)
-                all_err_descs = "; ".join(
-                    edesc.message
+                filtered_error_descs = [
+                    edesc
                     for edesc in err.error_descriptors
                     if edesc.error_code != DOCUMENT_ALREADY_EXISTS_API_ERROR_CODE
                     if edesc.message
+                ]
+                all_err_descs = "; ".join(
+                    edesc.message or ""
+                    for edesc in filtered_error_descs[:MAX_SHOWN_INSERTION_ERRORS]
                 )
+                there_s_more: str
+                if len(filtered_error_descs) > MAX_SHOWN_INSERTION_ERRORS:
+                    num_residual = (
+                        len(filtered_error_descs) - MAX_SHOWN_INSERTION_ERRORS
+                    )
+                    there_s_more = f". (Note: {num_residual} further errors omitted.)"
+                else:
+                    there_s_more = ""
                 full_err_message = (
                     "Cannot insert documents. The Data API returned the "
-                    f"following error(s): {all_err_descs}"
+                    f"following error(s): {all_err_descs}{there_s_more}"
                 )
                 raise ValueError(full_err_message) from err
 
