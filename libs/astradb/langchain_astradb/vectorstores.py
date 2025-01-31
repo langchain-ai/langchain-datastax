@@ -1062,7 +1062,20 @@ class AstraDBVectorStore(VectorStore):
                     if document["_id"] not in inserted_ids_set
                 ]
             else:
-                raise
+                # Raise a non-astrapy error with a message covering all errors
+                # except the DOCUMENT_ALREADY_EXISTS_API_ERROR_CODE, which this
+                # method can handle (if they were the only error)
+                all_err_descs = "; ".join(
+                    edesc.message
+                    for edesc in err.error_descriptors
+                    if edesc.error_code != DOCUMENT_ALREADY_EXISTS_API_ERROR_CODE
+                    if edesc.message
+                )
+                full_err_message = (
+                    "Cannot insert documents. The Data API returned the "
+                    f"following error(s): {all_err_descs}"
+                )
+                raise ValueError(full_err_message) from err
 
         # if necessary, replace docs for the non-inserted ids
         if ids_to_replace:
@@ -1191,7 +1204,20 @@ class AstraDBVectorStore(VectorStore):
                     if document["_id"] not in inserted_ids_set
                 ]
             else:
-                raise
+                # Raise a non-astrapy error with a message covering all errors
+                # except the DOCUMENT_ALREADY_EXISTS_API_ERROR_CODE, which this
+                # method can handle (if they were the only error)
+                all_err_descs = "; ".join(
+                    edesc.message
+                    for edesc in err.error_descriptors
+                    if edesc.error_code != DOCUMENT_ALREADY_EXISTS_API_ERROR_CODE
+                    if edesc.message
+                )
+                full_err_message = (
+                    "Cannot insert documents. The Data API returned the "
+                    f"following error(s): {all_err_descs}"
+                )
+                raise ValueError(full_err_message) from err
 
         # if necessary, replace docs for the non-inserted ids
         if ids_to_replace:
