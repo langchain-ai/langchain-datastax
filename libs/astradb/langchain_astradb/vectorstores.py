@@ -1085,9 +1085,14 @@ class AstraDBVectorStore(VectorStore):
                     there_s_more = f". (Note: {num_residual} further errors omitted.)"
                 else:
                     there_s_more = ""
+                original_err_note = (
+                    " (Full API error in '<this-exception>.__cause__.error_descriptors'"
+                    f": ignore '{DOCUMENT_ALREADY_EXISTS_API_ERROR_CODE}'.)"
+                )
                 full_err_message = (
                     "Cannot insert documents. The Data API returned the "
-                    f"following error(s): {all_err_descs}{there_s_more}"
+                    f"following error(s): {all_err_descs}"
+                    f"{there_s_more}{original_err_note}"
                 )
                 raise ValueError(full_err_message) from err
 
@@ -1239,9 +1244,14 @@ class AstraDBVectorStore(VectorStore):
                     there_s_more = f". (Note: {num_residual} further errors omitted.)"
                 else:
                     there_s_more = ""
+                original_err_note = (
+                    " (Full API error in '<this-exception>.__cause__.error_descriptors'"
+                    f": ignore '{DOCUMENT_ALREADY_EXISTS_API_ERROR_CODE}'.)"
+                )
                 full_err_message = (
                     "Cannot insert documents. The Data API returned the "
-                    f"following error(s): {all_err_descs}{there_s_more}"
+                    f"following error(s): {all_err_descs}"
+                    f"{there_s_more}{original_err_note}"
                 )
                 raise ValueError(full_err_message) from err
 
