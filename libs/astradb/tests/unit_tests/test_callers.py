@@ -298,7 +298,7 @@ class TestCallers:
         self, httpserver: HTTPServer
     ) -> None:
         """
-        Test of "with_component_name" for the vectorstore.
+        Test of "with_component_name" for the vectorstore, checking the actual headers.
         """
         base_endpoint = httpserver.url_for("/")
         base_path = "/v1/ks"

@@ -13,7 +13,7 @@ import pytest
 from astrapy.authentication import StaticTokenProvider
 from langchain_core.documents import Document
 
-from langchain_astradb.utils.astradb import SetupMode
+from langchain_astradb.utils.astradb import COMPONENT_NAME_VECTORSTORE, SetupMode
 from langchain_astradb.vectorstores import AstraDBVectorStore
 
 from .conftest import (
@@ -1784,3 +1784,29 @@ class TestAstraDBVectorStore:
         assert len(f_rec_warnings) == 1
         assert len(results) == 1
         assert results[0].page_content == "[1,2]"
+
+    @pytest.mark.parametrize(
+        "vector_store",
+        [
+            "vector_store_d2",
+            "vector_store_vz",
+        ],
+        ids=["nonvectorize_store", "vectorize_store"],
+    )
+    def test_astradb_vectorstore_withcomponentname(
+        self,
+        *,
+        vector_store: str,
+        request: pytest.FixtureRequest,
+    ) -> None:
+        """Verify change in callers down in the astra_env of the store."""
+        vstore0: AstraDBVectorStore = request.getfixturevalue(vector_store)
+
+        caller_names0 = {caller[0] for caller in vstore0.astra_env.collection.callers}
+        assert COMPONENT_NAME_VECTORSTORE in caller_names0
+
+        vstore1 = vstore0.with_component_name("xyz_component")
+
+        caller_names1 = {caller[0] for caller in vstore1.astra_env.collection.callers}
+        assert COMPONENT_NAME_VECTORSTORE not in caller_names1
+        assert "xyz_component" in caller_names1
