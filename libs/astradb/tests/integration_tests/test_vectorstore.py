@@ -10,10 +10,10 @@ import random
 from typing import TYPE_CHECKING, Any
 
 import pytest
-from astrapy.authentication import StaticTokenProvider
+from astrapy.authentication import EmbeddingAPIKeyHeaderProvider, StaticTokenProvider
 from langchain_core.documents import Document
 
-from langchain_astradb.utils.astradb import SetupMode
+from langchain_astradb.utils.astradb import COMPONENT_NAME_VECTORSTORE, SetupMode
 from langchain_astradb.vectorstores import AstraDBVectorStore
 
 from .conftest import (
@@ -1784,3 +1784,47 @@ class TestAstraDBVectorStore:
         assert len(f_rec_warnings) == 1
         assert len(results) == 1
         assert results[0].page_content == "[1,2]"
+
+    @pytest.mark.parametrize(
+        "vector_store",
+        [
+            "vector_store_d2",
+            "vector_store_vz",
+        ],
+        ids=["nonvectorize_store", "vectorize_store"],
+    )
+    def test_astradb_vectorstore_copy(
+        self,
+        *,
+        vector_store: str,
+        request: pytest.FixtureRequest,
+    ) -> None:
+        """Verify changed attributes in 'copy', down in the astra_env of the store."""
+        vstore0: AstraDBVectorStore = request.getfixturevalue(vector_store)
+
+        # component_name, deep test
+        # Note this line encodes assumptions on astrapy internals that will fail on 2.0:
+        caller_names0 = {caller[0] for caller in vstore0.astra_env.collection.callers}
+        assert COMPONENT_NAME_VECTORSTORE in caller_names0
+
+        vstore1 = vstore0.copy(component_name="xyz_component")
+
+        # Note this line encodes assumptions on astrapy internals that will fail on 2.0:
+        caller_names1 = {caller[0] for caller in vstore1.astra_env.collection.callers}
+        assert COMPONENT_NAME_VECTORSTORE not in caller_names1
+        assert "xyz_component" in caller_names1
+
+        # other changeable attributes (this check does not enter astrapy at all)
+        token2 = StaticTokenProvider("xyz")
+        apikey2 = EmbeddingAPIKeyHeaderProvider(None)
+        vstore2 = vstore0.copy(
+            token=token2,
+            ext_callers=[("cnx", "cvx")],
+            component_name="component_name2",
+            collection_embedding_api_key=apikey2,
+        )
+
+        assert vstore2.astra_env.token == token2
+        assert vstore2.astra_env.ext_callers == [("cnx", "cvx")]
+        assert vstore2.astra_env.component_name == "component_name2"
+        assert vstore2.astra_env.collection_embedding_api_key == apikey2
