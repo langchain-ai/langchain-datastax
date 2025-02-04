@@ -724,11 +724,40 @@ class AstraDBVectorStore(VectorStore):
         # so here the final score transformation is not reversing the interval.
         return lambda score: score
 
-    def with_component_name(self, component_name: str) -> AstraDBVectorStore:
-        """Create a copy of this vector store with just the 'component name' changed.
+    def copy(
+        self,
+        *,
+        token: str | TokenProvider | None = None,
+        ext_callers: list[tuple[str | None, str | None] | str | None] | None = None,
+        component_name: str | None = None,
+        collection_embedding_api_key: str | EmbeddingHeadersProvider | None = None,
+    ) -> AstraDBVectorStore:
+        """Create a copy, possibly with changed attributes.
+
+        This method creates a shallow copy of this environment. If a parameter
+        is passed and differs from None, it will replace the corresponding value
+        in the copy.
+
+        The method allows changing only the parameters that ensure the copy is
+        functional and does not trigger side-effects:
+        for example, one cannot create a copy acting on a new collection.
+        In those cases, one should create a new instance of ``AstraDBVectorStore``
+        from scratch.
 
         Attributes:
-            component_name: the new value, which replaces the current one in the copy.
+            token: API token for Astra DB usage, either in the form of a string
+                or a subclass of ``astrapy.authentication.TokenProvider``.
+                In order to suppress token usage in the copy, explicitly pass
+                ``astrapy.authentication.StaticTokenProvider(None)``.
+            ext_callers: additional custom (caller_name, caller_version) pairs
+                to attach to the User-Agent header when issuing Data API requests.
+            component_name: a value for the LangChain component name to use when
+                identifying the originator of the Data API requests.
+            collection_embedding_api_key: the API Key to supply in each Data API
+                request if necessary. This is necessary if using the Vectorize
+                feature and no secret is stored with the database.
+                In order to suppress the API Key in the copy, explicitly pass
+                ``astrapy.authentication.EmbeddingAPIKeyHeaderProvider(None)``.
         """
         copy = AstraDBVectorStore(
             collection_name="moot",
@@ -742,7 +771,7 @@ class AstraDBVectorStore(VectorStore):
             ),
         )
         copy.collection_name = self.collection_name
-        copy.token = self.token
+        copy.token = self.token if token is None else token
         copy.api_endpoint = self.api_endpoint
         copy.environment = self.environment
         copy.namespace = self.namespace
@@ -751,7 +780,11 @@ class AstraDBVectorStore(VectorStore):
         copy.embedding_dimension = self.embedding_dimension
         copy.embedding = self.embedding
         copy.metric = self.metric
-        copy.collection_embedding_api_key = self.collection_embedding_api_key
+        copy.collection_embedding_api_key = (
+            self.collection_embedding_api_key
+            if collection_embedding_api_key is None
+            else collection_embedding_api_key
+        )
         copy.collection_vector_service_options = self.collection_vector_service_options
         copy.document_codec = self.document_codec
         copy.batch_size = self.batch_size
@@ -759,7 +792,12 @@ class AstraDBVectorStore(VectorStore):
         copy.bulk_insert_overwrite_concurrency = self.bulk_insert_overwrite_concurrency
         copy.bulk_delete_concurrency = self.bulk_delete_concurrency
         # Now the .astra_env attribute:
-        copy.astra_env = self.astra_env.with_component_name(component_name)
+        copy.astra_env = self.astra_env.copy(
+            token=token,
+            ext_callers=ext_callers,
+            component_name=component_name,
+            collection_embedding_api_key=collection_embedding_api_key,
+        )
 
         return copy
 

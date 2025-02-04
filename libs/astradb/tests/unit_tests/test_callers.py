@@ -294,11 +294,9 @@ class TestCallers:
             ext_callers=[("ec0", "ev0")],
         )
 
-    def test_callers_vectorstore_withcomponentname(
-        self, httpserver: HTTPServer
-    ) -> None:
+    def test_callers_vectorstore_copy(self, httpserver: HTTPServer) -> None:
         """
-        Test of "with_component_name" for the vectorstore, checking the actual headers.
+        Test of "copy" for the vectorstore, checking the actual headers.
         """
         base_endpoint = httpserver.url_for("/")
         base_path = "/v1/ks"
@@ -330,7 +328,7 @@ class TestCallers:
         )
 
         # a clone with different component name:
-        vs1 = vs0.with_component_name(new_component_name)
+        vs1 = vs0.copy(component_name=new_component_name)
         httpserver.expect_oneshot_request(
             base_path + "/" + coll_name,
             method="POST",
