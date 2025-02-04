@@ -68,6 +68,8 @@ DocDict = Dict[str, Any]  # dicts expressing entries to insert
 DEFAULT_INDEXING_OPTIONS = {"allow": ["metadata"]}
 # error code to check for during bulk insertions
 DOCUMENT_ALREADY_EXISTS_API_ERROR_CODE = "DOCUMENT_ALREADY_EXISTS"
+# max number of errors shown in full insertion error messages
+MAX_SHOWN_INSERTION_ERRORS = 8
 
 logger = logging.getLogger(__name__)
 
@@ -145,6 +147,46 @@ def _validate_autodetect_init_params(
     if am_errors:
         msg = f"Invalid parameters for autodetect mode: {'; '.join(am_errors)}"
         raise ValueError(msg)
+
+
+def _insertmany_error_message(err: InsertManyException) -> str:
+    """Format an astrapy insert exception into an error message.
+
+    This utility prepares a detailed message from an astrapy InsertManyException,
+    to be used in raising an exception within a vectorstore multiple insertion.
+
+    This operation must filter out duplicate-id specific errors
+    (which the vector store could actually handle, if they were the only ondes).
+    """
+    err_msg = "Cannot insert documents. The Data API returned the following error(s): "
+
+    filtered_error_descs = [
+        edesc
+        for edesc in err.error_descriptors
+        if edesc.error_code != DOCUMENT_ALREADY_EXISTS_API_ERROR_CODE
+        if edesc.message
+    ]
+    err_msg += "; ".join(
+        edesc.message or ""
+        for edesc in filtered_error_descs[:MAX_SHOWN_INSERTION_ERRORS]
+    )
+
+    if (num_residual := len(filtered_error_descs) - MAX_SHOWN_INSERTION_ERRORS) > 0:
+        err_msg += f". (Note: {num_residual} further errors omitted.)"
+
+    err_msg += (
+        " (Full API error in '<this-exception>.__cause__.error_descriptors'"
+        f": ignore '{DOCUMENT_ALREADY_EXISTS_API_ERROR_CODE}'.)"
+    )
+    return err_msg
+
+
+class AstraDBVectorStoreError(Exception):
+    """An exception during vector-store activities.
+
+    This exception represents any operational exception occurring while
+    performing an action within an AstraDBVectorStore.
+    """
 
 
 class AstraDBVectorStore(VectorStore):
@@ -1033,7 +1075,7 @@ class AstraDBVectorStore(VectorStore):
     ) -> tuple[list[str], list[DocDict]]:
         if "status" not in insert_result:
             msg = f"API Exception while running bulk insertion: {insert_result}"
-            raise ValueError(msg)
+            raise AstraDBVectorStoreError(msg)
         batch_inserted = insert_result["status"]["insertedIds"]
         # estimation of the preexisting documents that failed
         missed_inserted_ids = {document["_id"] for document in document_batch} - set(
@@ -1047,7 +1089,7 @@ class AstraDBVectorStore(VectorStore):
         )
         if num_errors != len(missed_inserted_ids) or unexpected_errors:
             msg = f"API Exception while running bulk insertion: {errors}"
-            raise ValueError(msg)
+            raise AstraDBVectorStoreError(msg)
         # deal with the missing insertions as upserts
         missing_from_batch = [
             document
@@ -1140,7 +1182,8 @@ class AstraDBVectorStore(VectorStore):
                     if document["_id"] not in inserted_ids_set
                 ]
             else:
-                raise
+                full_err_message = _insertmany_error_message(err)
+                raise AstraDBVectorStoreError(full_err_message) from err
 
         # if necessary, replace docs for the non-inserted ids
         if ids_to_replace:
@@ -1180,7 +1223,7 @@ class AstraDBVectorStore(VectorStore):
                     "AstraDBVectorStore.add_texts could not insert all requested "
                     f"documents ({missing} failed replace_one calls)"
                 )
-                raise ValueError(msg)
+                raise AstraDBVectorStoreError(msg)
         return inserted_ids
 
     @override
@@ -1269,7 +1312,8 @@ class AstraDBVectorStore(VectorStore):
                     if document["_id"] not in inserted_ids_set
                 ]
             else:
-                raise
+                full_err_message = _insertmany_error_message(err)
+                raise AstraDBVectorStoreError(full_err_message) from err
 
         # if necessary, replace docs for the non-inserted ids
         if ids_to_replace:
@@ -1310,7 +1354,7 @@ class AstraDBVectorStore(VectorStore):
                     "AstraDBVectorStore.add_texts could not insert all requested "
                     f"documents ({missing} failed replace_one calls)"
                 )
-                raise ValueError(msg)
+                raise AstraDBVectorStoreError(msg)
         return inserted_ids
 
     def update_metadata(
@@ -1997,7 +2041,7 @@ class AstraDBVectorStore(VectorStore):
         sort_vector = await async_cursor.get_sort_vector()
         if sort_vector is None:
             msg = "Unable to retrieve the server-side embedding of the query."
-            raise ValueError(msg)
+            raise AstraDBVectorStoreError(msg)
         query_embedding = sort_vector
 
         return (
@@ -2037,7 +2081,7 @@ class AstraDBVectorStore(VectorStore):
         sort_vector = cursor.get_sort_vector()
         if sort_vector is None:
             msg = "Unable to retrieve the server-side embedding of the query."
-            raise ValueError(msg)
+            raise AstraDBVectorStoreError(msg)
         query_embedding = sort_vector
 
         return (
