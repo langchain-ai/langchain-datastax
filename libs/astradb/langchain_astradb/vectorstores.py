@@ -170,11 +170,8 @@ def _insertmany_error_message(err: InsertManyException) -> str:
         for edesc in filtered_error_descs[:MAX_SHOWN_INSERTION_ERRORS]
     )
 
-    if len(filtered_error_descs) > MAX_SHOWN_INSERTION_ERRORS:
-        err_msg += (
-            f". (Note: {len(filtered_error_descs) - MAX_SHOWN_INSERTION_ERRORS}"
-            " further errors omitted.)"
-        )
+    if (num_residual := len(filtered_error_descs) - MAX_SHOWN_INSERTION_ERRORS) > 0:
+        err_msg += f". (Note: {num_residual} further errors omitted.)"
 
     err_msg += (
         " (Full API error in '<this-exception>.__cause__.error_descriptors'"
