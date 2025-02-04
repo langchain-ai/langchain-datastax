@@ -148,6 +148,38 @@ def _validate_autodetect_init_params(
         raise ValueError(msg)
 
 
+def _insertmany_error_message(err: InsertManyException) -> str:
+    """Format an astrapy insert exception into an error message.
+
+    This utility prepares a detailed message from an astrapy InsertManyException,
+    to be used in raising an exception within a vectorstore multiple insertion.
+
+    This operation must filter out duplicate-id specific errors
+    (which the vector store could actually handle, if they were the only ondes).
+    """
+    err_msg = "Cannot insert documents. The Data API returned the following error(s): "
+
+    filtered_error_descs = [
+        edesc
+        for edesc in err.error_descriptors
+        if edesc.error_code != DOCUMENT_ALREADY_EXISTS_API_ERROR_CODE
+        if edesc.message
+    ]
+    err_msg += "; ".join(
+        edesc.message or ""
+        for edesc in filtered_error_descs[:MAX_SHOWN_INSERTION_ERRORS]
+    )
+
+    if num_residual := max(0, len(filtered_error_descs) - MAX_SHOWN_INSERTION_ERRORS):
+        err_msg += f". (Note: {num_residual} further errors omitted.)"
+
+    err_msg += (
+        " (Full API error in '<this-exception>.__cause__.error_descriptors'"
+        f": ignore '{DOCUMENT_ALREADY_EXISTS_API_ERROR_CODE}'.)"
+    )
+    return err_msg
+
+
 class AstraDBVectorStore(VectorStore):
     """AstraDB vector store integration.
 
@@ -1064,36 +1096,7 @@ class AstraDBVectorStore(VectorStore):
                     if document["_id"] not in inserted_ids_set
                 ]
             else:
-                # Raise a non-astrapy error with a message covering all errors
-                # except the DOCUMENT_ALREADY_EXISTS_API_ERROR_CODE, which this
-                # method can handle (if they were the only error)
-                filtered_error_descs = [
-                    edesc
-                    for edesc in err.error_descriptors
-                    if edesc.error_code != DOCUMENT_ALREADY_EXISTS_API_ERROR_CODE
-                    if edesc.message
-                ]
-                all_err_descs = "; ".join(
-                    edesc.message or ""
-                    for edesc in filtered_error_descs[:MAX_SHOWN_INSERTION_ERRORS]
-                )
-                there_s_more: str
-                if len(filtered_error_descs) > MAX_SHOWN_INSERTION_ERRORS:
-                    num_residual = (
-                        len(filtered_error_descs) - MAX_SHOWN_INSERTION_ERRORS
-                    )
-                    there_s_more = f". (Note: {num_residual} further errors omitted.)"
-                else:
-                    there_s_more = ""
-                original_err_note = (
-                    " (Full API error in '<this-exception>.__cause__.error_descriptors'"
-                    f": ignore '{DOCUMENT_ALREADY_EXISTS_API_ERROR_CODE}'.)"
-                )
-                full_err_message = (
-                    "Cannot insert documents. The Data API returned the "
-                    f"following error(s): {all_err_descs}"
-                    f"{there_s_more}{original_err_note}"
-                )
+                full_err_message = _insertmany_error_message(err)
                 raise ValueError(full_err_message) from err
 
         # if necessary, replace docs for the non-inserted ids
@@ -1223,36 +1226,7 @@ class AstraDBVectorStore(VectorStore):
                     if document["_id"] not in inserted_ids_set
                 ]
             else:
-                # Raise a non-astrapy error with a message covering all errors
-                # except the DOCUMENT_ALREADY_EXISTS_API_ERROR_CODE, which this
-                # method can handle (if they were the only error)
-                filtered_error_descs = [
-                    edesc
-                    for edesc in err.error_descriptors
-                    if edesc.error_code != DOCUMENT_ALREADY_EXISTS_API_ERROR_CODE
-                    if edesc.message
-                ]
-                all_err_descs = "; ".join(
-                    edesc.message or ""
-                    for edesc in filtered_error_descs[:MAX_SHOWN_INSERTION_ERRORS]
-                )
-                there_s_more: str
-                if len(filtered_error_descs) > MAX_SHOWN_INSERTION_ERRORS:
-                    num_residual = (
-                        len(filtered_error_descs) - MAX_SHOWN_INSERTION_ERRORS
-                    )
-                    there_s_more = f". (Note: {num_residual} further errors omitted.)"
-                else:
-                    there_s_more = ""
-                original_err_note = (
-                    " (Full API error in '<this-exception>.__cause__.error_descriptors'"
-                    f": ignore '{DOCUMENT_ALREADY_EXISTS_API_ERROR_CODE}'.)"
-                )
-                full_err_message = (
-                    "Cannot insert documents. The Data API returned the "
-                    f"following error(s): {all_err_descs}"
-                    f"{there_s_more}{original_err_note}"
-                )
+                full_err_message = _insertmany_error_message(err)
                 raise ValueError(full_err_message) from err
 
         # if necessary, replace docs for the non-inserted ids
