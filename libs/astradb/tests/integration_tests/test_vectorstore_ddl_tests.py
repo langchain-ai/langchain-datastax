@@ -13,7 +13,7 @@ import pytest
 from astrapy.authentication import EmbeddingAPIKeyHeaderProvider, StaticTokenProvider
 
 from langchain_astradb.utils.astradb import SetupMode
-from langchain_astradb.vectorstores import AstraDBVectorStore
+from langchain_astradb.vectorstores import AstraDBVectorStore, AstraDBVectorStoreError
 
 from .conftest import (
     EPHEMERAL_CUSTOM_IDX_NAME_D2,
@@ -509,7 +509,7 @@ class TestAstraDBVectorStoreDDLs:
         )
         # More specific messages are provider-specific, such as OpenAI returning:
         # "... Incorrect API key provided: verywrong ..."
-        with pytest.raises(ValueError, match="Embedding Provider returned"):
+        with pytest.raises(AstraDBVectorStoreError, match="verywrong"):
             v_store.add_texts(["Failing"])
 
     @pytest.mark.skipif(
@@ -537,5 +537,5 @@ class TestAstraDBVectorStoreDDLs:
         )
         # More specific messages are provider-specific, such as OpenAI returning:
         # "... Incorrect API key provided: verywrong ..."
-        with pytest.raises(ValueError, match="Embedding Provider returned"):
+        with pytest.raises(AstraDBVectorStoreError, match="verywrong"):
             v_store.add_texts(["Failing"])
