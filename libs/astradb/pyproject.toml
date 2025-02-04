@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "langchain-astradb"
-version = "0.5.2"
+version = "0.5.3"
 description = "An integration package connecting Astra DB and LangChain"
 authors = []
 readme = "README.md"
