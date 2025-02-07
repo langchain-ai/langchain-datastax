@@ -21,7 +21,9 @@ from typing import (
 )
 
 import numpy as np
+from astrapy.constants import Environment
 from astrapy.exceptions import InsertManyException
+from astrapy.info import CollectionVectorServiceOptions
 from langchain_community.vectorstores.utils import maximal_marginal_relevance
 from langchain_core.runnables.utils import gather_with_concurrency
 from langchain_core.vectorstores import VectorStore
@@ -54,7 +56,6 @@ if TYPE_CHECKING:
     from astrapy.db import (
         AsyncAstraDB as AsyncAstraDBClient,
     )
-    from astrapy.info import CollectionVectorServiceOptions
     from astrapy.results import UpdateResult
     from langchain_core.documents import Document
     from langchain_core.embeddings import Embeddings
@@ -67,6 +68,8 @@ DocDict = Dict[str, Any]  # dicts expressing entries to insert
 DEFAULT_INDEXING_OPTIONS = {"allow": ["metadata"]}
 # error code to check for during bulk insertions
 DOCUMENT_ALREADY_EXISTS_API_ERROR_CODE = "DOCUMENT_ALREADY_EXISTS"
+# max number of errors shown in full insertion error messages
+MAX_SHOWN_INSERTION_ERRORS = 8
 
 logger = logging.getLogger(__name__)
 
@@ -144,6 +147,46 @@ def _validate_autodetect_init_params(
     if am_errors:
         msg = f"Invalid parameters for autodetect mode: {'; '.join(am_errors)}"
         raise ValueError(msg)
+
+
+def _insertmany_error_message(err: InsertManyException) -> str:
+    """Format an astrapy insert exception into an error message.
+
+    This utility prepares a detailed message from an astrapy InsertManyException,
+    to be used in raising an exception within a vectorstore multiple insertion.
+
+    This operation must filter out duplicate-id specific errors
+    (which the vector store could actually handle, if they were the only ondes).
+    """
+    err_msg = "Cannot insert documents. The Data API returned the following error(s): "
+
+    filtered_error_descs = [
+        edesc
+        for edesc in err.error_descriptors
+        if edesc.error_code != DOCUMENT_ALREADY_EXISTS_API_ERROR_CODE
+        if edesc.message
+    ]
+    err_msg += "; ".join(
+        edesc.message or ""
+        for edesc in filtered_error_descs[:MAX_SHOWN_INSERTION_ERRORS]
+    )
+
+    if (num_residual := len(filtered_error_descs) - MAX_SHOWN_INSERTION_ERRORS) > 0:
+        err_msg += f". (Note: {num_residual} further errors omitted.)"
+
+    err_msg += (
+        " (Full API error in '<this-exception>.__cause__.error_descriptors'"
+        f": ignore '{DOCUMENT_ALREADY_EXISTS_API_ERROR_CODE}'.)"
+    )
+    return err_msg
+
+
+class AstraDBVectorStoreError(Exception):
+    """An exception during vector-store activities.
+
+    This exception represents any operational exception occurring while
+    performing an action within an AstraDBVectorStore.
+    """
 
 
 class AstraDBVectorStore(VectorStore):
@@ -723,6 +766,83 @@ class AstraDBVectorStore(VectorStore):
         # so here the final score transformation is not reversing the interval.
         return lambda score: score
 
+    def copy(
+        self,
+        *,
+        token: str | TokenProvider | None = None,
+        ext_callers: list[tuple[str | None, str | None] | str | None] | None = None,
+        component_name: str | None = None,
+        collection_embedding_api_key: str | EmbeddingHeadersProvider | None = None,
+    ) -> AstraDBVectorStore:
+        """Create a copy, possibly with changed attributes.
+
+        This method creates a shallow copy of this environment. If a parameter
+        is passed and differs from None, it will replace the corresponding value
+        in the copy.
+
+        The method allows changing only the parameters that ensure the copy is
+        functional and does not trigger side-effects:
+        for example, one cannot create a copy acting on a new collection.
+        In those cases, one should create a new instance of ``AstraDBVectorStore``
+        from scratch.
+
+        Attributes:
+            token: API token for Astra DB usage, either in the form of a string
+                or a subclass of ``astrapy.authentication.TokenProvider``.
+                In order to suppress token usage in the copy, explicitly pass
+                ``astrapy.authentication.StaticTokenProvider(None)``.
+            ext_callers: additional custom (caller_name, caller_version) pairs
+                to attach to the User-Agent header when issuing Data API requests.
+            component_name: a value for the LangChain component name to use when
+                identifying the originator of the Data API requests.
+            collection_embedding_api_key: the API Key to supply in each Data API
+                request if necessary. This is necessary if using the Vectorize
+                feature and no secret is stored with the database.
+                In order to suppress the API Key in the copy, explicitly pass
+                ``astrapy.authentication.EmbeddingAPIKeyHeaderProvider(None)``.
+        """
+        copy = AstraDBVectorStore(
+            collection_name="moot",
+            api_endpoint="http://moot",
+            environment=Environment.OTHER,
+            namespace="moot",
+            setup_mode=SetupMode.OFF,
+            collection_vector_service_options=CollectionVectorServiceOptions(
+                provider="moot",
+                model_name="moot",
+            ),
+        )
+        copy.collection_name = self.collection_name
+        copy.token = self.token if token is None else token
+        copy.api_endpoint = self.api_endpoint
+        copy.environment = self.environment
+        copy.namespace = self.namespace
+        copy.indexing_policy = self.indexing_policy
+        copy.autodetect_collection = self.autodetect_collection
+        copy.embedding_dimension = self.embedding_dimension
+        copy.embedding = self.embedding
+        copy.metric = self.metric
+        copy.collection_embedding_api_key = (
+            self.collection_embedding_api_key
+            if collection_embedding_api_key is None
+            else collection_embedding_api_key
+        )
+        copy.collection_vector_service_options = self.collection_vector_service_options
+        copy.document_codec = self.document_codec
+        copy.batch_size = self.batch_size
+        copy.bulk_insert_batch_concurrency = self.bulk_insert_batch_concurrency
+        copy.bulk_insert_overwrite_concurrency = self.bulk_insert_overwrite_concurrency
+        copy.bulk_delete_concurrency = self.bulk_delete_concurrency
+        # Now the .astra_env attribute:
+        copy.astra_env = self.astra_env.copy(
+            token=token,
+            ext_callers=ext_callers,
+            component_name=component_name,
+            collection_embedding_api_key=collection_embedding_api_key,
+        )
+
+        return copy
+
     def clear(self) -> None:
         """Empty the collection of all its stored entries."""
         self.astra_env.ensure_db_setup()
@@ -955,7 +1075,7 @@ class AstraDBVectorStore(VectorStore):
     ) -> tuple[list[str], list[DocDict]]:
         if "status" not in insert_result:
             msg = f"API Exception while running bulk insertion: {insert_result}"
-            raise ValueError(msg)
+            raise AstraDBVectorStoreError(msg)
         batch_inserted = insert_result["status"]["insertedIds"]
         # estimation of the preexisting documents that failed
         missed_inserted_ids = {document["_id"] for document in document_batch} - set(
@@ -969,7 +1089,7 @@ class AstraDBVectorStore(VectorStore):
         )
         if num_errors != len(missed_inserted_ids) or unexpected_errors:
             msg = f"API Exception while running bulk insertion: {errors}"
-            raise ValueError(msg)
+            raise AstraDBVectorStoreError(msg)
         # deal with the missing insertions as upserts
         missing_from_batch = [
             document
@@ -1062,7 +1182,8 @@ class AstraDBVectorStore(VectorStore):
                     if document["_id"] not in inserted_ids_set
                 ]
             else:
-                raise
+                full_err_message = _insertmany_error_message(err)
+                raise AstraDBVectorStoreError(full_err_message) from err
 
         # if necessary, replace docs for the non-inserted ids
         if ids_to_replace:
@@ -1102,7 +1223,7 @@ class AstraDBVectorStore(VectorStore):
                     "AstraDBVectorStore.add_texts could not insert all requested "
                     f"documents ({missing} failed replace_one calls)"
                 )
-                raise ValueError(msg)
+                raise AstraDBVectorStoreError(msg)
         return inserted_ids
 
     @override
@@ -1191,7 +1312,8 @@ class AstraDBVectorStore(VectorStore):
                     if document["_id"] not in inserted_ids_set
                 ]
             else:
-                raise
+                full_err_message = _insertmany_error_message(err)
+                raise AstraDBVectorStoreError(full_err_message) from err
 
         # if necessary, replace docs for the non-inserted ids
         if ids_to_replace:
@@ -1232,7 +1354,7 @@ class AstraDBVectorStore(VectorStore):
                     "AstraDBVectorStore.add_texts could not insert all requested "
                     f"documents ({missing} failed replace_one calls)"
                 )
-                raise ValueError(msg)
+                raise AstraDBVectorStoreError(msg)
         return inserted_ids
 
     def update_metadata(
@@ -1919,7 +2041,7 @@ class AstraDBVectorStore(VectorStore):
         sort_vector = await async_cursor.get_sort_vector()
         if sort_vector is None:
             msg = "Unable to retrieve the server-side embedding of the query."
-            raise ValueError(msg)
+            raise AstraDBVectorStoreError(msg)
         query_embedding = sort_vector
 
         return (
@@ -1959,7 +2081,7 @@ class AstraDBVectorStore(VectorStore):
         sort_vector = cursor.get_sort_vector()
         if sort_vector is None:
             msg = "Unable to retrieve the server-side embedding of the query."
-            raise ValueError(msg)
+            raise AstraDBVectorStoreError(msg)
         query_embedding = sort_vector
 
         return (

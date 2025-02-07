@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import math
 import os
@@ -9,10 +10,10 @@ import random
 from typing import TYPE_CHECKING, Any
 
 import pytest
-from astrapy.authentication import StaticTokenProvider
+from astrapy.authentication import EmbeddingAPIKeyHeaderProvider, StaticTokenProvider
 from langchain_core.documents import Document
 
-from langchain_astradb.utils.astradb import SetupMode
+from langchain_astradb.utils.astradb import COMPONENT_NAME_VECTORSTORE, SetupMode
 from langchain_astradb.vectorstores import AstraDBVectorStore
 
 from .conftest import (
@@ -371,7 +372,9 @@ class TestAstraDBVectorStore:
         request: pytest.FixtureRequest,
     ) -> None:
         """from_texts methods and the associated warnings, async version."""
-        collection: Collection = request.getfixturevalue(collection_fixture_name)
+        collection: Collection = await asyncio.to_thread(
+            request.getfixturevalue, collection_fixture_name
+        )
         init_kwargs: dict[str, Any]
         if is_vectorize:
             init_kwargs = {
@@ -481,7 +484,9 @@ class TestAstraDBVectorStore:
         from_documents, esp. the various handling of ID-in-doc vs external.
         Async version.
         """
-        collection: Collection = request.getfixturevalue(collection_fixture_name)
+        collection: Collection = await asyncio.to_thread(
+            request.getfixturevalue, collection_fixture_name
+        )
         pc1, pc2 = page_contents
         init_kwargs: dict[str, Any]
         if is_vectorize:
@@ -509,7 +514,7 @@ class TestAstraDBVectorStore:
         assert len(hits) == 1
         assert hits[0].page_content == pc2
         assert hits[0].metadata == {"m": 3}
-        v_store.clear()
+        await v_store.aclear()
 
         # IDs passed separately.
         with pytest.warns(DeprecationWarning) as rec_warnings:
@@ -536,7 +541,7 @@ class TestAstraDBVectorStore:
         assert hits[0].page_content == pc2
         assert hits[0].metadata == {"m": 3}
         assert hits[0].id == "idx3"
-        v_store_2.clear()
+        await v_store_2.aclear()
 
         # IDs in documents.
         v_store_3 = await AstraDBVectorStore.afrom_documents(
@@ -557,7 +562,7 @@ class TestAstraDBVectorStore:
         assert hits[0].page_content == pc2
         assert hits[0].metadata == {"m": 3}
         assert hits[0].id == "idx3"
-        v_store_3.clear()
+        await v_store_3.aclear()
 
         # IDs both in documents and aside.
         with pytest.warns(DeprecationWarning) as rec_warnings:
@@ -692,7 +697,9 @@ class TestAstraDBVectorStore:
         request: pytest.FixtureRequest,
     ) -> None:
         """Add/delete/update behaviour, async version."""
-        vstore: AstraDBVectorStore = request.getfixturevalue(vector_store)
+        vstore: AstraDBVectorStore = await asyncio.to_thread(
+            request.getfixturevalue, vector_store
+        )
 
         res0 = await vstore.asimilarity_search("[-1,-1]", k=2)
         assert res0 == []
@@ -1242,13 +1249,15 @@ class TestAstraDBVectorStore:
         metadata_documents: list[Document],
     ) -> None:
         """Metadata Search"""
-        vstore: AstraDBVectorStore = request.getfixturevalue(vector_store)
+        vstore: AstraDBVectorStore = await asyncio.to_thread(
+            request.getfixturevalue, vector_store
+        )
         await vstore.aadd_documents(metadata_documents)
         # no filters
         res0 = await vstore.ametadata_search(filter={}, n=10)
         assert {doc.metadata["letter"] for doc in res0} == set("qwreio")
         # single filter
-        res1 = vstore.metadata_search(
+        res1 = await vstore.ametadata_search(
             n=10,
             filter={"group": "vowel"},
         )
@@ -1313,7 +1322,9 @@ class TestAstraDBVectorStore:
         metadata_documents: list[Document],
     ) -> None:
         """Get by document_id"""
-        vstore: AstraDBVectorStore = request.getfixturevalue(vector_store)
+        vstore: AstraDBVectorStore = await asyncio.to_thread(
+            request.getfixturevalue, vector_store
+        )
         await vstore.aadd_documents(metadata_documents)
         # invalid id
         invalid = await vstore.aget_by_document_id(document_id="z")
@@ -1398,7 +1409,9 @@ class TestAstraDBVectorStore:
         request: pytest.FixtureRequest,
     ) -> None:
         """Scale of the similarity scores, async version."""
-        vstore: AstraDBVectorStore = request.getfixturevalue(vector_store)
+        vstore: AstraDBVectorStore = await asyncio.to_thread(
+            request.getfixturevalue, vector_store
+        )
         await vstore.aadd_texts(
             texts=texts,
             ids=["near", "far"],
@@ -1432,7 +1445,9 @@ class TestAstraDBVectorStore:
         """asimilarity_search_with_embedding is used as the building
         block for other components (like AstraDBGraphVectorStore).
         """
-        vstore: AstraDBVectorStore = request.getfixturevalue(vector_store)
+        vstore: AstraDBVectorStore = await asyncio.to_thread(
+            request.getfixturevalue, vector_store
+        )
         await vstore.aadd_documents(metadata_documents)
 
         query_embedding, results = await vstore.asimilarity_search_with_embedding(
@@ -1465,7 +1480,9 @@ class TestAstraDBVectorStore:
         """asimilarity_search_with_embedding_by_vector is used as the building
         block for other components (like AstraDBGraphVectorStore).
         """
-        vstore: AstraDBVectorStore = request.getfixturevalue(vector_store)
+        vstore: AstraDBVectorStore = await asyncio.to_thread(
+            request.getfixturevalue, vector_store
+        )
         await vstore.aadd_documents(metadata_documents)
 
         vector_dimensions = 1536 if is_vectorize else 2
@@ -1748,7 +1765,7 @@ class TestAstraDBVectorStore:
         Expect a deprecation warning from passing a (core) AstraDB class,
         but it must work. Async version.
         """
-        vector_store_d2.add_texts(["[1,2]"])
+        await vector_store_d2.aadd_texts(["[1,2]"])
 
         with pytest.warns(DeprecationWarning) as rec_warnings:
             v_store_init_core = AstraDBVectorStore(
@@ -1767,3 +1784,47 @@ class TestAstraDBVectorStore:
         assert len(f_rec_warnings) == 1
         assert len(results) == 1
         assert results[0].page_content == "[1,2]"
+
+    @pytest.mark.parametrize(
+        "vector_store",
+        [
+            "vector_store_d2",
+            "vector_store_vz",
+        ],
+        ids=["nonvectorize_store", "vectorize_store"],
+    )
+    def test_astradb_vectorstore_copy(
+        self,
+        *,
+        vector_store: str,
+        request: pytest.FixtureRequest,
+    ) -> None:
+        """Verify changed attributes in 'copy', down in the astra_env of the store."""
+        vstore0: AstraDBVectorStore = request.getfixturevalue(vector_store)
+
+        # component_name, deep test
+        # Note this line encodes assumptions on astrapy internals that will fail on 2.0:
+        caller_names0 = {caller[0] for caller in vstore0.astra_env.collection.callers}
+        assert COMPONENT_NAME_VECTORSTORE in caller_names0
+
+        vstore1 = vstore0.copy(component_name="xyz_component")
+
+        # Note this line encodes assumptions on astrapy internals that will fail on 2.0:
+        caller_names1 = {caller[0] for caller in vstore1.astra_env.collection.callers}
+        assert COMPONENT_NAME_VECTORSTORE not in caller_names1
+        assert "xyz_component" in caller_names1
+
+        # other changeable attributes (this check does not enter astrapy at all)
+        token2 = StaticTokenProvider("xyz")
+        apikey2 = EmbeddingAPIKeyHeaderProvider(None)
+        vstore2 = vstore0.copy(
+            token=token2,
+            ext_callers=[("cnx", "cvx")],
+            component_name="component_name2",
+            collection_embedding_api_key=apikey2,
+        )
+
+        assert vstore2.astra_env.token == token2
+        assert vstore2.astra_env.ext_callers == [("cnx", "cvx")]
+        assert vstore2.astra_env.component_name == "component_name2"
+        assert vstore2.astra_env.collection_embedding_api_key == apikey2

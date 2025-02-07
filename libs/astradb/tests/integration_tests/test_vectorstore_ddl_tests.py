@@ -5,15 +5,15 @@ Refer to `test_vectorstores.py` for the requirements to run.
 
 from __future__ import annotations
 
+import asyncio
 import warnings
 from typing import TYPE_CHECKING
 
 import pytest
 from astrapy.authentication import EmbeddingAPIKeyHeaderProvider, StaticTokenProvider
-from astrapy.exceptions import InsertManyException
 
 from langchain_astradb.utils.astradb import SetupMode
-from langchain_astradb.vectorstores import AstraDBVectorStore
+from langchain_astradb.vectorstores import AstraDBVectorStore, AstraDBVectorStoreError
 
 from .conftest import (
     EPHEMERAL_CUSTOM_IDX_NAME_D2,
@@ -96,10 +96,13 @@ class TestAstraDBVectorStoreDDLs:
             namespace=astra_db_credentials["namespace"],
             environment=astra_db_credentials["environment"],
             metric="cosine",
+            setup_mode=SetupMode.ASYNC,
         )
         await v_store.aadd_texts(["[1,2]"])
         await v_store.adelete_collection()
-        assert ephemeral_collection_cleaner_d2 not in database.list_collection_names()
+        assert ephemeral_collection_cleaner_d2 not in await asyncio.to_thread(
+            database.list_collection_names
+        )
 
     async def test_astradb_vectorstore_create_delete_vectorize_async(
         self,
@@ -118,10 +121,13 @@ class TestAstraDBVectorStoreDDLs:
             metric="cosine",
             collection_vector_service_options=OPENAI_VECTORIZE_OPTIONS_HEADER,
             collection_embedding_api_key=openai_api_key,
+            setup_mode=SetupMode.ASYNC,
         )
         await v_store.aadd_texts(["[1,2]"])
         await v_store.adelete_collection()
-        assert ephemeral_collection_cleaner_vz not in database.list_collection_names()
+        assert ephemeral_collection_cleaner_vz not in await asyncio.to_thread(
+            database.list_collection_names
+        )
 
     def test_astradb_vectorstore_pre_delete_collection_sync(
         self,
@@ -340,7 +346,7 @@ class TestAstraDBVectorStoreDDLs:
         Test of the vector store behaviour for various indexing settings,
         with an existing 'legacy' collection (i.e. unspecified indexing policy).
         """
-        database.create_collection(
+        await database.to_async().create_collection(
             EPHEMERAL_LEGACY_IDX_NAME_D2,
             dimension=2,
             check_exists=False,
@@ -503,7 +509,7 @@ class TestAstraDBVectorStoreDDLs:
         )
         # More specific messages are provider-specific, such as OpenAI returning:
         # "... Incorrect API key provided: verywrong ..."
-        with pytest.raises(InsertManyException, match="Embedding Provider returned"):
+        with pytest.raises(AstraDBVectorStoreError, match="verywrong"):
             v_store.add_texts(["Failing"])
 
     @pytest.mark.skipif(
@@ -531,5 +537,5 @@ class TestAstraDBVectorStoreDDLs:
         )
         # More specific messages are provider-specific, such as OpenAI returning:
         # "... Incorrect API key provided: verywrong ..."
-        with pytest.raises(InsertManyException, match="Embedding Provider returned"):
+        with pytest.raises(AstraDBVectorStoreError, match="verywrong"):
             v_store.add_texts(["Failing"])

@@ -1255,7 +1255,7 @@ class AstraDBGraphVectorStore(GraphVectorStore):
                 await asyncio.gather(*visit_node_tasks)
 
         # Start the traversal
-        initial_docs = self.vector_store.similarity_search(
+        initial_docs = await self.vector_store.asimilarity_search(
             query=query,
             k=k,
             filter=filter,

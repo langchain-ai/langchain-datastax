@@ -283,18 +283,20 @@ class _AstraDBEnvironment:
         # - a single ("langchain", <version of langchain_core>)
         # - if such is provided, a (component_name, <version of langchain_astradb>)
         #   (note: if component_name is None, astrapy strips it out automatically)
+        self.ext_callers = ext_callers
+        self.component_name = component_name
         norm_ext_callers = [
             cpair
             for cpair in (
                 _raw_caller if isinstance(_raw_caller, tuple) else (_raw_caller, None)
-                for _raw_caller in (ext_callers or [])
+                for _raw_caller in (self.ext_callers or [])
             )
             if cpair[0] is not None or cpair[1] is not None
         ]
         full_callers = [
             *norm_ext_callers,
             LC_CORE_CALLER,
-            (component_name, LC_ASTRADB_VERSION),
+            (self.component_name, LC_ASTRADB_VERSION),
         ]
 
         # create the callers
@@ -343,9 +345,10 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
             async_astra_db_client=async_astra_db_client,
         )
         self.collection_name = collection_name
+        self.collection_embedding_api_key = collection_embedding_api_key
         self.collection = self.database.get_collection(
             name=self.collection_name,
-            embedding_api_key=collection_embedding_api_key,
+            embedding_api_key=self.collection_embedding_api_key,
         )
         self.async_collection = self.collection.to_async()
 
@@ -395,6 +398,57 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
                 except ValueError as validation_error:
                     raise validation_error from data_api_exception
 
+    def copy(
+        self,
+        *,
+        token: str | TokenProvider | None = None,
+        ext_callers: list[tuple[str | None, str | None] | str | None] | None = None,
+        component_name: str | None = None,
+        collection_embedding_api_key: str | EmbeddingHeadersProvider | None = None,
+    ) -> _AstraDBCollectionEnvironment:
+        """Create a copy, possibly with changed attributes.
+
+        This method creates a shallow copy of this environment. If a parameter
+        is passed and differs from None, it will replace the corresponding value
+        in the copy.
+
+        The method allows changing only the parameters that ensure the copy is
+        functional and does not trigger side-effects:
+        for example, one cannot create a copy acting on a new collection.
+        In those cases, one should create a new instance
+        of ``_AstraDBCollectionEnvironment`` from scratch.
+
+        Attributes:
+            token: API token for Astra DB usage, either in the form of a string
+                or a subclass of ``astrapy.authentication.TokenProvider``.
+                In order to suppress token usage in the copy, explicitly pass
+                ``astrapy.authentication.StaticTokenProvider(None)``.
+            ext_callers: additional custom (caller_name, caller_version) pairs
+                to attach to the User-Agent header when issuing Data API requests.
+            component_name: a value for the LangChain component name to use when
+                identifying the originator of the Data API requests.
+            collection_embedding_api_key: the API Key to supply in each Data API
+                request if necessary. This is necessary if using the Vectorize
+                feature and no secret is stored with the database.
+                In order to suppress the API Key in the copy, explicitly pass
+                ``astrapy.authentication.EmbeddingAPIKeyHeaderProvider(None)``.
+        """
+        return _AstraDBCollectionEnvironment(
+            collection_name=self.collection_name,
+            token=self.token if token is None else token,
+            api_endpoint=self.api_endpoint,
+            keyspace=self.keyspace,
+            environment=self.environment,
+            ext_callers=self.ext_callers if ext_callers is None else ext_callers,
+            component_name=self.component_name
+            if component_name is None
+            else component_name,
+            setup_mode=SetupMode.OFF,
+            collection_embedding_api_key=self.collection_embedding_api_key
+            if collection_embedding_api_key
+            else collection_embedding_api_key,
+        )
+
     async def _asetup_db(
         self,
         *,
@@ -425,9 +479,9 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
         except DataAPIException as data_api_exception:
             # possibly the collection is preexisting and may have legacy,
             # or custom, indexing settings: verify
-            collection_descriptors = [
-                coll_desc async for coll_desc in self.async_database.list_collections()
-            ]
+            collection_descriptors = list(
+                await asyncio.to_thread(self.database.list_collections)
+            )
             try:
                 if not self._validate_indexing_policy(
                     collection_descriptors=collection_descriptors,
