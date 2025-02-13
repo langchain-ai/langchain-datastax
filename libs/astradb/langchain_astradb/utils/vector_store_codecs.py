@@ -16,11 +16,21 @@ VECTOR_REQUIRED_PREAMBLE_MSG = (
 )
 FLATTEN_CONFLICT_MSG = "Cannot flatten metadata: field name overlap for '{field}'."
 
+STANDARD_INDEXING_OPTIONS_DEFAULT = {"allow": ["metadata"]}
+
 logger = logging.getLogger(__name__)
 
 
 def _default_decode_vector(astra_doc: dict[str, Any]) -> list[float] | None:
     return astra_doc.get("$vector")
+
+
+def _default_metadata_key_to_field_identifier(md_key: str) -> str:
+    return f"metadata.{md_key}"
+
+
+def _flat_metadata_key_to_field_identifier(md_key: str) -> str:
+    return md_key
 
 
 def _default_encode_filter(filter_dict: dict[str, Any]) -> dict[str, Any]:
@@ -37,13 +47,19 @@ def _default_encode_filter(filter_dict: dict[str, Any]) -> dict[str, Any]:
                 # assume each list item can be fed back to this function
                 metadata_filter[k] = _default_encode_filter(v)  # type: ignore[assignment]
         else:
-            metadata_filter[f"metadata.{k}"] = v
+            metadata_filter[_default_metadata_key_to_field_identifier(k)] = v
 
     return metadata_filter
 
 
 def _default_encode_id(filter_id: str) -> dict[str, Any]:
     return {"_id": filter_id}
+
+
+def _default_encode_ids(filter_ids: list[str]) -> dict[str, Any]:
+    if len(filter_ids) == 1:
+        return _default_encode_id(filter_ids[0])
+    return {"_id": {"$in": filter_ids}}
 
 
 def _default_encode_vector_sort(vector: list[float]) -> dict[str, Any]:
@@ -132,6 +148,25 @@ class _AstraDBVectorStoreDocumentCodec(ABC):
         """
 
     @abstractmethod
+    def metadata_key_to_field_identifier(self, md_key: str) -> str:
+        """Express an 'abstract' metadata key as a full Data API field identifier."""
+
+    @property
+    @abstractmethod
+    def default_collection_indexing_policy(self) -> dict[str, list[str]]:
+        """Provide the default indexing policy if the collection must be created."""
+
+    def get_id(self, astra_document: dict[str, Any]) -> str:
+        """Return the ID of an encoded document (= a raw JSON read from DB)."""
+        return astra_document["_id"]
+
+    def get_similarity(self, astra_document: dict[str, Any]) -> float:
+        """Return the similarity of an encoded document (= a raw JSON read from DB).
+
+        This method assumes its argument comes from a suitable vector search.
+        """
+        return astra_document["$similarity"]
+
     def encode_id(self, filter_id: str) -> dict[str, Any]:
         """Encode an ID as a filter for use in Astra DB queries.
 
@@ -139,10 +174,23 @@ class _AstraDBVectorStoreDocumentCodec(ABC):
             filter_id: the ID value to filter on.
 
         Returns:
-            an filter clause for use in Astra DB's find queries.
+            a filter clause for use in Astra DB's find queries.
         """
+        return _default_encode_id(filter_id)
 
-    @abstractmethod
+    def encode_ids(self, filter_ids: list[str]) -> dict[str, Any]:
+        """Encode a list of IDs as an appropriate search filter.
+
+        The resulting filter expresses condition: "document ID is among filter_ids".
+
+        Args:
+            filter_ids: the ID values to filter on.
+
+        Returns:
+            a filter clause for use in Astra DB's find queries.
+        """
+        return _default_encode_ids(filter_ids)
+
     def encode_vector_sort(self, vector: list[float]) -> dict[str, Any]:
         """Encode a vector as a sort to use for Astra DB queries.
 
@@ -152,6 +200,7 @@ class _AstraDBVectorStoreDocumentCodec(ABC):
         Returns:
             an order clause for use in Astra DB's find queries.
         """
+        return _default_encode_vector_sort(vector)
 
 
 class _DefaultVSDocumentCodec(_AstraDBVectorStoreDocumentCodec):
@@ -226,12 +275,12 @@ class _DefaultVSDocumentCodec(_AstraDBVectorStoreDocumentCodec):
         return _default_encode_filter(filter_dict)
 
     @override
-    def encode_id(self, filter_id: str) -> dict[str, Any]:
-        return _default_encode_id(filter_id)
+    def metadata_key_to_field_identifier(self, md_key: str) -> str:
+        return _default_metadata_key_to_field_identifier(md_key)
 
-    @override
-    def encode_vector_sort(self, vector: list[float]) -> dict[str, Any]:
-        return _default_encode_vector_sort(vector)
+    @property
+    def default_collection_indexing_policy(self) -> dict[str, list[str]]:
+        return STANDARD_INDEXING_OPTIONS_DEFAULT
 
 
 class _DefaultVectorizeVSDocumentCodec(_AstraDBVectorStoreDocumentCodec):
@@ -308,13 +357,13 @@ class _DefaultVectorizeVSDocumentCodec(_AstraDBVectorStoreDocumentCodec):
     def encode_filter(self, filter_dict: dict[str, Any]) -> dict[str, Any]:
         return _default_encode_filter(filter_dict)
 
-    @override
-    def encode_id(self, filter_id: str) -> dict[str, Any]:
-        return _default_encode_id(filter_id)
+    @property
+    def default_collection_indexing_policy(self) -> dict[str, list[str]]:
+        return STANDARD_INDEXING_OPTIONS_DEFAULT
 
     @override
-    def encode_vector_sort(self, vector: list[float]) -> dict[str, Any]:
-        return _default_encode_vector_sort(vector)
+    def metadata_key_to_field_identifier(self, md_key: str) -> str:
+        return _default_metadata_key_to_field_identifier(md_key)
 
 
 class _FlatVSDocumentCodec(_AstraDBVectorStoreDocumentCodec):
@@ -396,13 +445,13 @@ class _FlatVSDocumentCodec(_AstraDBVectorStoreDocumentCodec):
     def encode_filter(self, filter_dict: dict[str, Any]) -> dict[str, Any]:
         return filter_dict
 
-    @override
-    def encode_id(self, filter_id: str) -> dict[str, Any]:
-        return _default_encode_id(filter_id)
+    @property
+    def default_collection_indexing_policy(self) -> dict[str, list[str]]:
+        return {"deny": [self.content_field]}
 
     @override
-    def encode_vector_sort(self, vector: list[float]) -> dict[str, Any]:
-        return _default_encode_vector_sort(vector)
+    def metadata_key_to_field_identifier(self, md_key: str) -> str:
+        return _flat_metadata_key_to_field_identifier(md_key)
 
 
 class _FlatVectorizeVSDocumentCodec(_AstraDBVectorStoreDocumentCodec):
@@ -477,10 +526,11 @@ class _FlatVectorizeVSDocumentCodec(_AstraDBVectorStoreDocumentCodec):
     def encode_filter(self, filter_dict: dict[str, Any]) -> dict[str, Any]:
         return filter_dict
 
-    @override
-    def encode_id(self, filter_id: str) -> dict[str, Any]:
-        return _default_encode_id(filter_id)
+    @property
+    def default_collection_indexing_policy(self) -> dict[str, list[str]]:
+        # $vectorize cannot be de-indexed explicitly (the API manages it entirely).
+        return {}
 
     @override
-    def encode_vector_sort(self, vector: list[float]) -> dict[str, Any]:
-        return _default_encode_vector_sort(vector)
+    def metadata_key_to_field_identifier(self, md_key: str) -> str:
+        return _flat_metadata_key_to_field_identifier(md_key)

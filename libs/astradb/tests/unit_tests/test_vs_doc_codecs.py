@@ -365,3 +365,20 @@ class TestVSDocCodecs:
         """Test vector-sort-encoding for flat, vectorize."""
         codec = _FlatVectorizeVSDocumentCodec(ignore_invalid_documents=False)
         assert codec.encode_vector_sort(VECTOR) == VECTOR_SORT
+
+    def test_codec_default_collection_indexing_policy(self) -> None:
+        """Test all codecs give their expected default indexing settings back."""
+        codec_d_n = _DefaultVSDocumentCodec(
+            content_field="content_x",
+            ignore_invalid_documents=False,
+        )
+        assert codec_d_n.default_collection_indexing_policy == {"allow": ["metadata"]}
+        codec_d_v = _DefaultVectorizeVSDocumentCodec(ignore_invalid_documents=True)
+        assert codec_d_v.default_collection_indexing_policy == {"allow": ["metadata"]}
+        codec_f_n = _FlatVSDocumentCodec(
+            content_field="content_x",
+            ignore_invalid_documents=False,
+        )
+        assert codec_f_n.default_collection_indexing_policy == {"deny": ["content_x"]}
+        codec_f_v = _FlatVectorizeVSDocumentCodec(ignore_invalid_documents=True)
+        assert codec_f_v.default_collection_indexing_policy == {}
