@@ -46,6 +46,12 @@ def _default_encode_id(filter_id: str) -> dict[str, Any]:
     return {"_id": filter_id}
 
 
+def _default_encode_ids(filter_ids: list[str]) -> dict[str, Any]:
+    if len(filter_ids) == 1:
+        return _default_encode_id(filter_ids[0])
+    return {"_id": {"$in": filter_ids}}
+
+
 def _default_encode_vector_sort(vector: list[float]) -> dict[str, Any]:
     return {"$vector": vector}
 
@@ -131,7 +137,6 @@ class _AstraDBVectorStoreDocumentCodec(ABC):
             an equivalent filter clause for use in Astra DB's find queries.
         """
 
-    @abstractmethod
     def encode_id(self, filter_id: str) -> dict[str, Any]:
         """Encode an ID as a filter for use in Astra DB queries.
 
@@ -139,10 +144,23 @@ class _AstraDBVectorStoreDocumentCodec(ABC):
             filter_id: the ID value to filter on.
 
         Returns:
-            an filter clause for use in Astra DB's find queries.
+            a filter clause for use in Astra DB's find queries.
         """
+        return _default_encode_id(filter_id)
 
-    @abstractmethod
+    def encode_ids(self, filter_ids: list[str]) -> dict[str, Any]:
+        """Encode a list of IDs as an appropriate search filter.
+
+        The resulting filter expresses condition: "document ID is among filter_ids".
+
+        Args:
+            filter_ids: the ID values to filter on.
+
+        Returns:
+            a filter clause for use in Astra DB's find queries.
+        """
+        return _default_encode_ids(filter_ids)
+
     def encode_vector_sort(self, vector: list[float]) -> dict[str, Any]:
         """Encode a vector as a sort to use for Astra DB queries.
 
@@ -152,6 +170,7 @@ class _AstraDBVectorStoreDocumentCodec(ABC):
         Returns:
             an order clause for use in Astra DB's find queries.
         """
+        return _default_encode_vector_sort(vector)
 
 
 class _DefaultVSDocumentCodec(_AstraDBVectorStoreDocumentCodec):
@@ -224,14 +243,6 @@ class _DefaultVSDocumentCodec(_AstraDBVectorStoreDocumentCodec):
     @override
     def encode_filter(self, filter_dict: dict[str, Any]) -> dict[str, Any]:
         return _default_encode_filter(filter_dict)
-
-    @override
-    def encode_id(self, filter_id: str) -> dict[str, Any]:
-        return _default_encode_id(filter_id)
-
-    @override
-    def encode_vector_sort(self, vector: list[float]) -> dict[str, Any]:
-        return _default_encode_vector_sort(vector)
 
 
 class _DefaultVectorizeVSDocumentCodec(_AstraDBVectorStoreDocumentCodec):
@@ -307,14 +318,6 @@ class _DefaultVectorizeVSDocumentCodec(_AstraDBVectorStoreDocumentCodec):
     @override
     def encode_filter(self, filter_dict: dict[str, Any]) -> dict[str, Any]:
         return _default_encode_filter(filter_dict)
-
-    @override
-    def encode_id(self, filter_id: str) -> dict[str, Any]:
-        return _default_encode_id(filter_id)
-
-    @override
-    def encode_vector_sort(self, vector: list[float]) -> dict[str, Any]:
-        return _default_encode_vector_sort(vector)
 
 
 class _FlatVSDocumentCodec(_AstraDBVectorStoreDocumentCodec):
@@ -396,14 +399,6 @@ class _FlatVSDocumentCodec(_AstraDBVectorStoreDocumentCodec):
     def encode_filter(self, filter_dict: dict[str, Any]) -> dict[str, Any]:
         return filter_dict
 
-    @override
-    def encode_id(self, filter_id: str) -> dict[str, Any]:
-        return _default_encode_id(filter_id)
-
-    @override
-    def encode_vector_sort(self, vector: list[float]) -> dict[str, Any]:
-        return _default_encode_vector_sort(vector)
-
 
 class _FlatVectorizeVSDocumentCodec(_AstraDBVectorStoreDocumentCodec):
     """Codec for collections populated externally, with server-side embeddings.
@@ -476,11 +471,3 @@ class _FlatVectorizeVSDocumentCodec(_AstraDBVectorStoreDocumentCodec):
     @override
     def encode_filter(self, filter_dict: dict[str, Any]) -> dict[str, Any]:
         return filter_dict
-
-    @override
-    def encode_id(self, filter_id: str) -> dict[str, Any]:
-        return _default_encode_id(filter_id)
-
-    @override
-    def encode_vector_sort(self, vector: list[float]) -> dict[str, Any]:
-        return _default_encode_vector_sort(vector)

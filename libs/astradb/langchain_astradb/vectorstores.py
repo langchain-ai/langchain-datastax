@@ -654,11 +654,6 @@ class AstraDBVectorStore(VectorStore):
                 msg = f"Collection '{self.collection_name}' not found."
                 raise ValueError(msg)
             # use the collection info to set the store properties
-            self.indexing_policy = self._normalize_metadata_indexing_policy(
-                metadata_indexing_include=None,
-                metadata_indexing_exclude=None,
-                collection_indexing_policy=c_descriptor.options.indexing,
-            )
             if c_descriptor.options.vector is None:
                 msg = "Non-vector collection detected."
                 raise ValueError(msg)
@@ -676,6 +671,11 @@ class AstraDBVectorStore(VectorStore):
                 has_vectorize=has_vectorize,
                 ignore_invalid_documents=ignore_invalid_documents,
                 norm_content_field=norm_content_field,
+            )
+            self.indexing_policy = self._normalize_metadata_indexing_policy(
+                metadata_indexing_include=None,
+                metadata_indexing_exclude=None,
+                collection_indexing_policy=c_descriptor.options.indexing,
             )
 
         # validate embedding/vectorize compatibility and such.
@@ -864,7 +864,9 @@ class AstraDBVectorStore(VectorStore):
         """
         self.astra_env.ensure_db_setup()
         # self.collection is not None (by _ensure_astra_db_client)
-        deletion_response = self.astra_env.collection.delete_one({"_id": document_id})
+        deletion_response = self.astra_env.collection.delete_one(
+            self.document_codec.encode_id(document_id),
+        )
         return deletion_response.deleted_count == 1
 
     async def adelete_by_document_id(self, document_id: str) -> bool:
@@ -878,7 +880,7 @@ class AstraDBVectorStore(VectorStore):
         """
         await self.astra_env.aensure_db_setup()
         deletion_response = await self.astra_env.async_collection.delete_one(
-            {"_id": document_id},
+            self.document_codec.encode_id(document_id),
         )
         return deletion_response.deleted_count == 1
 
@@ -1204,7 +1206,7 @@ class AstraDBVectorStore(VectorStore):
                     document: dict[str, Any],
                 ) -> tuple[UpdateResult, str]:
                     return self.astra_env.collection.replace_one(
-                        {"_id": document["_id"]},
+                        self.document_codec.encode_id(document["_id"]),
                         document,
                     ), document["_id"]
 
@@ -1334,7 +1336,7 @@ class AstraDBVectorStore(VectorStore):
             ) -> tuple[UpdateResult, str]:
                 async with sem:
                     return await _async_collection.replace_one(
-                        {"_id": document["_id"]},
+                        self.document_codec.encode_id(document["_id"]),
                         document,
                     ), document["_id"]
 
@@ -1395,7 +1397,7 @@ class AstraDBVectorStore(VectorStore):
                 document_id, update_metadata = id_md_pair
                 encoded_metadata = self.filter_to_query(update_metadata)
                 return self.astra_env.collection.update_one(
-                    {"_id": document_id},
+                    self.document_codec.encode_id(document_id),
                     {"$set": encoded_metadata},
                 )
 
@@ -1448,7 +1450,7 @@ class AstraDBVectorStore(VectorStore):
             encoded_metadata = self.filter_to_query(update_metadata)
             async with sem:
                 return await _async_collection.update_one(
-                    {"_id": document_id},
+                    self.document_codec.encode_id(document_id),
                     {"$set": encoded_metadata},
                 )
 
@@ -1520,7 +1522,7 @@ class AstraDBVectorStore(VectorStore):
         self.astra_env.ensure_db_setup()
         # self.collection is not None (by _ensure_astra_db_client)
         hit = self.astra_env.collection.find_one(
-            {"_id": document_id},
+            self.document_codec.encode_id(document_id),
             projection=self.document_codec.base_projection,
         )
         if hit is None:
@@ -1539,7 +1541,7 @@ class AstraDBVectorStore(VectorStore):
         await self.astra_env.aensure_db_setup()
         # self.collection is not None (by _ensure_astra_db_client)
         hit = await self.astra_env.async_collection.find_one(
-            {"_id": document_id},
+            self.document_codec.encode_id(document_id),
             projection=self.document_codec.base_projection,
         )
         if hit is None:
