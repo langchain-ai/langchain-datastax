@@ -32,7 +32,10 @@ from astrapy.db import AstraDB
 from astrapy.info import CollectionVectorServiceOptions
 
 from langchain_astradb.utils.astradb import SetupMode
-from langchain_astradb.vectorstores import DEFAULT_INDEXING_OPTIONS, AstraDBVectorStore
+from langchain_astradb.utils.vector_store_codecs import (
+    STANDARD_INDEXING_OPTIONS_DEFAULT,
+)
+from langchain_astradb.vectorstores import AstraDBVectorStore
 from tests.conftest import IdentityLLM, ParserEmbeddings
 
 if TYPE_CHECKING:
@@ -207,7 +210,7 @@ def collection_d2(
         COLLECTION_NAME_D2,
         dimension=2,
         check_exists=False,
-        indexing=DEFAULT_INDEXING_OPTIONS,
+        indexing=STANDARD_INDEXING_OPTIONS_DEFAULT,
         metric="euclidean",
     )
     yield collection
@@ -400,7 +403,7 @@ def collection_vz(
         COLLECTION_NAME_VZ,
         dimension=1536,
         check_exists=False,
-        indexing=DEFAULT_INDEXING_OPTIONS,
+        indexing=STANDARD_INDEXING_OPTIONS_DEFAULT,
         metric="euclidean",
         service=OPENAI_VECTORIZE_OPTIONS_HEADER,
         embedding_api_key=openai_api_key,

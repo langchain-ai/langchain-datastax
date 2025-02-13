@@ -16,11 +16,21 @@ VECTOR_REQUIRED_PREAMBLE_MSG = (
 )
 FLATTEN_CONFLICT_MSG = "Cannot flatten metadata: field name overlap for '{field}'."
 
+STANDARD_INDEXING_OPTIONS_DEFAULT = {"allow": ["metadata"]}
+
 logger = logging.getLogger(__name__)
 
 
 def _default_decode_vector(astra_doc: dict[str, Any]) -> list[float] | None:
     return astra_doc.get("$vector")
+
+
+def _default_metadata_key_to_field_identifier(md_key: str) -> str:
+    return f"metadata.{md_key}"
+
+
+def _flat_metadata_key_to_field_identifier(md_key: str) -> str:
+    return md_key
 
 
 def _default_encode_filter(filter_dict: dict[str, Any]) -> dict[str, Any]:
@@ -37,7 +47,7 @@ def _default_encode_filter(filter_dict: dict[str, Any]) -> dict[str, Any]:
                 # assume each list item can be fed back to this function
                 metadata_filter[k] = _default_encode_filter(v)  # type: ignore[assignment]
         else:
-            metadata_filter[f"metadata.{k}"] = v
+            metadata_filter[_default_metadata_key_to_field_identifier(k)] = v
 
     return metadata_filter
 
@@ -136,6 +146,26 @@ class _AstraDBVectorStoreDocumentCodec(ABC):
         Returns:
             an equivalent filter clause for use in Astra DB's find queries.
         """
+
+    @abstractmethod
+    def metadata_key_to_field_identifier(self, md_key: str) -> str:
+        """Express an 'abstract' metadata key as a full Data API field identifier."""
+
+    @property
+    @abstractmethod
+    def default_collection_indexing_policy(self) -> dict[str, list[str]]:
+        """Provide the default indexing policy if the collection must be created."""
+
+    def get_id(self, astra_document: dict[str, Any]) -> str:
+        """Return the ID of an encoded document (= a raw JSON read from DB)."""
+        return astra_document["_id"]
+
+    def get_similarity(self, astra_document: dict[str, Any]) -> float:
+        """Return the similarity of an encoded document (= a raw JSON read from DB).
+
+        This method assumes its argument comes from a suitable vector search.
+        """
+        return astra_document["$similarity"]
 
     def encode_id(self, filter_id: str) -> dict[str, Any]:
         """Encode an ID as a filter for use in Astra DB queries.
@@ -244,6 +274,14 @@ class _DefaultVSDocumentCodec(_AstraDBVectorStoreDocumentCodec):
     def encode_filter(self, filter_dict: dict[str, Any]) -> dict[str, Any]:
         return _default_encode_filter(filter_dict)
 
+    @override
+    def metadata_key_to_field_identifier(self, md_key: str) -> str:
+        return _default_metadata_key_to_field_identifier(md_key)
+
+    @property
+    def default_collection_indexing_policy(self) -> dict[str, list[str]]:
+        return STANDARD_INDEXING_OPTIONS_DEFAULT
+
 
 class _DefaultVectorizeVSDocumentCodec(_AstraDBVectorStoreDocumentCodec):
     """Codec for the default vector store usage with server-side embeddings.
@@ -318,6 +356,14 @@ class _DefaultVectorizeVSDocumentCodec(_AstraDBVectorStoreDocumentCodec):
     @override
     def encode_filter(self, filter_dict: dict[str, Any]) -> dict[str, Any]:
         return _default_encode_filter(filter_dict)
+
+    @property
+    def default_collection_indexing_policy(self) -> dict[str, list[str]]:
+        return STANDARD_INDEXING_OPTIONS_DEFAULT
+
+    @override
+    def metadata_key_to_field_identifier(self, md_key: str) -> str:
+        return _default_metadata_key_to_field_identifier(md_key)
 
 
 class _FlatVSDocumentCodec(_AstraDBVectorStoreDocumentCodec):
@@ -399,6 +445,14 @@ class _FlatVSDocumentCodec(_AstraDBVectorStoreDocumentCodec):
     def encode_filter(self, filter_dict: dict[str, Any]) -> dict[str, Any]:
         return filter_dict
 
+    @property
+    def default_collection_indexing_policy(self) -> dict[str, list[str]]:
+        return {"deny": [self.content_field]}
+
+    @override
+    def metadata_key_to_field_identifier(self, md_key: str) -> str:
+        return _flat_metadata_key_to_field_identifier(md_key)
+
 
 class _FlatVectorizeVSDocumentCodec(_AstraDBVectorStoreDocumentCodec):
     """Codec for collections populated externally, with server-side embeddings.
@@ -471,3 +525,12 @@ class _FlatVectorizeVSDocumentCodec(_AstraDBVectorStoreDocumentCodec):
     @override
     def encode_filter(self, filter_dict: dict[str, Any]) -> dict[str, Any]:
         return filter_dict
+
+    @property
+    def default_collection_indexing_policy(self) -> dict[str, list[str]]:
+        # $vectorize cannot be de-indexed explicitly (the API manages it entirely).
+        return {}
+
+    @override
+    def metadata_key_to_field_identifier(self, md_key: str) -> str:
+        return _flat_metadata_key_to_field_identifier(md_key)
