@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import warnings
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import Any, Iterable
 
 from langchain_core.documents import Document
 from typing_extensions import override
@@ -167,29 +167,24 @@ class _AstraDBVectorStoreDocumentCodec(ABC):
         """
         return astra_document["$similarity"]
 
-    def encode_id(self, filter_id: str) -> dict[str, Any]:
-        """Encode an ID as a filter for use in Astra DB queries.
+    def encode_query(
+        self,
+        *,
+        ids: Iterable[str] | None = None,
+        filter_dict: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        clauses: list[dict[str, Any]] = []
+        _ids_list = list(ids or [])
+        if _ids_list:
+            clauses.append(_default_encode_ids(_ids_list))
+        if filter_dict:
+            clauses.append(self.encode_filter(filter_dict))
 
-        Args:
-            filter_id: the ID value to filter on.
-
-        Returns:
-            a filter clause for use in Astra DB's find queries.
-        """
-        return _default_encode_id(filter_id)
-
-    def encode_ids(self, filter_ids: list[str]) -> dict[str, Any]:
-        """Encode a list of IDs as an appropriate search filter.
-
-        The resulting filter expresses condition: "document ID is among filter_ids".
-
-        Args:
-            filter_ids: the ID values to filter on.
-
-        Returns:
-            a filter clause for use in Astra DB's find queries.
-        """
-        return _default_encode_ids(filter_ids)
+        if clauses:
+            if len(clauses) > 1:
+                return {"$and": clauses}
+            return clauses[0]
+        return {}
 
     def encode_vector_sort(self, vector: list[float]) -> dict[str, Any]:
         """Encode a vector as a sort to use for Astra DB queries.

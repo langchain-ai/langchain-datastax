@@ -869,7 +869,7 @@ class AstraDBVectorStore(VectorStore):
         self.astra_env.ensure_db_setup()
         # self.collection is not None (by _ensure_astra_db_client)
         deletion_response = self.astra_env.collection.delete_one(
-            self.document_codec.encode_id(document_id),
+            self.document_codec.encode_query(ids=[document_id]),
         )
         return deletion_response.deleted_count == 1
 
@@ -884,7 +884,7 @@ class AstraDBVectorStore(VectorStore):
         """
         await self.astra_env.aensure_db_setup()
         deletion_response = await self.astra_env.async_collection.delete_one(
-            self.document_codec.encode_id(document_id),
+            self.document_codec.encode_query(ids=[document_id]),
         )
         return deletion_response.deleted_count == 1
 
@@ -1183,7 +1183,7 @@ class AstraDBVectorStore(VectorStore):
                 ) -> tuple[UpdateResult, str]:
                     doc_id = self.document_codec.get_id(document)
                     return self.astra_env.collection.replace_one(
-                        self.document_codec.encode_id(doc_id),
+                        self.document_codec.encode_query(ids=[doc_id]),
                         document,
                     ), doc_id
 
@@ -1315,7 +1315,7 @@ class AstraDBVectorStore(VectorStore):
                 async with sem:
                     doc_id = self.document_codec.get_id(document)
                     return await _async_collection.replace_one(
-                        self.document_codec.encode_id(doc_id),
+                        self.document_codec.encode_query(ids=[doc_id]),
                         document,
                     ), doc_id
 
@@ -1376,7 +1376,7 @@ class AstraDBVectorStore(VectorStore):
                 document_id, update_metadata = id_md_pair
                 encoded_metadata = self.filter_to_query(update_metadata)
                 return self.astra_env.collection.update_one(
-                    self.document_codec.encode_id(document_id),
+                    self.document_codec.encode_query(ids=[document_id]),
                     {"$set": encoded_metadata},
                 )
 
@@ -1429,7 +1429,7 @@ class AstraDBVectorStore(VectorStore):
             encoded_metadata = self.filter_to_query(update_metadata)
             async with sem:
                 return await _async_collection.update_one(
-                    self.document_codec.encode_id(document_id),
+                    self.document_codec.encode_query(ids=[document_id]),
                     {"$set": encoded_metadata},
                 )
 
@@ -1501,7 +1501,7 @@ class AstraDBVectorStore(VectorStore):
         self.astra_env.ensure_db_setup()
         # self.collection is not None (by _ensure_astra_db_client)
         hit = self.astra_env.collection.find_one(
-            self.document_codec.encode_id(document_id),
+            self.document_codec.encode_query(ids=[document_id]),
             projection=self.document_codec.base_projection,
         )
         if hit is None:
@@ -1520,7 +1520,7 @@ class AstraDBVectorStore(VectorStore):
         await self.astra_env.aensure_db_setup()
         # self.collection is not None (by _ensure_astra_db_client)
         hit = await self.astra_env.async_collection.find_one(
-            self.document_codec.encode_id(document_id),
+            self.document_codec.encode_query(ids=[document_id]),
             projection=self.document_codec.base_projection,
         )
         if hit is None:
