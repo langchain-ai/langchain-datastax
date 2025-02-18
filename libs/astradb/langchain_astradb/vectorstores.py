@@ -8,7 +8,6 @@ import logging
 import uuid
 import warnings
 from concurrent.futures import ThreadPoolExecutor
-from operator import itemgetter
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -64,8 +63,6 @@ T = TypeVar("T")
 U = TypeVar("U")
 DocDict = Dict[str, Any]  # dicts expressing entries to insert
 
-# indexing options when creating a collection
-DEFAULT_INDEXING_OPTIONS = {"allow": ["metadata"]}
 # error code to check for during bulk insertions
 DOCUMENT_ALREADY_EXISTS_API_ERROR_CODE = "DOCUMENT_ALREADY_EXISTS"
 # max number of errors shown in full insertion error messages
@@ -363,6 +360,7 @@ class AstraDBVectorStore(VectorStore):
         metadata_indexing_include: Iterable[str] | None,
         metadata_indexing_exclude: Iterable[str] | None,
         collection_indexing_policy: dict[str, Any] | None,
+        document_codec: _AstraDBVectorStoreDocumentCodec,
     ) -> dict[str, Any]:
         """Normalize the constructor indexing parameters.
 
@@ -385,19 +383,21 @@ class AstraDBVectorStore(VectorStore):
         if metadata_indexing_include is not None:
             return {
                 "allow": [
-                    f"metadata.{md_field}" for md_field in metadata_indexing_include
+                    document_codec.metadata_key_to_field_identifier(md_field)
+                    for md_field in metadata_indexing_include
                 ]
             }
         if metadata_indexing_exclude is not None:
             return {
                 "deny": [
-                    f"metadata.{md_field}" for md_field in metadata_indexing_exclude
+                    document_codec.metadata_key_to_field_identifier(md_field)
+                    for md_field in metadata_indexing_exclude
                 ]
             }
         return (
             collection_indexing_policy
             if collection_indexing_policy is not None
-            else DEFAULT_INDEXING_OPTIONS
+            else document_codec.default_collection_indexing_policy
         )
 
     def __init__(
@@ -621,6 +621,7 @@ class AstraDBVectorStore(VectorStore):
                 metadata_indexing_include=metadata_indexing_include,
                 metadata_indexing_exclude=metadata_indexing_exclude,
                 collection_indexing_policy=collection_indexing_policy,
+                document_codec=self.document_codec,
             )
         else:
             logger.info(
@@ -654,11 +655,6 @@ class AstraDBVectorStore(VectorStore):
                 msg = f"Collection '{self.collection_name}' not found."
                 raise ValueError(msg)
             # use the collection info to set the store properties
-            self.indexing_policy = self._normalize_metadata_indexing_policy(
-                metadata_indexing_include=None,
-                metadata_indexing_exclude=None,
-                collection_indexing_policy=c_descriptor.options.indexing,
-            )
             if c_descriptor.options.vector is None:
                 msg = "Non-vector collection detected."
                 raise ValueError(msg)
@@ -676,6 +672,12 @@ class AstraDBVectorStore(VectorStore):
                 has_vectorize=has_vectorize,
                 ignore_invalid_documents=ignore_invalid_documents,
                 norm_content_field=norm_content_field,
+            )
+            self.indexing_policy = self._normalize_metadata_indexing_policy(
+                metadata_indexing_include=None,
+                metadata_indexing_exclude=None,
+                collection_indexing_policy=c_descriptor.options.indexing,
+                document_codec=self.document_codec,
             )
 
         # validate embedding/vectorize compatibility and such.
@@ -708,7 +710,9 @@ class AstraDBVectorStore(VectorStore):
             embedding_dimension=_embedding_dimension,
             metric=self.metric,
             requested_indexing_policy=self.indexing_policy,
-            default_indexing_policy=DEFAULT_INDEXING_OPTIONS,
+            default_indexing_policy=(
+                self.document_codec.default_collection_indexing_policy
+            ),
             collection_vector_service_options=self.collection_vector_service_options,
             collection_embedding_api_key=self.collection_embedding_api_key,
             ext_callers=ext_callers,
@@ -864,7 +868,9 @@ class AstraDBVectorStore(VectorStore):
         """
         self.astra_env.ensure_db_setup()
         # self.collection is not None (by _ensure_astra_db_client)
-        deletion_response = self.astra_env.collection.delete_one({"_id": document_id})
+        deletion_response = self.astra_env.collection.delete_one(
+            self.document_codec.encode_query(ids=[document_id]),
+        )
         return deletion_response.deleted_count == 1
 
     async def adelete_by_document_id(self, document_id: str) -> bool:
@@ -878,7 +884,7 @@ class AstraDBVectorStore(VectorStore):
         """
         await self.astra_env.aensure_db_setup()
         deletion_response = await self.astra_env.async_collection.delete_one(
-            {"_id": document_id},
+            self.document_codec.encode_query(ids=[document_id]),
         )
         return deletion_response.deleted_count == 1
 
@@ -1066,37 +1072,8 @@ class AstraDBVectorStore(VectorStore):
         # make unique by id, keeping the last
         return _unique_list(
             documents_to_insert[::-1],
-            itemgetter("_id"),
+            self.document_codec.get_id,
         )[::-1]
-
-    @staticmethod
-    def _get_missing_from_batch(
-        document_batch: list[DocDict], insert_result: dict[str, Any]
-    ) -> tuple[list[str], list[DocDict]]:
-        if "status" not in insert_result:
-            msg = f"API Exception while running bulk insertion: {insert_result}"
-            raise AstraDBVectorStoreError(msg)
-        batch_inserted = insert_result["status"]["insertedIds"]
-        # estimation of the preexisting documents that failed
-        missed_inserted_ids = {document["_id"] for document in document_batch} - set(
-            batch_inserted
-        )
-        errors = insert_result.get("errors", [])
-        # careful for other sources of error other than "doc already exists"
-        num_errors = len(errors)
-        unexpected_errors = any(
-            error.get("errorCode") != "DOCUMENT_ALREADY_EXISTS" for error in errors
-        )
-        if num_errors != len(missed_inserted_ids) or unexpected_errors:
-            msg = f"API Exception while running bulk insertion: {errors}"
-            raise AstraDBVectorStoreError(msg)
-        # deal with the missing insertions as upserts
-        missing_from_batch = [
-            document
-            for document in document_batch
-            if document["_id"] in missed_inserted_ids
-        ]
-        return batch_inserted, missing_from_batch
 
     @override
     def add_texts(
@@ -1159,7 +1136,7 @@ class AstraDBVectorStore(VectorStore):
         )
 
         # perform an AstraPy insert_many, catching exceptions for overwriting docs
-        ids_to_replace: list[int]
+        ids_to_replace: list[str]
         inserted_ids: list[str] = []
         try:
             insert_many_result = self.astra_env.collection.insert_many(
@@ -1177,9 +1154,10 @@ class AstraDBVectorStore(VectorStore):
                 inserted_ids = err.partial_result.inserted_ids
                 inserted_ids_set = set(inserted_ids)
                 ids_to_replace = [
-                    document["_id"]
+                    doc_id
                     for document in documents_to_insert
-                    if document["_id"] not in inserted_ids_set
+                    if (doc_id := self.document_codec.get_id(document))
+                    not in inserted_ids_set
                 ]
             else:
                 full_err_message = _insertmany_error_message(err)
@@ -1190,7 +1168,7 @@ class AstraDBVectorStore(VectorStore):
             documents_to_replace = [
                 document
                 for document in documents_to_insert
-                if document["_id"] in ids_to_replace
+                if self.document_codec.get_id(document) in ids_to_replace
             ]
 
             _max_workers = (
@@ -1203,10 +1181,11 @@ class AstraDBVectorStore(VectorStore):
                 def _replace_document(
                     document: dict[str, Any],
                 ) -> tuple[UpdateResult, str]:
+                    doc_id = self.document_codec.get_id(document)
                     return self.astra_env.collection.replace_one(
-                        {"_id": document["_id"]},
+                        self.document_codec.encode_query(ids=[doc_id]),
                         document,
-                    ), document["_id"]
+                    ), doc_id
 
                 replace_results = list(
                     executor.map(
@@ -1289,7 +1268,7 @@ class AstraDBVectorStore(VectorStore):
         )
 
         # perform an AstraPy insert_many, catching exceptions for overwriting docs
-        ids_to_replace: list[int]
+        ids_to_replace: list[str]
         inserted_ids: list[str] = []
         try:
             insert_many_result = await self.astra_env.async_collection.insert_many(
@@ -1307,9 +1286,10 @@ class AstraDBVectorStore(VectorStore):
                 inserted_ids = err.partial_result.inserted_ids
                 inserted_ids_set = set(inserted_ids)
                 ids_to_replace = [
-                    document["_id"]
+                    doc_id
                     for document in documents_to_insert
-                    if document["_id"] not in inserted_ids_set
+                    if (doc_id := self.document_codec.get_id(document))
+                    not in inserted_ids_set
                 ]
             else:
                 full_err_message = _insertmany_error_message(err)
@@ -1320,7 +1300,7 @@ class AstraDBVectorStore(VectorStore):
             documents_to_replace = [
                 document
                 for document in documents_to_insert
-                if document["_id"] in ids_to_replace
+                if self.document_codec.get_id(document) in ids_to_replace
             ]
 
             sem = asyncio.Semaphore(
@@ -1333,10 +1313,11 @@ class AstraDBVectorStore(VectorStore):
                 document: dict[str, Any],
             ) -> tuple[UpdateResult, str]:
                 async with sem:
+                    doc_id = self.document_codec.get_id(document)
                     return await _async_collection.replace_one(
-                        {"_id": document["_id"]},
+                        self.document_codec.encode_query(ids=[doc_id]),
                         document,
-                    ), document["_id"]
+                    ), doc_id
 
             tasks = [
                 asyncio.create_task(_replace_document(document))
@@ -1395,7 +1376,7 @@ class AstraDBVectorStore(VectorStore):
                 document_id, update_metadata = id_md_pair
                 encoded_metadata = self.filter_to_query(update_metadata)
                 return self.astra_env.collection.update_one(
-                    {"_id": document_id},
+                    self.document_codec.encode_query(ids=[document_id]),
                     {"$set": encoded_metadata},
                 )
 
@@ -1448,7 +1429,7 @@ class AstraDBVectorStore(VectorStore):
             encoded_metadata = self.filter_to_query(update_metadata)
             async with sem:
                 return await _async_collection.update_one(
-                    {"_id": document_id},
+                    self.document_codec.encode_query(ids=[document_id]),
                     {"$set": encoded_metadata},
                 )
 
@@ -1520,7 +1501,7 @@ class AstraDBVectorStore(VectorStore):
         self.astra_env.ensure_db_setup()
         # self.collection is not None (by _ensure_astra_db_client)
         hit = self.astra_env.collection.find_one(
-            {"_id": document_id},
+            self.document_codec.encode_query(ids=[document_id]),
             projection=self.document_codec.base_projection,
         )
         if hit is None:
@@ -1539,7 +1520,7 @@ class AstraDBVectorStore(VectorStore):
         await self.astra_env.aensure_db_setup()
         # self.collection is not None (by _ensure_astra_db_client)
         hit = await self.astra_env.async_collection.find_one(
-            {"_id": document_id},
+            self.document_codec.encode_query(ids=[document_id]),
             projection=self.document_codec.base_projection,
         )
         if hit is None:
@@ -1734,8 +1715,8 @@ class AstraDBVectorStore(VectorStore):
             for (doc, sim, did) in (
                 (
                     self.document_codec.decode(hit),
-                    hit["$similarity"],
-                    hit["_id"],
+                    self.document_codec.get_similarity(hit),
+                    self.document_codec.get_id(hit),
                 )
                 for hit in hits_ite
             )
@@ -2113,8 +2094,8 @@ class AstraDBVectorStore(VectorStore):
             async for (doc, sim, did) in (
                 (
                     self.document_codec.decode(hit),
-                    hit["$similarity"],
-                    hit["_id"],
+                    self.document_codec.get_similarity(hit),
+                    self.document_codec.get_id(hit),
                 )
                 async for hit in self.astra_env.async_collection.find(
                     filter=metadata_parameter,

@@ -9,6 +9,7 @@ from langchain_core.documents import Document
 from langchain_astradb.utils.vector_store_codecs import (
     NO_NULL_VECTOR_MSG,
     VECTOR_REQUIRED_PREAMBLE_MSG,
+    _AstraDBVectorStoreDocumentCodec,
     _DefaultVectorizeVSDocumentCodec,
     _DefaultVSDocumentCodec,
     _FlatVectorizeVSDocumentCodec,
@@ -21,7 +22,6 @@ VECTOR: list[float] = [1, 2, 3]
 DOCUMENT_ID = "the_id"
 LC_DOCUMENT = Document(id=DOCUMENT_ID, page_content=CONTENT, metadata=METADATA)
 LC_FILTER = {"a0": 0, "$or": [{"b1": 1}, {"b2": 2}]}
-ID_FILTER = {"_id": DOCUMENT_ID}
 VECTOR_SORT = {"$vector": VECTOR}
 
 ASTRA_DEFAULT_DOCUMENT_NOVECTORIZE = {
@@ -136,12 +136,86 @@ class TestVSDocCodecs:
         assert codec.decode_vector(ASTRA_DEFAULT_DOCUMENT_NOVECTORIZE) == VECTOR
         assert codec.decode_vector({}) is None
 
-    def test_default_novectorize_id_encoding(self) -> None:
-        """Test id-encoding for default, no-vectorize."""
-        codec = _DefaultVSDocumentCodec(
-            content_field="content_x", ignore_invalid_documents=False
-        )
-        assert codec.encode_id(DOCUMENT_ID) == ID_FILTER
+    @pytest.mark.parametrize(
+        ("default_codec_class", "codec_kwargs"),
+        [
+            (
+                _DefaultVSDocumentCodec,
+                {"content_field": "cf", "ignore_invalid_documents": False},
+            ),
+            (_DefaultVectorizeVSDocumentCodec, {"ignore_invalid_documents": False}),
+        ],
+        ids=("default", "default_vectorize"),
+    )
+    def test_default_query_encoding(
+        self,
+        default_codec_class: type[_AstraDBVectorStoreDocumentCodec],
+        codec_kwargs: dict[str, Any],
+    ) -> None:
+        """Test query-encoding for default, no-vectorize."""
+        codec = default_codec_class(**codec_kwargs)
+        assert codec.encode_query() == {}
+        assert codec.encode_query(ids=[DOCUMENT_ID]) == {"_id": DOCUMENT_ID}
+        assert codec.encode_query(ids=["id1", "id2"]) == {
+            "_id": {"$in": ["id1", "id2"]}
+        }
+        assert codec.encode_query(ids=[DOCUMENT_ID], filter_dict={"mdk": "mdv"}) == {
+            "$and": [{"_id": DOCUMENT_ID}, {"metadata.mdk": "mdv"}]
+        }
+        assert codec.encode_query(
+            ids=[DOCUMENT_ID], filter_dict={"mdk1": "mdv1", "mdk2": "mdv2"}
+        ) == {
+            "$and": [
+                {"_id": DOCUMENT_ID},
+                {"metadata.mdk1": "mdv1", "metadata.mdk2": "mdv2"},
+            ]
+        }
+        assert codec.encode_query(
+            ids=[DOCUMENT_ID], filter_dict={"$or": [{"mdk1": "mdv1"}, {"mdk2": "mdv2"}]}
+        ) == {
+            "$and": [
+                {"_id": DOCUMENT_ID},
+                {"$or": [{"metadata.mdk1": "mdv1"}, {"metadata.mdk2": "mdv2"}]},
+            ]
+        }
+
+    @pytest.mark.parametrize(
+        ("default_codec_class", "codec_kwargs"),
+        [
+            (
+                _FlatVSDocumentCodec,
+                {"content_field": "cf", "ignore_invalid_documents": False},
+            ),
+            (_FlatVectorizeVSDocumentCodec, {"ignore_invalid_documents": False}),
+        ],
+        ids=("flat", "flat_vectorize"),
+    )
+    def test_flat_query_encoding(
+        self,
+        default_codec_class: type[_AstraDBVectorStoreDocumentCodec],
+        codec_kwargs: dict[str, Any],
+    ) -> None:
+        """Test query-encoding for default, no-vectorize."""
+        codec = default_codec_class(**codec_kwargs)
+        assert codec.encode_query() == {}
+        assert codec.encode_query(ids=[DOCUMENT_ID]) == {"_id": DOCUMENT_ID}
+        assert codec.encode_query(ids=["id1", "id2"]) == {
+            "_id": {"$in": ["id1", "id2"]}
+        }
+        assert codec.encode_query(ids=[DOCUMENT_ID], filter_dict={"mdk": "mdv"}) == {
+            "$and": [{"_id": DOCUMENT_ID}, {"mdk": "mdv"}]
+        }
+        assert codec.encode_query(
+            ids=[DOCUMENT_ID], filter_dict={"mdk1": "mdv1", "mdk2": "mdv2"}
+        ) == {"$and": [{"_id": DOCUMENT_ID}, {"mdk1": "mdv1", "mdk2": "mdv2"}]}
+        assert codec.encode_query(
+            ids=[DOCUMENT_ID], filter_dict={"$or": [{"mdk1": "mdv1"}, {"mdk2": "mdv2"}]}
+        ) == {
+            "$and": [
+                {"_id": DOCUMENT_ID},
+                {"$or": [{"mdk1": "mdv1"}, {"mdk2": "mdv2"}]},
+            ]
+        }
 
     def test_default_novectorize_vectorsort_encoding(self) -> None:
         """Test vector-sort-encoding for default, no-vectorize."""
@@ -205,11 +279,6 @@ class TestVSDocCodecs:
         codec = _DefaultVectorizeVSDocumentCodec(ignore_invalid_documents=False)
         assert codec.decode_vector(ASTRA_DEFAULT_DOCUMENT_VECTORIZE_READ) == VECTOR
         assert codec.decode_vector({}) is None
-
-    def test_default_vectorize_id_encoding(self) -> None:
-        """Test id-encoding for default, vectorize."""
-        codec = _DefaultVectorizeVSDocumentCodec(ignore_invalid_documents=False)
-        assert codec.encode_id(DOCUMENT_ID) == ID_FILTER
 
     def test_default_vectorize_vectorsort_encoding(self) -> None:
         """Test vector-sort-encoding for default, vectorize."""
@@ -286,13 +355,6 @@ class TestVSDocCodecs:
         assert codec.decode_vector(ASTRA_FLAT_DOCUMENT_NOVECTORIZE) == VECTOR
         assert codec.decode_vector({}) is None
 
-    def test_flat_novectorize_id_encoding(self) -> None:
-        """Test id-encoding for flat, no-vectorize."""
-        codec = _FlatVSDocumentCodec(
-            content_field="content_x", ignore_invalid_documents=False
-        )
-        assert codec.encode_id(DOCUMENT_ID) == ID_FILTER
-
     def test_flat_novectorize_vectorsort_encoding(self) -> None:
         """Test vector-sort-encoding for flat, no-vectorize."""
         codec = _FlatVSDocumentCodec(
@@ -356,12 +418,24 @@ class TestVSDocCodecs:
         assert codec.decode_vector(ASTRA_FLAT_DOCUMENT_VECTORIZE_READ) == VECTOR
         assert codec.decode_vector({}) is None
 
-    def test_flat_vectorize_id_encoding(self) -> None:
-        """Test id-encoding for flat, vectorize."""
-        codec = _FlatVectorizeVSDocumentCodec(ignore_invalid_documents=False)
-        assert codec.encode_id(DOCUMENT_ID) == ID_FILTER
-
     def test_flat_vectorize_vectorsort_encoding(self) -> None:
         """Test vector-sort-encoding for flat, vectorize."""
         codec = _FlatVectorizeVSDocumentCodec(ignore_invalid_documents=False)
         assert codec.encode_vector_sort(VECTOR) == VECTOR_SORT
+
+    def test_codec_default_collection_indexing_policy(self) -> None:
+        """Test all codecs give their expected default indexing settings back."""
+        codec_d_n = _DefaultVSDocumentCodec(
+            content_field="content_x",
+            ignore_invalid_documents=False,
+        )
+        assert codec_d_n.default_collection_indexing_policy == {"allow": ["metadata"]}
+        codec_d_v = _DefaultVectorizeVSDocumentCodec(ignore_invalid_documents=True)
+        assert codec_d_v.default_collection_indexing_policy == {"allow": ["metadata"]}
+        codec_f_n = _FlatVSDocumentCodec(
+            content_field="content_x",
+            ignore_invalid_documents=False,
+        )
+        assert codec_f_n.default_collection_indexing_policy == {"deny": ["content_x"]}
+        codec_f_v = _FlatVectorizeVSDocumentCodec(ignore_invalid_documents=True)
+        assert codec_f_v.default_collection_indexing_policy == {}
