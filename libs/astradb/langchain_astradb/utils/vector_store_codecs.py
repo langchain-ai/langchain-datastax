@@ -1,4 +1,4 @@
-"""Classes to handle encoding of documents on DB for the Vector Store.."""
+"""Classes to handle encoding of Documents on DB for the Vector Store.."""
 
 from __future__ import annotations
 
@@ -22,18 +22,38 @@ logger = logging.getLogger(__name__)
 
 
 def _default_decode_vector(astra_doc: dict[str, Any]) -> list[float] | None:
+    """Extract the embedding vector from an Astra DB document."""
     return astra_doc.get("$vector")
 
 
 def _default_metadata_key_to_field_identifier(md_key: str) -> str:
+    """Rewrite a metadata key name to its full path in the 'default' encoding.
+
+    The input `md_key` is an "abstract" metadata key, while the return value
+    identifies its actual full-path location on an Astra DB document encoded in the
+    'default' way (i.e. with a nested `metadata` dictionary).
+    """
     return f"metadata.{md_key}"
 
 
 def _flat_metadata_key_to_field_identifier(md_key: str) -> str:
+    """Rewrite a metadata key name to its full path in the 'flat' encoding.
+
+    The input `md_key` is an "abstract" metadata key, while the return value
+    identifies its actual full-path location on an Astra DB document encoded in the
+    'flat' way (i.e. metadata fields appearing at top-level in the Astra DB document).
+    """
     return md_key
 
 
 def _default_encode_filter(filter_dict: dict[str, Any]) -> dict[str, Any]:
+    """Encode an "abstract" metadata condition for the 'default' encoding.
+
+    The input can express a query clause on metadata and uses just the metadata field
+    names, possibly connected/nested through AND and ORs. The output makes key names
+    into their full path-identifiers (e.g. "metadata.xyz") according to the 'default'
+    encoding scheme for Astra DB documents.
+    """
     metadata_filter = {}
     for k, v in filter_dict.items():
         # Key in this dict starting with $ are supposedly operators and as such
@@ -52,25 +72,35 @@ def _default_encode_filter(filter_dict: dict[str, Any]) -> dict[str, Any]:
     return metadata_filter
 
 
-def _default_encode_id(filter_id: str) -> dict[str, Any]:
+def _astra_generic_encode_id(filter_id: str) -> dict[str, Any]:
+    """Encoding of a single Document ID as a query clause for an Astra DB document."""
     return {"_id": filter_id}
 
 
-def _default_encode_ids(filter_ids: list[str]) -> dict[str, Any]:
+def _astra_generic_encode_ids(filter_ids: list[str]) -> dict[str, Any]:
+    """Encoding of Document IDs as a query clause for an Astra DB document.
+
+    This function picks the right, and most concise, expression based on the
+    multiplicity of the provided IDs.
+    """
     if len(filter_ids) == 1:
-        return _default_encode_id(filter_ids[0])
+        return _astra_generic_encode_id(filter_ids[0])
     return {"_id": {"$in": filter_ids}}
 
 
-def _default_encode_vector_sort(vector: list[float]) -> dict[str, Any]:
+def _astra_generic_encode_vector_sort(vector: list[float]) -> dict[str, Any]:
+    """Encoding of a vector-based sort as a query clause for an Astra DB document."""
     return {"$vector": vector}
 
 
 class _AstraDBVectorStoreDocumentCodec(ABC):
-    """A document codec for the Astra DB vector store.
+    """A Document codec for the Astra DB vector store.
 
-    The document codec contains the information for consistent interaction
+    Document codecs hold the logic consistent interaction
     with documents as stored on the Astra DB collection.
+
+    In this context, 'Document' (capital D) refers to the LangChain class,
+    while 'Astra DB document' refers to the JSON-like object stored on DB.
 
     Implementations of this class must:
     - define how to encode/decode documents consistently to and from
@@ -78,7 +108,7 @@ class _AstraDBVectorStoreDocumentCodec(ABC):
       to the identity on both sides (except for the quirks of their signatures).
     - provide the adequate projection dictionaries for running find
       operations on Astra DB, with and without the field containing the vector.
-    - encode IDs to the `_id` field on Astra DB.
+    - encode Document IDs to the right field on Astra DB ("_id" for Collections).
     - define the name of the field storing the textual content of the Document.
     - define whether embeddings are computed server-side (with $vectorize) or not.
     """
@@ -173,10 +203,38 @@ class _AstraDBVectorStoreDocumentCodec(ABC):
         ids: Iterable[str] | None = None,
         filter_dict: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
+        """Prepare an encoded query according to the Astra DB document encoding.
+
+        The method optionally accepts both IDs and metadata filters. The two,
+        if passed together, are automatically combined with an AND operation.
+
+        In other words, if passing both IDs and a metadata filtering clause,
+        the resulting query would return Astra DB documents matching the metadata
+        clause AND having an ID among those provided to this method. If, instead,
+        an OR is required, one should run two separate queries and subsequently merge
+        the result (taking care of avoiding duplcates).
+
+        Args:
+            ids: an iterable over Document IDs. If provided, the resulting Astra DB
+                query dictionary expresses the requirement that returning documents
+                have an ID among those provided here. Passing an empty iterable,
+                or None, results in a query with no conditions on the IDs at all.
+            filter_dict: a metadata filtering part. If provided, if must refer to
+                metadata keys by their bare name (such as `{"key": 123}`).
+                This filter can combine nested conditions with "$or"/"$and" connectors,
+                for example:
+                - `{"tag": "a"}`
+                - `{"$or": [{"tag": "a"}, "label": "b"]}`
+                - `{"$and": [{"tag": {"$in": ["a", "z"]}}, "label": "b"]}`
+
+        Returns:
+            a query dictionary ready to be used in an Astra DB find operation on
+            a collection.
+        """
         clauses: list[dict[str, Any]] = []
         _ids_list = list(ids or [])
         if _ids_list:
-            clauses.append(_default_encode_ids(_ids_list))
+            clauses.append(_astra_generic_encode_ids(_ids_list))
         if filter_dict:
             clauses.append(self.encode_filter(filter_dict))
 
@@ -195,7 +253,7 @@ class _AstraDBVectorStoreDocumentCodec(ABC):
         Returns:
             an order clause for use in Astra DB's find queries.
         """
-        return _default_encode_vector_sort(vector)
+        return _astra_generic_encode_vector_sort(vector)
 
 
 class _DefaultVSDocumentCodec(_AstraDBVectorStoreDocumentCodec):
