@@ -1442,6 +1442,69 @@ class AstraDBVectorStore(VectorStore):
 
         return sum(u_res.update_info["n"] for u_res in update_results)
 
+    def run_query(
+        self,
+        *,
+        n: int,
+        ids: list[str] | None = None,
+        filter: dict[str, Any] | None = None,  # noqa: A002
+        ann_sort: dict[str, Any] | None = None,
+        include_similarity: bool | None = None,
+        include_sort_vector: bool | None = None,
+        include_embeddings: bool | None = None,
+        raw_document_mapper: Callable[[dict[str, Any]], Any | None] | None = None,
+    ) -> tuple[
+        list[float] | None, Iterable[tuple[Any, str, list[float] | None, float | None]]
+    ]:
+        """Execute a generic query on stored documents.
+
+        The return value has the following shape:
+        (qvector?, [(mappeds, id, embedding?, similarity?)])
+
+        projection is dictated by include_embeddings essentially
+
+        Note: if codec skips invalid docs, you may get <k results even if
+        there were more.
+        """
+        find_query = self.document_codec.encode_query(
+            ids=ids,
+            filter_dict=filter,
+        )
+        find_sort = ann_sort
+        find_projection = (
+            self.document_codec.full_projection
+            if include_embeddings
+            else self.document_codec.base_projection
+        )
+        mapper: Callable[[dict[str, Any]], Any | None]
+        if raw_document_mapper:
+            mapper = raw_document_mapper
+        else:
+            mapper = self.document_codec.decode
+
+        find_raw_iterator = self.astra_env.collection.find(
+            filter=find_query,
+            projection=find_projection,
+            limit=n,
+            include_similarity=include_similarity,
+            include_sort_vector=include_sort_vector,
+            sort=find_sort,
+        )
+
+        sort_vector = find_raw_iterator.get_sort_vector()
+        final_doc_iterator = (
+            (
+                mapper(raw_doc),
+                self.document_codec.get_id(raw_doc),
+                raw_doc.get("$vector") if include_embeddings else None,
+                self.document_codec.get_similarity(raw_doc)
+                if include_similarity
+                else None,
+            )
+            for raw_doc in find_raw_iterator
+        )
+        return sort_vector, final_doc_iterator
+
     def metadata_search(
         self,
         filter: dict[str, Any] | None = None,  # noqa: A002
@@ -1687,7 +1750,7 @@ class AstraDBVectorStore(VectorStore):
                 "embeddings is not allowed."
             )
             raise ValueError(msg)
-        sort = {"$vector": embedding}
+        sort = self.document_codec.encode_vector_sort(embedding)
         return self._similarity_search_with_score_id_by_sort(
             sort=sort,
             k=k,
@@ -1883,7 +1946,7 @@ class AstraDBVectorStore(VectorStore):
                 "embeddings is not allowed."
             )
             raise ValueError(msg)
-        sort = {"$vector": embedding}
+        sort = self.document_codec.encode_vector_sort(embedding)
         return await self._asimilarity_search_with_score_id_by_sort(
             sort=sort,
             k=k,
@@ -2214,7 +2277,7 @@ class AstraDBVectorStore(VectorStore):
         metadata_parameter = self.filter_to_query(filter)
 
         return self._run_mmr_query_by_sort(
-            sort={"$vector": embedding},
+            sort=self.document_codec.encode_vector_sort(embedding),
             k=k,
             fetch_k=fetch_k,
             lambda_mult=lambda_mult,
@@ -2253,7 +2316,7 @@ class AstraDBVectorStore(VectorStore):
         metadata_parameter = self.filter_to_query(filter)
 
         return await self._arun_mmr_query_by_sort(
-            sort={"$vector": embedding},
+            sort=self.document_codec.encode_vector_sort(embedding),
             k=k,
             fetch_k=fetch_k,
             lambda_mult=lambda_mult,
