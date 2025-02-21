@@ -18,6 +18,7 @@ from typing import (
     Iterable,
     Sequence,
     TypeVar,
+    cast,
 )
 
 import numpy as np
@@ -25,6 +26,7 @@ from astrapy.constants import Environment
 from astrapy.exceptions import InsertManyException
 from astrapy.info import CollectionVectorServiceOptions
 from langchain_community.vectorstores.utils import maximal_marginal_relevance
+from langchain_core.documents import Document
 from langchain_core.runnables.utils import gather_with_concurrency
 from langchain_core.vectorstores import VectorStore
 from typing_extensions import override
@@ -57,7 +59,6 @@ if TYPE_CHECKING:
         AsyncAstraDB as AsyncAstraDBClient,
     )
     from astrapy.results import UpdateResult
-    from langchain_core.documents import Document
     from langchain_core.embeddings import Embeddings
 
 T = TypeVar("T")
@@ -1180,7 +1181,7 @@ class AstraDBVectorStore(VectorStore):
             ) as executor:
 
                 def _replace_document(
-                    document: dict[str, Any],
+                    document: DocDict,
                 ) -> tuple[UpdateResult, str]:
                     doc_id = self.document_codec.get_id(document)
                     return self.astra_env.collection.replace_one(
@@ -1311,7 +1312,7 @@ class AstraDBVectorStore(VectorStore):
             _async_collection = self.astra_env.async_collection
 
             async def _replace_document(
-                document: dict[str, Any],
+                document: DocDict,
             ) -> tuple[UpdateResult, str]:
                 async with sem:
                     doc_id = self.document_codec.get_id(document)
@@ -1453,7 +1454,7 @@ class AstraDBVectorStore(VectorStore):
         include_similarity: bool | None = None,
         include_sort_vector: bool | None = None,
         include_embeddings: bool | None = None,
-        raw_document_mapper: Callable[[dict[str, Any]], Any | None] | None = None,
+        raw_document_mapper: Callable[[DocDict], Any | None] | None = None,
     ) -> tuple[
         list[float] | None, Iterable[tuple[Any, str, list[float] | None, float | None]]
     ]:
@@ -1537,7 +1538,7 @@ class AstraDBVectorStore(VectorStore):
             if include_embeddings
             else self.document_codec.base_projection
         )
-        mapper: Callable[[dict[str, Any]], Any | None]
+        mapper: Callable[[DocDict], Any | None]
         if raw_document_mapper:
             mapper = raw_document_mapper
         else:
@@ -1579,7 +1580,7 @@ class AstraDBVectorStore(VectorStore):
         include_similarity: bool | None = None,
         include_sort_vector: bool | None = None,
         include_embeddings: bool | None = None,
-        raw_document_mapper: Callable[[dict[str, Any]], Any | None] | None = None,
+        raw_document_mapper: Callable[[DocDict], Any | None] | None = None,
     ) -> tuple[
         list[float] | None,
         AsyncIterable[tuple[Any, str, list[float] | None, float | None]],
@@ -1664,7 +1665,7 @@ class AstraDBVectorStore(VectorStore):
             if include_embeddings
             else self.document_codec.base_projection
         )
-        mapper: Callable[[dict[str, Any]], Any | None]
+        mapper: Callable[[DocDict], Any | None]
         if raw_document_mapper:
             mapper = raw_document_mapper
         else:
@@ -1943,7 +1944,10 @@ class AstraDBVectorStore(VectorStore):
             include_similarity=True,
         )
         # doc is a Document and sim is a float:
-        return [(doc, sim, did) for doc, did, _, sim in hits_ite]  # type:ignore[misc]
+        return [
+            cast(tuple[Document, float, str], (doc, sim, did))
+            for doc, did, _, sim in hits_ite
+        ]
 
     @override
     async def asimilarity_search(
@@ -2244,7 +2248,13 @@ class AstraDBVectorStore(VectorStore):
             msg = "Unable to retrieve the server-side embedding of the query."
             raise AstraDBVectorStoreError(msg)
         # doc is a Document and emb is a list[float]:
-        return (sort_vec, [(doc, emb) async for doc, _, emb, _ in hits_ite])  # type:ignore[misc]
+        return (
+            sort_vec,
+            [
+                cast(tuple[Document, list[float]], (doc, emb))
+                async for doc, _, emb, _ in hits_ite
+            ],
+        )
 
     def _similarity_search_with_embedding_by_sort(
         self,
@@ -2268,7 +2278,13 @@ class AstraDBVectorStore(VectorStore):
             msg = "Unable to retrieve the server-side embedding of the query."
             raise AstraDBVectorStoreError(msg)
         # doc is a Document and emb is a list[float]:
-        return (sort_vec, [(doc, emb) for doc, _, emb, _ in hits_ite])  # type:ignore[misc]
+        return (
+            sort_vec,
+            [
+                cast(tuple[Document, list[float]], (doc, emb))
+                for doc, _, emb, _ in hits_ite
+            ],
+        )
 
     async def _asimilarity_search_with_score_id_by_sort(
         self,
@@ -2284,7 +2300,10 @@ class AstraDBVectorStore(VectorStore):
             include_similarity=True,
         )
         # doc is a Document and sim is a float:
-        return [(doc, sim, did) async for doc, did, _, sim in hits_ite]  # type:ignore[misc]
+        return [
+            cast(tuple[Document, float, str], (doc, sim, did))
+            async for doc, did, _, sim in hits_ite
+        ]
 
     def _run_mmr_query_by_sort(
         self,
@@ -2300,9 +2319,12 @@ class AstraDBVectorStore(VectorStore):
             sort=sort,
             include_sort_vector=True,
             include_embeddings=True,
-            raw_document_mapper=lambda raw_doc: raw_doc,  # TODO: codec and side-$vector
         )
-        prefetch_hits = [doc for doc, _, _, _ in hits_ite]
+        # this is list[tuple[Document, list[float]]]:
+        prefetch_hit_pairs = cast(
+            list[tuple[Document, list[float]]],
+            [(doc, emb) for doc, _, emb, _ in hits_ite],
+        )
         if sort_vec is None:
             msg = "Unable to retrieve the server-side embedding of the query."
             raise AstraDBVectorStoreError(msg)
@@ -2310,7 +2332,7 @@ class AstraDBVectorStore(VectorStore):
             embedding=sort_vec,
             k=k,
             lambda_mult=lambda_mult,
-            prefetch_hits=prefetch_hits,
+            prefetch_hit_pairs=prefetch_hit_pairs,
         )
 
     async def _arun_mmr_query_by_sort(
@@ -2327,9 +2349,12 @@ class AstraDBVectorStore(VectorStore):
             sort=sort,
             include_sort_vector=True,
             include_embeddings=True,
-            raw_document_mapper=lambda raw_doc: raw_doc,  # TODO: codec and side-$vector
         )
-        prefetch_hits = [doc async for doc, _, _, _ in hits_ite]
+        # this is list[tuple[Document, list[float]]]:
+        prefetch_hit_pairs = cast(
+            list[tuple[Document, list[float]]],
+            [(doc, emb) async for doc, _, emb, _ in hits_ite],
+        )
         if sort_vec is None:
             msg = "Unable to retrieve the server-side embedding of the query."
             raise AstraDBVectorStoreError(msg)
@@ -2337,7 +2362,7 @@ class AstraDBVectorStore(VectorStore):
             embedding=sort_vec,
             k=k,
             lambda_mult=lambda_mult,
-            prefetch_hits=prefetch_hits,
+            prefetch_hit_pairs=prefetch_hit_pairs,
         )
 
     def _get_mmr_hits(
@@ -2345,23 +2370,18 @@ class AstraDBVectorStore(VectorStore):
         embedding: list[float],
         k: int,
         lambda_mult: float,
-        prefetch_hits: list[DocDict],
+        prefetch_hit_pairs: list[tuple[Document, list[float]]],
     ) -> list[Document]:
         mmr_chosen_indices = maximal_marginal_relevance(
             np.array(embedding, dtype=np.float32),
-            [prefetch_hit["$vector"] for prefetch_hit in prefetch_hits],
+            [hit_pair[1] for hit_pair in prefetch_hit_pairs],
             k=k,
             lambda_mult=lambda_mult,
         )
-        mmr_hits = [
-            prefetch_hit
-            for prefetch_index, prefetch_hit in enumerate(prefetch_hits)
-            if prefetch_index in mmr_chosen_indices
-        ]
         return [
-            doc
-            for doc in (self.document_codec.decode(hit) for hit in mmr_hits)
-            if doc is not None
+            hit_pair[0]
+            for pf_hit_index, hit_pair in enumerate(prefetch_hit_pairs)
+            if pf_hit_index in mmr_chosen_indices
         ]
 
     @override
