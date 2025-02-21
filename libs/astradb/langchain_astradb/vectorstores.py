@@ -11,6 +11,7 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import (
     TYPE_CHECKING,
     Any,
+    AsyncIterable,
     Awaitable,
     Callable,
     Dict,
@@ -1505,6 +1506,74 @@ class AstraDBVectorStore(VectorStore):
                 else None,
             )
             for raw_doc in find_raw_iterator
+            if (mapped_doc := mapper(raw_doc)) is not None
+        )
+        return sort_vector, final_doc_iterator
+
+    async def arun_query(
+        self,
+        *,
+        n: int,
+        ids: list[str] | None = None,
+        filter: dict[str, Any] | None = None,  # noqa: A002
+        ann_sort: dict[str, Any] | None = None,
+        include_similarity: bool | None = None,
+        include_sort_vector: bool | None = None,
+        include_embeddings: bool | None = None,
+        raw_document_mapper: Callable[[dict[str, Any]], Any | None] | None = None,
+    ) -> tuple[
+        list[float] | None,
+        AsyncIterable[tuple[Any, str, list[float] | None, float | None]],
+    ]:
+        """Execute a generic query on stored documents.
+
+        The return value has the following shape:
+        (qvector?, [(mappeds, id, embedding?, similarity?)])
+
+        projection is dictated by include_embeddings essentially
+
+        Note: If passing a mapping, you may want to take care of the invalid docs
+        (which the codec may be configured to do otherwise).
+
+        Note: if codec skips invalid docs, you may get <k results even if
+        there were more.
+        """
+        find_query = self.document_codec.encode_query(
+            ids=ids,
+            filter_dict=filter,
+        )
+        find_sort = ann_sort
+        find_projection = (
+            self.document_codec.full_projection
+            if include_embeddings
+            else self.document_codec.base_projection
+        )
+        mapper: Callable[[dict[str, Any]], Any | None]
+        if raw_document_mapper:
+            mapper = raw_document_mapper
+        else:
+            mapper = self.document_codec.decode
+
+        find_raw_iterator = self.astra_env.async_collection.find(
+            filter=find_query,
+            projection=find_projection,
+            limit=n,
+            include_similarity=include_similarity,
+            include_sort_vector=include_sort_vector,
+            sort=find_sort,
+        )
+
+        sort_vector = await find_raw_iterator.get_sort_vector()
+        final_doc_iterator = (
+            (
+                mapped_doc,
+                self.document_codec.get_id(raw_doc),
+                raw_doc.get("$vector") if include_embeddings else None,
+                self.document_codec.get_similarity(raw_doc)
+                if include_similarity
+                else None,
+            )
+            async for raw_doc in find_raw_iterator
             if (mapped_doc := mapper(raw_doc)) is not None
         )
         return sort_vector, final_doc_iterator
