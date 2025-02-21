@@ -2296,7 +2296,7 @@ class AstraDBVectorStore(VectorStore):
     ) -> list[Document]:
         sort_vec, hits_ite = self.run_query(
             n=fetch_k,
-            filter=filter,,
+            filter=filter,
             sort=sort,
             include_sort_vector=True,
             include_embeddings=True,
