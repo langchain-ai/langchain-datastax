@@ -1463,6 +1463,9 @@ class AstraDBVectorStore(VectorStore):
 
         projection is dictated by include_embeddings essentially
 
+        Note: If passing a mapping, you may want to take care of the invalid docs
+        (which the codec may be configured to do otherwise).
+
         Note: if codec skips invalid docs, you may get <k results even if
         there were more.
         """
@@ -1494,7 +1497,7 @@ class AstraDBVectorStore(VectorStore):
         sort_vector = find_raw_iterator.get_sort_vector()
         final_doc_iterator = (
             (
-                mapper(raw_doc),
+                mapped_doc,
                 self.document_codec.get_id(raw_doc),
                 raw_doc.get("$vector") if include_embeddings else None,
                 self.document_codec.get_similarity(raw_doc)
@@ -1502,6 +1505,7 @@ class AstraDBVectorStore(VectorStore):
                 else None,
             )
             for raw_doc in find_raw_iterator
+            if (mapped_doc := mapper(raw_doc)) is not None
         )
         return sort_vector, final_doc_iterator
 
