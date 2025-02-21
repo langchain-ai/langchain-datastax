@@ -45,6 +45,7 @@ from langchain_astradb.utils.vector_store_autodetect import (
     _detect_document_codec,
 )
 from langchain_astradb.utils.vector_store_codecs import (
+    VECTORIZE_FIELD_NAME,
     _AstraDBVectorStoreDocumentCodec,
     _DefaultVectorizeVSDocumentCodec,
     _DefaultVSDocumentCodec,
@@ -94,7 +95,7 @@ def _normalize_content_field(
         if content_field is not None:
             msg = "content_field is not configurable for vectorize collections."
             raise ValueError(msg)
-        return "$vectorize"
+        return VECTORIZE_FIELD_NAME
 
     if content_field is None:
         return "*" if is_autodetect else "content"
@@ -1560,7 +1561,9 @@ class AstraDBVectorStore(VectorStore):
             (
                 mapped_doc,
                 self.document_codec.get_id(raw_doc),
-                raw_doc.get("$vector") if include_embeddings else None,
+                self.document_codec.decode_vector(raw_doc)
+                if include_embeddings
+                else None,
                 self.document_codec.get_similarity(raw_doc)
                 if include_similarity
                 else None,
@@ -1687,7 +1690,9 @@ class AstraDBVectorStore(VectorStore):
             (
                 mapped_doc,
                 self.document_codec.get_id(raw_doc),
-                raw_doc.get("$vector") if include_embeddings else None,
+                self.document_codec.decode_vector(raw_doc)
+                if include_embeddings
+                else None,
                 self.document_codec.get_similarity(raw_doc)
                 if include_similarity
                 else None,
@@ -1834,7 +1839,7 @@ class AstraDBVectorStore(VectorStore):
             The list of (Document, score, id), the most similar to the query.
         """
         if self.document_codec.server_side_embeddings:
-            sort = {"$vectorize": query}
+            sort = self.document_codec.encode_vectorize_sort(query)
             return self._similarity_search_with_score_id_by_sort(
                 sort=sort,
                 k=k,
@@ -2020,7 +2025,7 @@ class AstraDBVectorStore(VectorStore):
             The list of (Document, score, id), the most similar to the query.
         """
         if self.document_codec.server_side_embeddings:
-            sort = {"$vectorize": query}
+            sort = self.document_codec.encode_vectorize_sort(query)
             return await self._asimilarity_search_with_score_id_by_sort(
                 sort=sort,
                 k=k,
@@ -2182,7 +2187,7 @@ class AstraDBVectorStore(VectorStore):
             the most similar to the query vector.).
         """
         if self.document_codec.server_side_embeddings:
-            sort = {"$vectorize": query}
+            sort = self.document_codec.encode_vectorize_sort(query)
         else:
             query_embedding = self._get_safe_embedding().embed_query(text=query)
             # shortcut return if query isn't needed.
@@ -2214,7 +2219,7 @@ class AstraDBVectorStore(VectorStore):
             the most similar to the query vector.).
         """
         if self.document_codec.server_side_embeddings:
-            sort = {"$vectorize": query}
+            sort = self.document_codec.encode_vectorize_sort(query)
         else:
             query_embedding = self._get_safe_embedding().embed_query(text=query)
             # shortcut return if query isn't needed.
@@ -2489,7 +2494,7 @@ class AstraDBVectorStore(VectorStore):
             # (and does its own filter normalization, as it cannot
             #  use the path for the with-embedding mmr querying)
             return self._run_mmr_query_by_sort(
-                sort={"$vectorize": query},
+                sort=self.document_codec.encode_vectorize_sort(query),
                 k=k,
                 fetch_k=fetch_k,
                 lambda_mult=lambda_mult,
@@ -2539,7 +2544,7 @@ class AstraDBVectorStore(VectorStore):
             # (and does its own filter normalization, as it cannot
             #  use the path for the with-embedding mmr querying)
             return await self._arun_mmr_query_by_sort(
-                sort={"$vectorize": query},
+                sort=self.document_codec.encode_vectorize_sort(query),
                 k=k,
                 fetch_k=fetch_k,
                 lambda_mult=lambda_mult,

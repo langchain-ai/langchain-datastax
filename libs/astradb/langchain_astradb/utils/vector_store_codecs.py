@@ -15,15 +15,21 @@ VECTOR_REQUIRED_PREAMBLE_MSG = (
     "Default vectorize codec got a non-null vector to encode."
 )
 FLATTEN_CONFLICT_MSG = "Cannot flatten metadata: field name overlap for '{field}'."
+VECTORIZE_NOT_AVAILABLE_MSG = "Vectorize not available for this codec."
 
-STANDARD_INDEXING_OPTIONS_DEFAULT = {"allow": ["metadata"]}
+VECTOR_FIELD_NAME = "$vector"
+VECTORIZE_FIELD_NAME = "$vectorize"
+SIMILARITY_FIELD_NAME = "$similarity"
+DEFAULT_METADATA_FIELD_NAME = "metadata"
+
+STANDARD_INDEXING_OPTIONS_DEFAULT = {"allow": [DEFAULT_METADATA_FIELD_NAME]}
 
 logger = logging.getLogger(__name__)
 
 
 def _default_decode_vector(astra_doc: dict[str, Any]) -> list[float] | None:
     """Extract the embedding vector from an Astra DB document."""
-    return astra_doc.get("$vector")
+    return astra_doc.get(VECTOR_FIELD_NAME)
 
 
 def _default_metadata_key_to_field_identifier(md_key: str) -> str:
@@ -33,7 +39,7 @@ def _default_metadata_key_to_field_identifier(md_key: str) -> str:
     identifies its actual full-path location on an Astra DB document encoded in the
     'default' way (i.e. with a nested `metadata` dictionary).
     """
-    return f"metadata.{md_key}"
+    return f"{DEFAULT_METADATA_FIELD_NAME}.{md_key}"
 
 
 def _flat_metadata_key_to_field_identifier(md_key: str) -> str:
@@ -61,7 +67,7 @@ def _default_encode_filter(filter_dict: dict[str, Any]) -> dict[str, Any]:
         # >>> _default_encode_filter({'a':1, '$or': [{'b':2}, {'c': 3}]})
         #     {'metadata.a': 1, '$or': [{'metadata.b': 2}, {'metadata.c': 3}]}
         if k and k[0] == "$":
-            if isinstance(v, list) and k != "$vector":
+            if isinstance(v, list) and k != VECTOR_FIELD_NAME:
                 metadata_filter[k] = [_default_encode_filter(f) for f in v]
             elif isinstance(v, dict):
                 # assume each list item can be fed back to this function
@@ -93,7 +99,12 @@ def _astra_generic_encode_ids(filter_ids: list[str]) -> dict[str, Any]:
 
 def _astra_generic_encode_vector_sort(vector: list[float]) -> dict[str, Any]:
     """Encoding of a vector-based sort as a query clause for an Astra DB document."""
-    return {"$vector": vector}
+    return {VECTOR_FIELD_NAME: vector}
+
+
+def _astra_generic_encode_vectorize_sort(query_text: str) -> dict[str, Any]:
+    """Encoding of a vectorize-based sort as a query clause for an Astra DB document."""
+    return {VECTORIZE_FIELD_NAME: query_text}
 
 
 class _AstraDBVectorStoreDocumentCodec(ABC):
@@ -155,17 +166,6 @@ class _AstraDBVectorStoreDocumentCodec(ABC):
         """
 
     @abstractmethod
-    def decode_vector(self, astra_document: dict[str, Any]) -> list[float] | None:
-        """Create a vector from a document retrieved from Astra DB.
-
-        Args:
-            astra_document: a dictionary as retrieved from Astra DB.
-
-        Returns:
-            a vector corresponding to the input.
-        """
-
-    @abstractmethod
     def encode_filter(self, filter_dict: dict[str, Any]) -> dict[str, Any]:
         """Encode a LangChain filter for use in Astra DB queries.
 
@@ -184,10 +184,35 @@ class _AstraDBVectorStoreDocumentCodec(ABC):
     def metadata_key_to_field_identifier(self, md_key: str) -> str:
         """Express an 'abstract' metadata key as a full Data API field identifier."""
 
+    @abstractmethod
+    def encode_vectorize_sort(self, query_text: str) -> dict[str, Any]:
+        """Encode a query text as a sort to use for Astra DB 'vectorize' queries.
+
+        Note that calling this method on codecs that don't support 'vectorize'
+        will result in an exception being thrown.
+
+        Args:
+            query_text: the search query text to order results by.
+
+        Returns:
+            an order clause for use in Astra DB's find queries.
+        """
+
     @property
     @abstractmethod
     def default_collection_indexing_policy(self) -> dict[str, list[str]]:
         """Provide the default indexing policy if the collection must be created."""
+
+    def decode_vector(self, astra_document: dict[str, Any]) -> list[float] | None:
+        """Create a vector from a document retrieved from Astra DB.
+
+        Args:
+            astra_document: a dictionary as retrieved from Astra DB.
+
+        Returns:
+            a vector corresponding to the input.
+        """
+        return _default_decode_vector(astra_document)
 
     def get_id(self, astra_document: dict[str, Any]) -> str:
         """Return the ID of an encoded document (= a raw JSON read from DB)."""
@@ -198,7 +223,7 @@ class _AstraDBVectorStoreDocumentCodec(ABC):
 
         This method assumes its argument comes from a suitable vector search.
         """
-        return astra_document["$similarity"]
+        return astra_document[SIMILARITY_FIELD_NAME]
 
     def encode_query(
         self,
@@ -277,12 +302,16 @@ class _DefaultVSDocumentCodec(_AstraDBVectorStoreDocumentCodec):
                 are logged and a None is returned (instead of raising an exception).
         """
         self.content_field = content_field
-        self.base_projection = {"_id": True, self.content_field: True, "metadata": True}
+        self.base_projection = {
+            "_id": True,
+            self.content_field: True,
+            DEFAULT_METADATA_FIELD_NAME: True,
+        }
         self.full_projection = {
             "_id": True,
             self.content_field: True,
-            "metadata": True,
-            "$vector": True,
+            DEFAULT_METADATA_FIELD_NAME: True,
+            VECTOR_FIELD_NAME: True,
         }
         self.ignore_invalid_documents = ignore_invalid_documents
 
@@ -299,14 +328,15 @@ class _DefaultVSDocumentCodec(_AstraDBVectorStoreDocumentCodec):
         return {
             self.content_field: content,
             "_id": document_id,
-            "$vector": vector,
-            "metadata": metadata or {},
+            VECTOR_FIELD_NAME: vector,
+            DEFAULT_METADATA_FIELD_NAME: metadata or {},
         }
 
     @override
     def decode(self, astra_document: dict[str, Any]) -> Document | None:
         _invalid_doc = (
-            "metadata" not in astra_document or self.content_field not in astra_document
+            DEFAULT_METADATA_FIELD_NAME not in astra_document
+            or self.content_field not in astra_document
         )
         if _invalid_doc and self.ignore_invalid_documents:
             invalid_doc_warning = (
@@ -318,13 +348,9 @@ class _DefaultVSDocumentCodec(_AstraDBVectorStoreDocumentCodec):
             return None
         return Document(
             page_content=astra_document[self.content_field],
-            metadata=astra_document["metadata"],
+            metadata=astra_document[DEFAULT_METADATA_FIELD_NAME],
             id=astra_document["_id"],
         )
-
-    @override
-    def decode_vector(self, astra_document: dict[str, Any]) -> list[float] | None:
-        return _default_decode_vector(astra_document)
 
     @override
     def encode_filter(self, filter_dict: dict[str, Any]) -> dict[str, Any]:
@@ -334,7 +360,12 @@ class _DefaultVSDocumentCodec(_AstraDBVectorStoreDocumentCodec):
     def metadata_key_to_field_identifier(self, md_key: str) -> str:
         return _default_metadata_key_to_field_identifier(md_key)
 
+    @override
+    def encode_vectorize_sort(self, query_text: str) -> dict[str, Any]:
+        raise ValueError(VECTORIZE_NOT_AVAILABLE_MSG)
+
     @property
+    @override
     def default_collection_indexing_policy(self) -> dict[str, list[str]]:
         return STANDARD_INDEXING_OPTIONS_DEFAULT
 
@@ -348,7 +379,7 @@ class _DefaultVectorizeVSDocumentCodec(_AstraDBVectorStoreDocumentCodec):
     """
 
     server_side_embeddings = True
-    content_field = "$vectorize"
+    content_field = VECTORIZE_FIELD_NAME
 
     def __init__(self, *, ignore_invalid_documents: bool) -> None:
         """Initialize a new DefaultVectorizeVSDocumentCodec.
@@ -357,12 +388,16 @@ class _DefaultVectorizeVSDocumentCodec(_AstraDBVectorStoreDocumentCodec):
             ignore_invalid_documents: if True, noncompliant inputs to `decode`
                 are logged and a None is returned (instead of raising an exception).
         """
-        self.base_projection = {"_id": True, "$vectorize": True, "metadata": True}
+        self.base_projection = {
+            "_id": True,
+            VECTORIZE_FIELD_NAME: True,
+            DEFAULT_METADATA_FIELD_NAME: True,
+        }
         self.full_projection = {
             "_id": True,
-            "$vectorize": True,
-            "metadata": True,
-            "$vector": True,
+            VECTORIZE_FIELD_NAME: True,
+            DEFAULT_METADATA_FIELD_NAME: True,
+            VECTOR_FIELD_NAME: True,
         }
         self.ignore_invalid_documents = ignore_invalid_documents
 
@@ -378,15 +413,16 @@ class _DefaultVectorizeVSDocumentCodec(_AstraDBVectorStoreDocumentCodec):
             msg = f"{VECTOR_REQUIRED_PREAMBLE_MSG}: {vector}"
             raise ValueError(msg)
         return {
-            "$vectorize": content,
+            VECTORIZE_FIELD_NAME: content,
             "_id": document_id,
-            "metadata": metadata or {},
+            DEFAULT_METADATA_FIELD_NAME: metadata or {},
         }
 
     @override
     def decode(self, astra_document: dict[str, Any]) -> Document | None:
         _invalid_doc = (
-            "metadata" not in astra_document or "$vectorize" not in astra_document
+            DEFAULT_METADATA_FIELD_NAME not in astra_document
+            or VECTORIZE_FIELD_NAME not in astra_document
         )
         if _invalid_doc and self.ignore_invalid_documents:
             invalid_doc_warning = (
@@ -400,26 +436,27 @@ class _DefaultVectorizeVSDocumentCodec(_AstraDBVectorStoreDocumentCodec):
             )
             return None
         return Document(
-            page_content=astra_document["$vectorize"],
-            metadata=astra_document["metadata"],
+            page_content=astra_document[VECTORIZE_FIELD_NAME],
+            metadata=astra_document[DEFAULT_METADATA_FIELD_NAME],
             id=astra_document["_id"],
         )
-
-    @override
-    def decode_vector(self, astra_document: dict[str, Any]) -> list[float] | None:
-        return _default_decode_vector(astra_document)
 
     @override
     def encode_filter(self, filter_dict: dict[str, Any]) -> dict[str, Any]:
         return _default_encode_filter(filter_dict)
 
-    @property
-    def default_collection_indexing_policy(self) -> dict[str, list[str]]:
-        return STANDARD_INDEXING_OPTIONS_DEFAULT
-
     @override
     def metadata_key_to_field_identifier(self, md_key: str) -> str:
         return _default_metadata_key_to_field_identifier(md_key)
+
+    @override
+    def encode_vectorize_sort(self, query_text: str) -> dict[str, Any]:
+        return _astra_generic_encode_vectorize_sort(query_text)
+
+    @property
+    @override
+    def default_collection_indexing_policy(self) -> dict[str, list[str]]:
+        return STANDARD_INDEXING_OPTIONS_DEFAULT
 
 
 class _FlatVSDocumentCodec(_AstraDBVectorStoreDocumentCodec):
@@ -440,15 +477,15 @@ class _FlatVSDocumentCodec(_AstraDBVectorStoreDocumentCodec):
                 are logged and a None is returned (instead of raising an exception).
         """
         self.content_field = content_field
-        self.base_projection = {"_id": True, "$vector": False}
+        self.base_projection = {"_id": True, VECTOR_FIELD_NAME: False}
         self.full_projection = {"*": True}
         self.ignore_invalid_documents = ignore_invalid_documents
         self._non_md_fields = {
             "_id",
-            "$vector",
-            "$vectorize",
+            VECTOR_FIELD_NAME,
+            VECTORIZE_FIELD_NAME,
             self.content_field,
-            "$similarity",
+            SIMILARITY_FIELD_NAME,
         }
 
     @override
@@ -467,7 +504,7 @@ class _FlatVSDocumentCodec(_AstraDBVectorStoreDocumentCodec):
         return {
             self.content_field: content,
             "_id": document_id,
-            "$vector": vector,
+            VECTOR_FIELD_NAME: vector,
             **(metadata or {}),
         }
 
@@ -494,20 +531,21 @@ class _FlatVSDocumentCodec(_AstraDBVectorStoreDocumentCodec):
         )
 
     @override
-    def decode_vector(self, astra_document: dict[str, Any]) -> list[float] | None:
-        return _default_decode_vector(astra_document)
-
-    @override
     def encode_filter(self, filter_dict: dict[str, Any]) -> dict[str, Any]:
         return filter_dict
-
-    @property
-    def default_collection_indexing_policy(self) -> dict[str, list[str]]:
-        return {"deny": [self.content_field]}
 
     @override
     def metadata_key_to_field_identifier(self, md_key: str) -> str:
         return _flat_metadata_key_to_field_identifier(md_key)
+
+    @override
+    def encode_vectorize_sort(self, query_text: str) -> dict[str, Any]:
+        raise ValueError(VECTORIZE_NOT_AVAILABLE_MSG)
+
+    @property
+    @override
+    def default_collection_indexing_policy(self) -> dict[str, list[str]]:
+        return {"deny": [self.content_field]}
 
 
 class _FlatVectorizeVSDocumentCodec(_AstraDBVectorStoreDocumentCodec):
@@ -518,7 +556,7 @@ class _FlatVectorizeVSDocumentCodec(_AstraDBVectorStoreDocumentCodec):
     """
 
     server_side_embeddings = True
-    content_field = "$vectorize"
+    content_field = VECTORIZE_FIELD_NAME
 
     def __init__(self, *, ignore_invalid_documents: bool) -> None:
         """Initialize a new DefaultVectorizeVSDocumentCodec.
@@ -527,10 +565,19 @@ class _FlatVectorizeVSDocumentCodec(_AstraDBVectorStoreDocumentCodec):
             ignore_invalid_documents: if True, noncompliant inputs to `decode`
                 are logged and a None is returned (instead of raising an exception).
         """
-        self.base_projection = {"_id": True, "$vector": False, "$vectorize": True}
+        self.base_projection = {
+            "_id": True,
+            VECTOR_FIELD_NAME: False,
+            VECTORIZE_FIELD_NAME: True,
+        }
         self.full_projection = {"*": True}
         self.ignore_invalid_documents = ignore_invalid_documents
-        self._non_md_fields = {"_id", "$vector", "$vectorize", "$similarity"}
+        self._non_md_fields = {
+            "_id",
+            VECTOR_FIELD_NAME,
+            VECTORIZE_FIELD_NAME,
+            SIMILARITY_FIELD_NAME,
+        }
 
     @override
     def encode(
@@ -543,18 +590,18 @@ class _FlatVectorizeVSDocumentCodec(_AstraDBVectorStoreDocumentCodec):
         if vector is not None:
             msg = f"{VECTOR_REQUIRED_PREAMBLE_MSG}: {vector}"
             raise ValueError(msg)
-        if "$vectorize" in (metadata or {}):
-            msg = FLATTEN_CONFLICT_MSG.format(field="$vectorize")
+        if VECTORIZE_FIELD_NAME in (metadata or {}):
+            msg = FLATTEN_CONFLICT_MSG.format(field=VECTORIZE_FIELD_NAME)
             raise ValueError(msg)
         return {
-            "$vectorize": content,
+            VECTORIZE_FIELD_NAME: content,
             "_id": document_id,
             **(metadata or {}),
         }
 
     @override
     def decode(self, astra_document: dict[str, Any]) -> Document | None:
-        if "$vectorize" not in astra_document and self.ignore_invalid_documents:
+        if VECTORIZE_FIELD_NAME not in astra_document and self.ignore_invalid_documents:
             invalid_doc_warning = (
                 "Ignoring document with _id = "
                 f"{astra_document.get('_id', '(no _id)')}. "
@@ -569,24 +616,25 @@ class _FlatVectorizeVSDocumentCodec(_AstraDBVectorStoreDocumentCodec):
             k: v for k, v in astra_document.items() if k not in self._non_md_fields
         }
         return Document(
-            page_content=astra_document["$vectorize"],
+            page_content=astra_document[VECTORIZE_FIELD_NAME],
             metadata=_metadata,
             id=astra_document["_id"],
         )
 
     @override
-    def decode_vector(self, astra_document: dict[str, Any]) -> list[float] | None:
-        return _default_decode_vector(astra_document)
-
-    @override
     def encode_filter(self, filter_dict: dict[str, Any]) -> dict[str, Any]:
         return filter_dict
-
-    @property
-    def default_collection_indexing_policy(self) -> dict[str, list[str]]:
-        # $vectorize cannot be de-indexed explicitly (the API manages it entirely).
-        return {}
 
     @override
     def metadata_key_to_field_identifier(self, md_key: str) -> str:
         return _flat_metadata_key_to_field_identifier(md_key)
+
+    @override
+    def encode_vectorize_sort(self, query_text: str) -> dict[str, Any]:
+        return _astra_generic_encode_vectorize_sort(query_text)
+
+    @property
+    @override
+    def default_collection_indexing_policy(self) -> dict[str, list[str]]:
+        # $vectorize cannot be de-indexed explicitly (the API manages it entirely).
+        return {}
