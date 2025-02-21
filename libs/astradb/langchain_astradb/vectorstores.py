@@ -19,6 +19,7 @@ from typing import (
     Sequence,
     TypeVar,
     cast,
+    overload,
 )
 
 import numpy as np
@@ -64,6 +65,7 @@ if TYPE_CHECKING:
 
 T = TypeVar("T")
 U = TypeVar("U")
+V = TypeVar("V")
 DocDict = Dict[str, Any]  # dicts expressing entries to insert
 
 # error code to check for during bulk insertions
@@ -1445,19 +1447,53 @@ class AstraDBVectorStore(VectorStore):
 
         return sum(u_res.update_info["n"] for u_res in update_results)
 
+    @overload
     def run_query(
         self,
         *,
         n: int,
+        raw_document_mapper: None = ...,
+        ids: list[str] | None = None,
+        filter: dict[str, Any] | None = None,
+        sort: dict[str, Any] | None = None,
+        include_similarity: bool | None = None,
+        include_sort_vector: bool | None = None,
+        include_embeddings: bool | None = None,
+    ) -> tuple[
+        list[float] | None,
+        Iterable[tuple[Document, str, list[float] | None, float | None]],
+    ]: ...
+
+    @overload
+    def run_query(
+        self,
+        *,
+        n: int,
+        raw_document_mapper: Callable[[DocDict], V | None],
+        ids: list[str] | None = None,
+        filter: dict[str, Any] | None = None,
+        sort: dict[str, Any] | None = None,
+        include_similarity: bool | None = None,
+        include_sort_vector: bool | None = None,
+        include_embeddings: bool | None = None,
+    ) -> tuple[
+        list[float] | None, Iterable[tuple[V, str, list[float] | None, float | None]]
+    ]: ...
+
+    def run_query(
+        self,
+        *,
+        n: int,
+        raw_document_mapper: Callable[[DocDict], V | None] | None = None,
         ids: list[str] | None = None,
         filter: dict[str, Any] | None = None,  # noqa: A002
         sort: dict[str, Any] | None = None,
         include_similarity: bool | None = None,
         include_sort_vector: bool | None = None,
         include_embeddings: bool | None = None,
-        raw_document_mapper: Callable[[DocDict], Any | None] | None = None,
     ) -> tuple[
-        list[float] | None, Iterable[tuple[Any, str, list[float] | None, float | None]]
+        list[float] | None,
+        Iterable[tuple[V | Document, str, list[float] | None, float | None]],
     ]:
         """Execute a generic query on stored documents.
 
@@ -1573,20 +1609,54 @@ class AstraDBVectorStore(VectorStore):
         )
         return sort_vector, final_doc_iterator
 
+    @overload
     async def arun_query(
         self,
         *,
         n: int,
+        raw_document_mapper: None = ...,
+        ids: list[str] | None = None,
+        filter: dict[str, Any] | None = None,
+        sort: dict[str, Any] | None = None,
+        include_similarity: bool | None = None,
+        include_sort_vector: bool | None = None,
+        include_embeddings: bool | None = None,
+    ) -> tuple[
+        list[float] | None,
+        AsyncIterable[tuple[Document, str, list[float] | None, float | None]],
+    ]: ...
+
+    @overload
+    async def arun_query(
+        self,
+        *,
+        n: int,
+        raw_document_mapper: Callable[[DocDict], V | None],
+        ids: list[str] | None = None,
+        filter: dict[str, Any] | None = None,
+        sort: dict[str, Any] | None = None,
+        include_similarity: bool | None = None,
+        include_sort_vector: bool | None = None,
+        include_embeddings: bool | None = None,
+    ) -> tuple[
+        list[float] | None,
+        AsyncIterable[tuple[V, str, list[float] | None, float | None]],
+    ]: ...
+
+    async def arun_query(
+        self,
+        *,
+        n: int,
+        raw_document_mapper: Callable[[DocDict], V | None] | None = None,
         ids: list[str] | None = None,
         filter: dict[str, Any] | None = None,  # noqa: A002
         sort: dict[str, Any] | None = None,
         include_similarity: bool | None = None,
         include_sort_vector: bool | None = None,
         include_embeddings: bool | None = None,
-        raw_document_mapper: Callable[[DocDict], Any | None] | None = None,
     ) -> tuple[
         list[float] | None,
-        AsyncIterable[tuple[Any, str, list[float] | None, float | None]],
+        AsyncIterable[tuple[V | Document, str, list[float] | None, float | None]],
     ]:
         """Execute a generic query on stored documents.
 

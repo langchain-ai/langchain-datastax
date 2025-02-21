@@ -1878,6 +1878,9 @@ class TestAstraDBVectorStore:
             for i in range(10)
         ]
         vstore.add_documents(documents_to_insert)
+        sort_clause: dict[str, list[float] | str] = (
+            {"$vectorize": "This is number 6"} if is_vectorize else {"$vector": [1, 6]}
+        )
 
         # baseline
         search_vector0, hits0 = vstore.run_query(n=5)
@@ -1951,11 +1954,7 @@ class TestAstraDBVectorStore:
             n=2,
             ids=["1", "2", "6", "7", "9", "10"],
             filter={"$or": [{"a": "a"}, {"b": "b"}]},
-            sort=(
-                {"$vectorize": "This is number 6"}
-                if is_vectorize
-                else {"$vector": [1, 6]}
-            ),
+            sort=sort_clause,
             include_similarity=True,
             include_sort_vector=False,
             include_embeddings=False,
@@ -1974,11 +1973,7 @@ class TestAstraDBVectorStore:
             n=2,
             ids=["1", "2", "6", "7", "9", "10"],
             filter={"$or": [{"a": "a"}, {"b": "b"}]},
-            sort=(
-                {"$vectorize": "This is number 6"}
-                if is_vectorize
-                else {"$vector": [1, 6]}
-            ),
+            sort=sort_clause,
             include_similarity=False,
             include_sort_vector=True,
             include_embeddings=False,
@@ -1998,11 +1993,7 @@ class TestAstraDBVectorStore:
             n=2,
             ids=["1", "2", "6", "7", "9", "10"],
             filter={"$or": [{"a": "a"}, {"b": "b"}]},
-            sort=(
-                {"$vectorize": "This is number 6"}
-                if is_vectorize
-                else {"$vector": [1, 6]}
-            ),
+            sort=sort_clause,
             include_similarity=False,
             include_sort_vector=False,
             include_embeddings=True,
@@ -2022,11 +2013,7 @@ class TestAstraDBVectorStore:
             n=2,
             ids=["1", "2", "6", "7", "9", "10"],
             filter={"$or": [{"a": "a"}, {"b": "b"}]},
-            sort=(
-                {"$vectorize": "This is number 6"}
-                if is_vectorize
-                else {"$vector": [1, 6]}
-            ),
+            sort=sort_clause,
             include_similarity=False,
             include_sort_vector=False,
             include_embeddings=False,
@@ -2107,6 +2094,9 @@ class TestAstraDBVectorStore:
             for i in range(10)
         ]
         await vstore.aadd_documents(documents_to_insert)
+        sort_clause: dict[str, list[float] | str] = (
+            {"$vectorize": "This is number 6"} if is_vectorize else {"$vector": [1, 6]}
+        )
 
         # baseline
         search_vector0, hits0 = await vstore.arun_query(n=5)
@@ -2180,11 +2170,7 @@ class TestAstraDBVectorStore:
             n=2,
             ids=["1", "2", "6", "7", "9", "10"],
             filter={"$or": [{"a": "a"}, {"b": "b"}]},
-            sort=(
-                {"$vectorize": "This is number 6"}
-                if is_vectorize
-                else {"$vector": [1, 6]}
-            ),
+            sort=sort_clause,
             include_similarity=True,
             include_sort_vector=False,
             include_embeddings=False,
@@ -2203,11 +2189,7 @@ class TestAstraDBVectorStore:
             n=2,
             ids=["1", "2", "6", "7", "9", "10"],
             filter={"$or": [{"a": "a"}, {"b": "b"}]},
-            sort=(
-                {"$vectorize": "This is number 6"}
-                if is_vectorize
-                else {"$vector": [1, 6]}
-            ),
+            sort=sort_clause,
             include_similarity=False,
             include_sort_vector=True,
             include_embeddings=False,
@@ -2227,11 +2209,7 @@ class TestAstraDBVectorStore:
             n=2,
             ids=["1", "2", "6", "7", "9", "10"],
             filter={"$or": [{"a": "a"}, {"b": "b"}]},
-            sort=(
-                {"$vectorize": "This is number 6"}
-                if is_vectorize
-                else {"$vector": [1, 6]}
-            ),
+            sort=sort_clause,
             include_similarity=False,
             include_sort_vector=False,
             include_embeddings=True,
@@ -2251,11 +2229,7 @@ class TestAstraDBVectorStore:
             n=2,
             ids=["1", "2", "6", "7", "9", "10"],
             filter={"$or": [{"a": "a"}, {"b": "b"}]},
-            sort=(
-                {"$vectorize": "This is number 6"}
-                if is_vectorize
-                else {"$vector": [1, 6]}
-            ),
+            sort=sort_clause,
             include_similarity=False,
             include_sort_vector=False,
             include_embeddings=False,
