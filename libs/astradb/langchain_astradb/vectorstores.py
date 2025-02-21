@@ -1525,6 +1525,8 @@ class AstraDBVectorStore(VectorStore):
                     - `emb` is the embedding vector if requested, None otherwise;
                     - `sim` is the numeric similarity, if requested, None otherwise.
         """
+        self.astra_env.ensure_db_setup()
+
         find_query = self.document_codec.encode_query(
             ids=ids,
             filter_dict=filter,
@@ -1650,6 +1652,8 @@ class AstraDBVectorStore(VectorStore):
                     - `emb` is the embedding vector if requested, None otherwise;
                     - `sim` is the numeric similarity, if requested, None otherwise.
         """
+        await self.astra_env.aensure_db_setup()
+
         find_query = self.document_codec.encode_query(
             ids=ids,
             filter_dict=filter,
@@ -1703,15 +1707,8 @@ class AstraDBVectorStore(VectorStore):
             filter: the metadata to query for.
             n: the maximum number of documents to return.
         """
-        self.astra_env.ensure_db_setup()
-        metadata_parameter = self.filter_to_query(filter)
-        hits_ite = self.astra_env.collection.find(
-            filter=metadata_parameter,
-            projection=self.document_codec.base_projection,
-            limit=n,
-        )
-        docs = [self.document_codec.decode(hit) for hit in hits_ite]
-        return [doc for doc in docs if doc is not None]
+        _, docs_ite = self.run_query(n=n, filter=filter)
+        return [doc for doc, _, _, _ in docs_ite]
 
     async def ametadata_search(
         self,
@@ -1724,20 +1721,8 @@ class AstraDBVectorStore(VectorStore):
             filter: the metadata to query for.
             n: the maximum number of documents to return.
         """
-        await self.astra_env.aensure_db_setup()
-        metadata_parameter = self.filter_to_query(filter)
-        return [
-            doc
-            async for doc in (
-                self.document_codec.decode(hit)
-                async for hit in self.astra_env.async_collection.find(
-                    filter=metadata_parameter,
-                    projection=self.document_codec.base_projection,
-                    limit=n,
-                )
-            )
-            if doc is not None
-        ]
+        _, docs_ite = await self.arun_query(n=n, filter=filter)
+        return [doc async for doc, _, _, _ in docs_ite]
 
     def get_by_document_id(self, document_id: str) -> Document | None:
         """Retrieve a single document from the store, given its document ID.
@@ -1748,15 +1733,15 @@ class AstraDBVectorStore(VectorStore):
         Returns:
             The the document if it exists. Otherwise None.
         """
-        self.astra_env.ensure_db_setup()
-        # self.collection is not None (by _ensure_astra_db_client)
-        hit = self.astra_env.collection.find_one(
-            self.document_codec.encode_query(ids=[document_id]),
-            projection=self.document_codec.base_projection,
+        _, hits_ite = self.run_query(
+            n=1,
+            ids=[document_id],
         )
-        if hit is None:
-            return None
-        return self.document_codec.decode(hit)
+        hits = [doc for doc, _, _, _ in hits_ite]
+        if hits:
+            return hits[0]
+
+        return None
 
     async def aget_by_document_id(self, document_id: str) -> Document | None:
         """Retrieve a single document from the store, given its document ID.
@@ -1767,15 +1752,15 @@ class AstraDBVectorStore(VectorStore):
         Returns:
             The the document if it exists. Otherwise None.
         """
-        await self.astra_env.aensure_db_setup()
-        # self.collection is not None (by _ensure_astra_db_client)
-        hit = await self.astra_env.async_collection.find_one(
-            self.document_codec.encode_query(ids=[document_id]),
-            projection=self.document_codec.base_projection,
+        _, hits_ite = await self.arun_query(
+            n=1,
+            ids=[document_id],
         )
-        if hit is None:
-            return None
-        return self.document_codec.decode(hit)
+        hits = [doc async for doc, _, _, _ in hits_ite]
+        if hits:
+            return hits[0]
+
+        return None
 
     @override
     def similarity_search(
@@ -1951,27 +1936,14 @@ class AstraDBVectorStore(VectorStore):
         filter: dict[str, Any] | None = None,  # noqa: A002
     ) -> list[tuple[Document, float, str]]:
         """Run ANN search with a provided sort clause."""
-        self.astra_env.ensure_db_setup()
-        metadata_parameter = self.filter_to_query(filter)
-        hits_ite = self.astra_env.collection.find(
-            filter=metadata_parameter,
-            projection=self.document_codec.base_projection,
-            limit=k,
-            include_similarity=True,
+        _, hits_ite = self.run_query(
+            n=k,
+            filter=filter,
             sort=sort,
+            include_similarity=True,
         )
-        return [
-            (doc, sim, did)
-            for (doc, sim, did) in (
-                (
-                    self.document_codec.decode(hit),
-                    self.document_codec.get_similarity(hit),
-                    self.document_codec.get_id(hit),
-                )
-                for hit in hits_ite
-            )
-            if doc is not None
-        ]
+        # doc is a Document and sim is a float:
+        return [(doc, sim, did) for doc, did, _, sim in hits_ite]  # type:ignore[misc]
 
     @override
     async def asimilarity_search(
@@ -2261,34 +2233,18 @@ class AstraDBVectorStore(VectorStore):
         Returns:
             (query_embedding, List of (Document, embedding) most similar to the query).
         """
-        await self.astra_env.aensure_db_setup()
-        async_cursor = self.astra_env.async_collection.find(
-            filter=self.filter_to_query(filter),
-            projection=self.document_codec.full_projection,
-            limit=k,
-            include_sort_vector=True,
+        sort_vec, hits_ite = await self.arun_query(
+            n=k,
+            filter=filter,
             sort=sort,
+            include_sort_vector=True,
+            include_embeddings=True,
         )
-        sort_vector = await async_cursor.get_sort_vector()
-        if sort_vector is None:
+        if sort_vec is None:
             msg = "Unable to retrieve the server-side embedding of the query."
             raise AstraDBVectorStoreError(msg)
-        query_embedding = sort_vector
-
-        return (
-            query_embedding,
-            [
-                (doc, emb)
-                async for (doc, emb) in (
-                    (
-                        self.document_codec.decode(hit),
-                        self.document_codec.decode_vector(hit),
-                    )
-                    async for hit in async_cursor
-                )
-                if doc is not None and emb is not None
-            ],
-        )
+        # doc is a Document and emb is a list[float]:
+        return (sort_vec, [(doc, emb) async for doc, _, emb, _ in hits_ite])  # type:ignore[misc]
 
     def _similarity_search_with_embedding_by_sort(
         self,
@@ -2301,34 +2257,18 @@ class AstraDBVectorStore(VectorStore):
         Returns:
             (query_embedding, List of (Document, embedding) most similar to the query).
         """
-        self.astra_env.ensure_db_setup()
-        cursor = self.astra_env.collection.find(
-            filter=self.filter_to_query(filter),
-            projection=self.document_codec.full_projection,
-            limit=k,
-            include_sort_vector=True,
+        sort_vec, hits_ite = self.run_query(
+            n=k,
+            filter=filter,
             sort=sort,
+            include_sort_vector=True,
+            include_embeddings=True,
         )
-        sort_vector = cursor.get_sort_vector()
-        if sort_vector is None:
+        if sort_vec is None:
             msg = "Unable to retrieve the server-side embedding of the query."
             raise AstraDBVectorStoreError(msg)
-        query_embedding = sort_vector
-
-        return (
-            query_embedding,
-            [
-                (doc, emb)
-                for (doc, emb) in (
-                    (
-                        self.document_codec.decode(hit),
-                        self.document_codec.decode_vector(hit),
-                    )
-                    for hit in cursor
-                )
-                if doc is not None and emb is not None
-            ],
-        )
+        # doc is a Document and emb is a list[float]:
+        return (sort_vec, [(doc, emb) for doc, _, emb, _ in hits_ite])  # type:ignore[misc]
 
     async def _asimilarity_search_with_score_id_by_sort(
         self,
@@ -2337,26 +2277,14 @@ class AstraDBVectorStore(VectorStore):
         filter: dict[str, Any] | None = None,  # noqa: A002
     ) -> list[tuple[Document, float, str]]:
         """Run ANN search with a provided sort clause."""
-        await self.astra_env.aensure_db_setup()
-        metadata_parameter = self.filter_to_query(filter)
-        return [
-            (doc, sim, did)
-            async for (doc, sim, did) in (
-                (
-                    self.document_codec.decode(hit),
-                    self.document_codec.get_similarity(hit),
-                    self.document_codec.get_id(hit),
-                )
-                async for hit in self.astra_env.async_collection.find(
-                    filter=metadata_parameter,
-                    projection=self.document_codec.base_projection,
-                    limit=k,
-                    include_similarity=True,
-                    sort=sort,
-                )
-            )
-            if doc is not None
-        ]
+        _, hits_ite = await self.arun_query(
+            n=k,
+            filter=filter,
+            sort=sort,
+            include_similarity=True,
+        )
+        # doc is a Document and sim is a float:
+        return [(doc, sim, did) async for doc, did, _, sim in hits_ite]  # type:ignore[misc]
 
     def _run_mmr_query_by_sort(
         self,
@@ -2364,20 +2292,22 @@ class AstraDBVectorStore(VectorStore):
         k: int,
         fetch_k: int,
         lambda_mult: float,
-        metadata_parameter: dict[str, Any],
+        filter: dict[str, Any] | None,  # noqa: A002
     ) -> list[Document]:
-        prefetch_cursor = self.astra_env.collection.find(
-            filter=metadata_parameter,
-            projection=self.document_codec.full_projection,
-            limit=fetch_k,
-            include_similarity=True,
-            include_sort_vector=True,
+        sort_vec, hits_ite = self.run_query(
+            n=fetch_k,
+            filter=filter,,
             sort=sort,
+            include_sort_vector=True,
+            include_embeddings=True,
+            raw_document_mapper=lambda raw_doc: raw_doc,  # TODO: codec and side-$vector
         )
-        prefetch_hits = list(prefetch_cursor)
-        query_vector = prefetch_cursor.get_sort_vector()
+        prefetch_hits = [doc for doc, _, _, _ in hits_ite]
+        if sort_vec is None:
+            msg = "Unable to retrieve the server-side embedding of the query."
+            raise AstraDBVectorStoreError(msg)
         return self._get_mmr_hits(
-            embedding=query_vector,  # type: ignore[arg-type]
+            embedding=sort_vec,
             k=k,
             lambda_mult=lambda_mult,
             prefetch_hits=prefetch_hits,
@@ -2389,20 +2319,22 @@ class AstraDBVectorStore(VectorStore):
         k: int,
         fetch_k: int,
         lambda_mult: float,
-        metadata_parameter: dict[str, Any],
+        filter: dict[str, Any] | None,  # noqa: A002
     ) -> list[Document]:
-        prefetch_cursor = self.astra_env.async_collection.find(
-            filter=metadata_parameter,
-            projection=self.document_codec.full_projection,
-            limit=fetch_k,
-            include_similarity=True,
-            include_sort_vector=True,
+        sort_vec, hits_ite = await self.arun_query(
+            n=fetch_k,
+            filter=filter,
             sort=sort,
+            include_sort_vector=True,
+            include_embeddings=True,
+            raw_document_mapper=lambda raw_doc: raw_doc,  # TODO: codec and side-$vector
         )
-        prefetch_hits = [hit async for hit in prefetch_cursor]
-        query_vector = await prefetch_cursor.get_sort_vector()
+        prefetch_hits = [doc async for doc, _, _, _ in hits_ite]
+        if sort_vec is None:
+            msg = "Unable to retrieve the server-side embedding of the query."
+            raise AstraDBVectorStoreError(msg)
         return self._get_mmr_hits(
-            embedding=query_vector,  # type: ignore[arg-type]
+            embedding=sort_vec,
             k=k,
             lambda_mult=lambda_mult,
             prefetch_hits=prefetch_hits,
@@ -2460,15 +2392,12 @@ class AstraDBVectorStore(VectorStore):
         Returns:
             The list of Documents selected by maximal marginal relevance.
         """
-        self.astra_env.ensure_db_setup()
-        metadata_parameter = self.filter_to_query(filter)
-
         return self._run_mmr_query_by_sort(
             sort=self.document_codec.encode_vector_sort(embedding),
             k=k,
             fetch_k=fetch_k,
             lambda_mult=lambda_mult,
-            metadata_parameter=metadata_parameter,
+            filter=filter,
         )
 
     @override
@@ -2499,15 +2428,12 @@ class AstraDBVectorStore(VectorStore):
         Returns:
             The list of Documents selected by maximal marginal relevance.
         """
-        await self.astra_env.aensure_db_setup()
-        metadata_parameter = self.filter_to_query(filter)
-
         return await self._arun_mmr_query_by_sort(
             sort=self.document_codec.encode_vector_sort(embedding),
             k=k,
             fetch_k=fetch_k,
             lambda_mult=lambda_mult,
-            metadata_parameter=metadata_parameter,
+            filter=filter,
         )
 
     @override
@@ -2542,13 +2468,12 @@ class AstraDBVectorStore(VectorStore):
             # this case goes directly to the "_by_sort" method
             # (and does its own filter normalization, as it cannot
             #  use the path for the with-embedding mmr querying)
-            metadata_parameter = self.filter_to_query(filter)
             return self._run_mmr_query_by_sort(
                 sort={"$vectorize": query},
                 k=k,
                 fetch_k=fetch_k,
                 lambda_mult=lambda_mult,
-                metadata_parameter=metadata_parameter,
+                filter=filter,
             )
 
         embedding_vector = self._get_safe_embedding().embed_query(query)
@@ -2593,13 +2518,12 @@ class AstraDBVectorStore(VectorStore):
             # this case goes directly to the "_by_sort" method
             # (and does its own filter normalization, as it cannot
             #  use the path for the with-embedding mmr querying)
-            metadata_parameter = self.filter_to_query(filter)
             return await self._arun_mmr_query_by_sort(
                 sort={"$vectorize": query},
                 k=k,
                 fetch_k=fetch_k,
                 lambda_mult=lambda_mult,
-                metadata_parameter=metadata_parameter,
+                filter=filter,
             )
 
         embedding_vector = await self._get_safe_embedding().aembed_query(query)
