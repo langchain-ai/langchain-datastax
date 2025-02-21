@@ -47,12 +47,12 @@ def _flat_metadata_key_to_field_identifier(md_key: str) -> str:
 
 
 def _default_encode_filter(filter_dict: dict[str, Any]) -> dict[str, Any]:
-    """Encode an "abstract" metadata condition for the 'default' encoding.
+    """Encode an "abstract" filter/sort condition for the 'default' encoding.
 
-    The input can express a query clause on metadata and uses just the metadata field
-    names, possibly connected/nested through AND and ORs. The output makes key names
-    into their full path-identifiers (e.g. "metadata.xyz") according to the 'default'
-    encoding scheme for Astra DB documents.
+    The input can express a query clause, or sort criterion, on metadata and uses
+    just the metadata field names, possibly connected/nested through AND and ORs.
+    The output makes key names into their full path-identifiers (e.g. "metadata.xyz")
+    according to the 'default' encoding scheme for Astra DB documents.
     """
     metadata_filter = {}
     for k, v in filter_dict.items():
@@ -61,11 +61,14 @@ def _default_encode_filter(filter_dict: dict[str, Any]) -> dict[str, Any]:
         # >>> _default_encode_filter({'a':1, '$or': [{'b':2}, {'c': 3}]})
         #     {'metadata.a': 1, '$or': [{'metadata.b': 2}, {'metadata.c': 3}]}
         if k and k[0] == "$":
-            if isinstance(v, list):
+            if isinstance(v, list) and k != "$vector":
                 metadata_filter[k] = [_default_encode_filter(f) for f in v]
-            else:
+            elif isinstance(v, dict):
                 # assume each list item can be fed back to this function
                 metadata_filter[k] = _default_encode_filter(v)  # type: ignore[assignment]
+            else:
+                # a scalar. As this is a 'value', never touch it
+                metadata_filter[k] = v
         else:
             metadata_filter[_default_metadata_key_to_field_identifier(k)] = v
 

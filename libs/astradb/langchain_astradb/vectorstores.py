@@ -1449,7 +1449,7 @@ class AstraDBVectorStore(VectorStore):
         n: int,
         ids: list[str] | None = None,
         filter: dict[str, Any] | None = None,  # noqa: A002
-        ann_sort: dict[str, Any] | None = None,
+        sort: dict[str, Any] | None = None,
         include_similarity: bool | None = None,
         include_sort_vector: bool | None = None,
         include_embeddings: bool | None = None,
@@ -1459,22 +1459,77 @@ class AstraDBVectorStore(VectorStore):
     ]:
         """Execute a generic query on stored documents.
 
-        The return value has the following shape:
-        (qvector?, [(mappeds, id, embedding?, similarity?)])
+        The return value has a fixed format, which accommodates all items that
+        can be possibly retrieved by the query depending on various settings.
+        Items that are not requested/unavailable are replaced by `None`.
 
-        projection is dictated by include_embeddings essentially
+        Only the `n` parameter is required. Omitting all other parameters results
+        in a query that matches each and every document found on the collection.
 
-        Note: If passing a mapping, you may want to take care of the invalid docs
-        (which the codec may be configured to do otherwise).
+        The method does not expose a projection directly, which is instead
+        automatically determined based on the invocation options.
 
-        Note: if codec skips invalid docs, you may get <k results even if
-        there were more.
+        The returned documents are converted into `Document` instances by default
+        according to the codec in use by the vector store, but custom mapping
+        functions can be supplied for arbitrary transformations from
+        the Astra DB document.
+
+        Since the mapping function (whether from the coded or user-supplied) is
+        applied after collecting the results, in case documents are discarded
+        (for instance because they are invalid) the amount of returned items may
+        be lower than the requested `n`, even if the database has more matches.
+
+        Args:
+            n: amount of items to return. Fewer items than `n` may be returned in the
+                following cases: (a) the document mapper skips some raw entries from
+                the server; (b) the collection has not enough matches.
+            ids: a list of document IDs to restrict the query to. If this is supplied,
+                only document with an ID among the provided one will match. If further
+                query filters are provided (i.e. metadata), matches must satisfy both
+                requirements.
+            filter: a metadata filtering part. If provided, if must refer to
+                metadata keys by their bare name (such as `{"key": 123}`).
+                This filter can combine nested conditions with "$or"/"$and" connectors,
+                for example:
+                - `{"tag": "a"}`
+                - `{"$or": [{"tag": "a"}, "label": "b"]}`
+                - `{"$and": [{"tag": {"$in": ["a", "z"]}}, "label": "b"]}`
+            sort: a 'sort' clause for the query, such as `{"$vector": [...]}`,
+                `{"$vectorize": "..."}` or `{"mdkey": 1}`. Metadata sort conditions
+                must be expressed by their 'bare' name.
+            include_similarity: whether to return similarity scores with each match.
+                Requires vector sort.
+            include_sort_vector: whether to return the very query vector used for the
+                ANN search alongside the iterable of results. Requires vector sort.
+            include_embeddings: whether to retrieve the matches' own embedding vectors.
+            raw_document_mapper: if provided, an arbitrary function to process the raw
+                documents, as found on Astra DB, and possibly convert them into another
+                format (`V`). If passed, it must be `Callable[[dict], V | None]`.
+                If omitted, the vector store's codec is used, returning Documents.
+                When providing a custom mapper, it is the caller's responsibility to
+                deal with different encoding (such as the main text being found in
+                "$vectorize" or in "content", or the flat vs. nested structure of the
+                metadata). Matches that are converted into `None` by the mapper function
+                are silently discarded from the final iterable of results: this is
+                a possible way to take care of invalid documents that could be
+                encountered when querying the collection (documents which the codec,
+                conversely, may be configured to skip automatically).
+
+        Returns:
+            A structure (nested tuple) packing all requested information as follows:
+            `(sort_v, results_ite)`, where:
+                - `sort_v` is the sort vector, if requested, or None.
+                - `results_ite` is an iterable over `(match, id, emb, sim)` tuples:
+                    - `match` is the Document (or the `V` under a generic mapping);
+                    - `id` is the document ID;
+                    - `emb` is the embedding vector if requested, None otherwise;
+                    - `sim` is the numeric similarity, if requested, None otherwise.
         """
         find_query = self.document_codec.encode_query(
             ids=ids,
             filter_dict=filter,
         )
-        find_sort = ann_sort
+        find_sort = self.document_codec.encode_filter(sort or {})
         find_projection = (
             self.document_codec.full_projection
             if include_embeddings
@@ -1495,7 +1550,9 @@ class AstraDBVectorStore(VectorStore):
             sort=find_sort,
         )
 
-        sort_vector = find_raw_iterator.get_sort_vector()
+        sort_vector = (
+            find_raw_iterator.get_sort_vector() if include_sort_vector else None
+        )
         final_doc_iterator = (
             (
                 mapped_doc,
@@ -1516,7 +1573,7 @@ class AstraDBVectorStore(VectorStore):
         n: int,
         ids: list[str] | None = None,
         filter: dict[str, Any] | None = None,  # noqa: A002
-        ann_sort: dict[str, Any] | None = None,
+        sort: dict[str, Any] | None = None,
         include_similarity: bool | None = None,
         include_sort_vector: bool | None = None,
         include_embeddings: bool | None = None,
@@ -1527,22 +1584,77 @@ class AstraDBVectorStore(VectorStore):
     ]:
         """Execute a generic query on stored documents.
 
-        The return value has the following shape:
-        (qvector?, [(mappeds, id, embedding?, similarity?)])
+        The return value has a fixed format, which accommodates all items that
+        can be possibly retrieved by the query depending on various settings.
+        Items that are not requested/unavailable are replaced by `None`.
 
-        projection is dictated by include_embeddings essentially
+        Only the `n` parameter is required. Omitting all other parameters results
+        in a query that matches each and every document found on the collection.
 
-        Note: If passing a mapping, you may want to take care of the invalid docs
-        (which the codec may be configured to do otherwise).
+        The method does not expose a projection directly, which is instead
+        automatically determined based on the invocation options.
 
-        Note: if codec skips invalid docs, you may get <k results even if
-        there were more.
+        The returned documents are converted into `Document` instances by default
+        according to the codec in use by the vector store, but custom mapping
+        functions can be supplied for arbitrary transformations from
+        the Astra DB document.
+
+        Since the mapping function (whether from the coded or user-supplied) is
+        applied after collecting the results, in case documents are discarded
+        (for instance because they are invalid) the amount of returned items may
+        be lower than the requested `n`, even if the database has more matches.
+
+        Args:
+            n: amount of items to return. Fewer items than `n` may be returned in the
+                following cases: (a) the document mapper skips some raw entries from
+                the server; (b) the collection has not enough matches.
+            ids: a list of document IDs to restrict the query to. If this is supplied,
+                only document with an ID among the provided one will match. If further
+                query filters are provided (i.e. metadata), matches must satisfy both
+                requirements.
+            filter: a metadata filtering part. If provided, if must refer to
+                metadata keys by their bare name (such as `{"key": 123}`).
+                This filter can combine nested conditions with "$or"/"$and" connectors,
+                for example:
+                - `{"tag": "a"}`
+                - `{"$or": [{"tag": "a"}, "label": "b"]}`
+                - `{"$and": [{"tag": {"$in": ["a", "z"]}}, "label": "b"]}`
+            sort: a 'sort' clause for the query, such as `{"$vector": [...]}`,
+                `{"$vectorize": "..."}` or `{"mdkey": 1}`. Metadata sort conditions
+                must be expressed by their 'bare' name.
+            include_similarity: whether to return similarity scores with each match.
+                Requires vector sort.
+            include_sort_vector: whether to return the very query vector used for the
+                ANN search alongside the iterable of results. Requires vector sort.
+            include_embeddings: whether to retrieve the matches' own embedding vectors.
+            raw_document_mapper: if provided, an arbitrary function to process the raw
+                documents, as found on Astra DB, and possibly convert them into another
+                format (`V`). If passed, it must be `Callable[[dict], V | None]`.
+                If omitted, the vector store's codec is used, returning Documents.
+                When providing a custom mapper, it is the caller's responsibility to
+                deal with different encoding (such as the main text being found in
+                "$vectorize" or in "content", or the flat vs. nested structure of the
+                metadata). Matches that are converted into `None` by the mapper function
+                are silently discarded from the final iterable of results: this is
+                a possible way to take care of invalid documents that could be
+                encountered when querying the collection (documents which the codec,
+                conversely, may be configured to skip automatically).
+
+        Returns:
+            A structure (nested tuple) packing all requested information as follows:
+            `(sort_v, results_ite)`, where:
+                - `sort_v` is the sort vector, if requested, or None.
+                - `results_ite` is an iterable over `(match, id, emb, sim)` tuples:
+                    - `match` is the Document (or the `V` under a generic mapping);
+                    - `id` is the document ID;
+                    - `emb` is the embedding vector if requested, None otherwise;
+                    - `sim` is the numeric similarity, if requested, None otherwise.
         """
         find_query = self.document_codec.encode_query(
             ids=ids,
             filter_dict=filter,
         )
-        find_sort = ann_sort
+        find_sort = self.document_codec.encode_filter(sort or {})
         find_projection = (
             self.document_codec.full_projection
             if include_embeddings
@@ -1563,7 +1675,9 @@ class AstraDBVectorStore(VectorStore):
             sort=find_sort,
         )
 
-        sort_vector = await find_raw_iterator.get_sort_vector()
+        sort_vector = (
+            (await find_raw_iterator.get_sort_vector()) if include_sort_vector else None
+        )
         final_doc_iterator = (
             (
                 mapped_doc,

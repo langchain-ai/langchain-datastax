@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 from astrapy.authentication import EmbeddingAPIKeyHeaderProvider, StaticTokenProvider
+from astrapy.constants import SortDocuments
 from langchain_core.documents import Document
 
 from langchain_astradb.utils.astradb import COMPONENT_NAME_VECTORSTORE, SetupMode
@@ -1870,6 +1871,7 @@ class TestAstraDBVectorStore:
                     **({"a": "a"} if i < 5 else {}),
                     **({"b": "b"} if i < 7 and i >= 3 else {}),
                     **({"c": "c"} if i >= 5 else {}),
+                    "int_index": i + 1,
                 },
                 id=f"{i+1}",
             )
@@ -1949,7 +1951,7 @@ class TestAstraDBVectorStore:
             n=2,
             ids=["1", "2", "6", "7", "9", "10"],
             filter={"$or": [{"a": "a"}, {"b": "b"}]},
-            ann_sort=(
+            sort=(
                 {"$vectorize": "This is number 6"}
                 if is_vectorize
                 else {"$vector": [1, 6]}
@@ -1972,7 +1974,7 @@ class TestAstraDBVectorStore:
             n=2,
             ids=["1", "2", "6", "7", "9", "10"],
             filter={"$or": [{"a": "a"}, {"b": "b"}]},
-            ann_sort=(
+            sort=(
                 {"$vectorize": "This is number 6"}
                 if is_vectorize
                 else {"$vector": [1, 6]}
@@ -1996,7 +1998,7 @@ class TestAstraDBVectorStore:
             n=2,
             ids=["1", "2", "6", "7", "9", "10"],
             filter={"$or": [{"a": "a"}, {"b": "b"}]},
-            ann_sort=(
+            sort=(
                 {"$vectorize": "This is number 6"}
                 if is_vectorize
                 else {"$vector": [1, 6]}
@@ -2020,7 +2022,7 @@ class TestAstraDBVectorStore:
             n=2,
             ids=["1", "2", "6", "7", "9", "10"],
             filter={"$or": [{"a": "a"}, {"b": "b"}]},
-            ann_sort=(
+            sort=(
                 {"$vectorize": "This is number 6"}
                 if is_vectorize
                 else {"$vector": [1, 6]}
@@ -2040,6 +2042,20 @@ class TestAstraDBVectorStore:
         assert hits8_l[0][1] in {"1", "2", "6", "7"}
         assert hits8_l[0][2] is None
         assert hits8_l[0][3] is None
+
+        # nonvector sort
+        _, hits9a = vstore.run_query(
+            n=3,
+            sort={"int_index": SortDocuments.ASCENDING},
+        )
+        hits9a_l = list(hits9a)
+        assert [doc_id for _, doc_id, _, _ in hits9a_l] == ["1", "2", "3"]
+        _, hits9d = vstore.run_query(
+            n=3,
+            sort={"int_index": SortDocuments.DESCENDING},
+        )
+        hits9d_l = list(hits9d)
+        assert [doc_id for _, doc_id, _, _ in hits9d_l] == ["10", "9", "8"]
 
     @pytest.mark.parametrize(
         ("vector_store", "is_vectorize"),
@@ -2084,6 +2100,7 @@ class TestAstraDBVectorStore:
                     **({"a": "a"} if i < 5 else {}),
                     **({"b": "b"} if i < 7 and i >= 3 else {}),
                     **({"c": "c"} if i >= 5 else {}),
+                    "int_index": i + 1,
                 },
                 id=f"{i+1}",
             )
@@ -2163,7 +2180,7 @@ class TestAstraDBVectorStore:
             n=2,
             ids=["1", "2", "6", "7", "9", "10"],
             filter={"$or": [{"a": "a"}, {"b": "b"}]},
-            ann_sort=(
+            sort=(
                 {"$vectorize": "This is number 6"}
                 if is_vectorize
                 else {"$vector": [1, 6]}
@@ -2186,7 +2203,7 @@ class TestAstraDBVectorStore:
             n=2,
             ids=["1", "2", "6", "7", "9", "10"],
             filter={"$or": [{"a": "a"}, {"b": "b"}]},
-            ann_sort=(
+            sort=(
                 {"$vectorize": "This is number 6"}
                 if is_vectorize
                 else {"$vector": [1, 6]}
@@ -2210,7 +2227,7 @@ class TestAstraDBVectorStore:
             n=2,
             ids=["1", "2", "6", "7", "9", "10"],
             filter={"$or": [{"a": "a"}, {"b": "b"}]},
-            ann_sort=(
+            sort=(
                 {"$vectorize": "This is number 6"}
                 if is_vectorize
                 else {"$vector": [1, 6]}
@@ -2234,7 +2251,7 @@ class TestAstraDBVectorStore:
             n=2,
             ids=["1", "2", "6", "7", "9", "10"],
             filter={"$or": [{"a": "a"}, {"b": "b"}]},
-            ann_sort=(
+            sort=(
                 {"$vectorize": "This is number 6"}
                 if is_vectorize
                 else {"$vector": [1, 6]}
@@ -2254,3 +2271,17 @@ class TestAstraDBVectorStore:
         assert hits8_l[0][1] in {"1", "2", "6", "7"}
         assert hits8_l[0][2] is None
         assert hits8_l[0][3] is None
+
+        # nonvector sort
+        _, hits9a = await vstore.arun_query(
+            n=3,
+            sort={"int_index": SortDocuments.ASCENDING},
+        )
+        hits9a_l = [tpl async for tpl in hits9a]
+        assert [doc_id for _, doc_id, _, _ in hits9a_l] == ["1", "2", "3"]
+        _, hits9d = await vstore.arun_query(
+            n=3,
+            sort={"int_index": SortDocuments.DESCENDING},
+        )
+        hits9d_l = [tpl async for tpl in hits9d]
+        assert [doc_id for _, doc_id, _, _ in hits9d_l] == ["10", "9", "8"]
