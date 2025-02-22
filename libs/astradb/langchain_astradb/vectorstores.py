@@ -1525,7 +1525,7 @@ class AstraDBVectorStore(VectorStore):
                 only document with an ID among the provided one will match. If further
                 query filters are provided (i.e. metadata), matches must satisfy both
                 requirements.
-            filter: a metadata filtering part. If provided, if must refer to
+            filter: a metadata filtering part. If provided, it must refer to
                 metadata keys by their bare name (such as `{"key": 123}`).
                 This filter can combine nested conditions with "$or"/"$and" connectors,
                 for example:
@@ -1688,7 +1688,7 @@ class AstraDBVectorStore(VectorStore):
                 only document with an ID among the provided one will match. If further
                 query filters are provided (i.e. metadata), matches must satisfy both
                 requirements.
-            filter: a metadata filtering part. If provided, if must refer to
+            filter: a metadata filtering part. If provided, it must refer to
                 metadata keys by their bare name (such as `{"key": 123}`).
                 This filter can combine nested conditions with "$or"/"$and" connectors,
                 for example:
