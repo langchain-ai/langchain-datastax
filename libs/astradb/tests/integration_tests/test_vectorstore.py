@@ -1883,9 +1883,8 @@ class TestAstraDBVectorStore:
         )
 
         # baseline
-        search_vector0, hits0 = vstore.run_query(n=5)
+        hits0 = vstore.run_query(n=5)
         hits0_l = list(hits0)
-        assert search_vector0 is None
         assert len(hits0_l) == 5
         assert isinstance(hits0_l[0][0], Document)
         assert isinstance(hits0_l[0][1], str)
@@ -1893,12 +1892,11 @@ class TestAstraDBVectorStore:
         assert hits0_l[0][3] is None
 
         # just id
-        search_vector1, hits1 = vstore.run_query(
+        hits1 = vstore.run_query(
             n=2,
             ids=["5", "6", "7", "8"],
         )
         hits1_l = list(hits1)
-        assert search_vector1 is None
         assert len(hits1_l) >= 2  # sometimes _id-based queries return more.
         assert len(hits1_l) <= 4
         assert isinstance(hits1_l[0][0], Document)
@@ -1907,12 +1905,11 @@ class TestAstraDBVectorStore:
         assert hits1_l[0][3] is None
 
         # just simple filters
-        search_vector2, hits2 = vstore.run_query(
+        hits2 = vstore.run_query(
             n=20,
             filter={"a": "a"},
         )
         hits2_l = list(hits2)
-        assert search_vector2 is None
         assert len(hits2_l) == 5
         assert isinstance(hits2_l[0][0], Document)
         assert hits2_l[0][1] in {"1", "2", "3", "4", "5"}
@@ -1920,12 +1917,11 @@ class TestAstraDBVectorStore:
         assert hits2_l[0][3] is None
 
         # just elaborate filters
-        search_vector3, hits3 = vstore.run_query(
+        hits3 = vstore.run_query(
             n=30,
             filter={"$or": [{"a": "a"}, {"b": "b"}]},
         )
         hits3_l = list(hits3)
-        assert search_vector3 is None
         assert len(hits3_l) == 7
         assert isinstance(hits3_l[0][0], Document)
         assert hits3_l[0][1] in {"1", "2", "3", "4", "5", "6", "7"}
@@ -1934,13 +1930,12 @@ class TestAstraDBVectorStore:
         assert hits3_l[0][3] is None
 
         # id + filters
-        search_vector4, hits4 = vstore.run_query(
+        hits4 = vstore.run_query(
             n=2,
             ids=["1", "2", "6", "7", "9", "10"],
             filter={"$or": [{"a": "a"}, {"b": "b"}]},
         )
         hits4_l = list(hits4)
-        assert search_vector4 is None
         assert len(hits4_l) >= 2  # sometimes _id-based queries return more.
         assert len(hits4_l) <= 4
         assert isinstance(hits4_l[0][0], Document)
@@ -1950,7 +1945,7 @@ class TestAstraDBVectorStore:
         assert hits4_l[0][3] is None
 
         # get similarity
-        search_vector5, hits5 = vstore.run_query(
+        hits5 = vstore.run_query(
             n=2,
             ids=["1", "2", "6", "7", "9", "10"],
             filter={"$or": [{"a": "a"}, {"b": "b"}]},
@@ -1960,7 +1955,6 @@ class TestAstraDBVectorStore:
             include_embeddings=False,
         )
         hits5_l = list(hits5)
-        assert search_vector5 is None
         assert len(hits5_l) >= 2  # sometimes _id-based queries return more.
         assert len(hits5_l) <= 4
         assert isinstance(hits5_l[0][0], Document)
@@ -1989,7 +1983,7 @@ class TestAstraDBVectorStore:
         assert hits6_l[0][3] is None
 
         # get embeddings
-        search_vector7, hits7 = vstore.run_query(
+        hits7 = vstore.run_query(
             n=2,
             ids=["1", "2", "6", "7", "9", "10"],
             filter={"$or": [{"a": "a"}, {"b": "b"}]},
@@ -1999,7 +1993,6 @@ class TestAstraDBVectorStore:
             include_embeddings=True,
         )
         hits7_l = list(hits7)
-        assert search_vector7 is None
         assert len(hits7_l) >= 2  # sometimes _id-based queries return more.
         assert len(hits7_l) <= 4
         assert isinstance(hits7_l[0][0], Document)
@@ -2009,13 +2002,13 @@ class TestAstraDBVectorStore:
         assert hits7_l[0][3] is None
 
         # nonvector sort
-        _, hits9a = vstore.run_query(
+        hits9a = vstore.run_query(
             n=3,
             sort={"int_index": SortDocuments.ASCENDING},
         )
         hits9a_l = list(hits9a)
         assert [doc_id for _, doc_id, _, _ in hits9a_l] == ["1", "2", "3"]
-        _, hits9d = vstore.run_query(
+        hits9d = vstore.run_query(
             n=3,
             sort={"int_index": SortDocuments.DESCENDING},
         )
@@ -2077,9 +2070,8 @@ class TestAstraDBVectorStore:
         )
 
         # baseline
-        search_vector0, hits0 = await vstore.arun_query(n=5)
+        hits0 = await vstore.arun_query(n=5)
         hits0_l = [tpl async for tpl in hits0]
-        assert search_vector0 is None
         assert len(hits0_l) == 5
         assert isinstance(hits0_l[0][0], Document)
         assert isinstance(hits0_l[0][1], str)
@@ -2087,12 +2079,11 @@ class TestAstraDBVectorStore:
         assert hits0_l[0][3] is None
 
         # just id
-        search_vector1, hits1 = await vstore.arun_query(
+        hits1 = await vstore.arun_query(
             n=2,
             ids=["5", "6", "7", "8"],
         )
         hits1_l = [tpl async for tpl in hits1]
-        assert search_vector1 is None
         assert len(hits1_l) >= 2  # sometimes _id-based queries return more.
         assert len(hits1_l) <= 4
         assert isinstance(hits1_l[0][0], Document)
@@ -2101,12 +2092,11 @@ class TestAstraDBVectorStore:
         assert hits1_l[0][3] is None
 
         # just simple filters
-        search_vector2, hits2 = await vstore.arun_query(
+        hits2 = await vstore.arun_query(
             n=20,
             filter={"a": "a"},
         )
         hits2_l = [tpl async for tpl in hits2]
-        assert search_vector2 is None
         assert len(hits2_l) == 5
         assert isinstance(hits2_l[0][0], Document)
         assert hits2_l[0][1] in {"1", "2", "3", "4", "5"}
@@ -2114,12 +2104,11 @@ class TestAstraDBVectorStore:
         assert hits2_l[0][3] is None
 
         # just elaborate filters
-        search_vector3, hits3 = await vstore.arun_query(
+        hits3 = await vstore.arun_query(
             n=30,
             filter={"$or": [{"a": "a"}, {"b": "b"}]},
         )
         hits3_l = [tpl async for tpl in hits3]
-        assert search_vector3 is None
         assert len(hits3_l) == 7
         assert isinstance(hits3_l[0][0], Document)
         assert hits3_l[0][1] in {"1", "2", "3", "4", "5", "6", "7"}
@@ -2128,13 +2117,12 @@ class TestAstraDBVectorStore:
         assert hits3_l[0][3] is None
 
         # id + filters
-        search_vector4, hits4 = await vstore.arun_query(
+        hits4 = await vstore.arun_query(
             n=2,
             ids=["1", "2", "6", "7", "9", "10"],
             filter={"$or": [{"a": "a"}, {"b": "b"}]},
         )
         hits4_l = [tpl async for tpl in hits4]
-        assert search_vector4 is None
         assert len(hits4_l) >= 2  # sometimes _id-based queries return more.
         assert len(hits4_l) <= 4
         assert isinstance(hits4_l[0][0], Document)
@@ -2144,7 +2132,7 @@ class TestAstraDBVectorStore:
         assert hits4_l[0][3] is None
 
         # get similarity
-        search_vector5, hits5 = await vstore.arun_query(
+        hits5 = await vstore.arun_query(
             n=2,
             ids=["1", "2", "6", "7", "9", "10"],
             filter={"$or": [{"a": "a"}, {"b": "b"}]},
@@ -2154,7 +2142,6 @@ class TestAstraDBVectorStore:
             include_embeddings=False,
         )
         hits5_l = [tpl async for tpl in hits5]
-        assert search_vector5 is None
         assert len(hits5_l) >= 2  # sometimes _id-based queries return more.
         assert len(hits5_l) <= 4
         assert isinstance(hits5_l[0][0], Document)
@@ -2183,7 +2170,7 @@ class TestAstraDBVectorStore:
         assert hits6_l[0][3] is None
 
         # get embeddings
-        search_vector7, hits7 = await vstore.arun_query(
+        hits7 = await vstore.arun_query(
             n=2,
             ids=["1", "2", "6", "7", "9", "10"],
             filter={"$or": [{"a": "a"}, {"b": "b"}]},
@@ -2193,7 +2180,6 @@ class TestAstraDBVectorStore:
             include_embeddings=True,
         )
         hits7_l = [tpl async for tpl in hits7]
-        assert search_vector7 is None
         assert len(hits7_l) >= 2  # sometimes _id-based queries return more.
         assert len(hits7_l) <= 4
         assert isinstance(hits7_l[0][0], Document)
@@ -2203,13 +2189,13 @@ class TestAstraDBVectorStore:
         assert hits7_l[0][3] is None
 
         # nonvector sort
-        _, hits9a = await vstore.arun_query(
+        hits9a = await vstore.arun_query(
             n=3,
             sort={"int_index": SortDocuments.ASCENDING},
         )
         hits9a_l = [tpl async for tpl in hits9a]
         assert [doc_id for _, doc_id, _, _ in hits9a_l] == ["1", "2", "3"]
-        _, hits9d = await vstore.arun_query(
+        hits9d = await vstore.arun_query(
             n=3,
             sort={"int_index": SortDocuments.DESCENDING},
         )

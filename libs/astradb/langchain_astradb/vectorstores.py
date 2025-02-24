@@ -16,10 +16,12 @@ from typing import (
     Callable,
     Dict,
     Iterable,
+    Literal,
     NamedTuple,
     Sequence,
     TypeVar,
     cast,
+    overload,
 )
 
 import numpy as np
@@ -1499,6 +1501,32 @@ class AstraDBVectorStore(VectorStore):
             )
         return None
 
+    @overload
+    def run_query_raw(
+        self,
+        *,
+        n: int,
+        include_sort_vector: Literal[False] = False,
+        ids: list[str] | None = None,
+        filter: dict[str, Any] | None = None,
+        sort: dict[str, Any] | None = None,
+        include_similarity: bool | None = None,
+        include_embeddings: bool = False,
+    ) -> Iterable[DocDict]: ...
+
+    @overload
+    def run_query_raw(
+        self,
+        *,
+        n: int,
+        include_sort_vector: Literal[True],
+        ids: list[str] | None = None,
+        filter: dict[str, Any] | None = None,
+        sort: dict[str, Any] | None = None,
+        include_similarity: bool | None = None,
+        include_embeddings: bool = False,
+    ) -> tuple[list[float] | None, Iterable[DocDict]]: ...
+
     def run_query_raw(
         self,
         *,
@@ -1506,15 +1534,14 @@ class AstraDBVectorStore(VectorStore):
         ids: list[str] | None = None,
         filter: dict[str, Any] | None = None,  # noqa: A002
         sort: dict[str, Any] | None = None,
-        include_similarity: bool = False,
+        include_similarity: bool | None = None,
         include_sort_vector: bool = False,
         include_embeddings: bool = False,
-    ) -> tuple[list[float] | None, Iterable[DocDict]]:
+    ) -> tuple[list[float] | None, Iterable[DocDict]] | Iterable[DocDict]:
         """Execute a generic query on stored documents, returning Astra DB documents.
 
-        The return value has a fixed format, which accommodates for the possible
-        'query vector' that can also be requested back from the server. In case
-        no query vector comes back, a None value is found in its place.
+        The return value has a variable format, depending on whether the 'sort vector'
+        is requested back from the server.
 
         Only the `n` parameter is required. Omitting all other parameters results
         in a query that matches each and every document found on the collection.
@@ -1551,11 +1578,16 @@ class AstraDBVectorStore(VectorStore):
                 Requires vector sort.
             include_sort_vector: whether to return the very query vector used for the
                 ANN search alongside the iterable of results. Requires vector sort.
+                Note that the shape of the return value depends on this parameter.
             include_embeddings: whether to retrieve the matches' own embedding vectors.
 
         Returns:
-            A two-item `(sort_v, astra_db_ite)` tuple, where:
-                - `sort_v` is the sort vector, if requested, or None.
+            The shape of the return value depends on the value of `include_sort_vector`:
+            * if `include_sort_vector = False`, the return value is an iterable over
+                Astra DB documents (dictionaries);
+            * if `include_sort_vector = True`, the return value is a 2-item tuple
+                `(sort_v, astra_db_ite)` tuple, where:
+                - `sort_v` is the sort vector, if requested, or None if not available.
                 - `astra_db_ite` is an iterable over Astra DB documents (dictionaries).
         """
         self.astra_env.ensure_db_setup()
@@ -1581,10 +1613,38 @@ class AstraDBVectorStore(VectorStore):
         )
         # stripping down the Astra DB cursor details into a plain iterator:
         final_doc_iterator = (doc for doc in find_raw_iterator)
-        sort_vector = (
-            find_raw_iterator.get_sort_vector() if include_sort_vector else None
-        )
-        return sort_vector, final_doc_iterator
+        if include_sort_vector:
+            sort_vector = (
+                find_raw_iterator.get_sort_vector() if include_sort_vector else None
+            )
+            return sort_vector, final_doc_iterator
+        return final_doc_iterator
+
+    @overload
+    def run_query(
+        self,
+        *,
+        n: int,
+        include_sort_vector: Literal[False] = False,
+        ids: list[str] | None = None,
+        filter: dict[str, Any] | None = None,
+        sort: dict[str, Any] | None = None,
+        include_similarity: bool | None = None,
+        include_embeddings: bool = False,
+    ) -> Iterable[AstraDBQueryResult]: ...
+
+    @overload
+    def run_query(
+        self,
+        *,
+        n: int,
+        include_sort_vector: Literal[True],
+        ids: list[str] | None = None,
+        filter: dict[str, Any] | None = None,
+        sort: dict[str, Any] | None = None,
+        include_similarity: bool | None = None,
+        include_embeddings: bool = False,
+    ) -> tuple[list[float] | None, Iterable[AstraDBQueryResult]]: ...
 
     def run_query(
         self,
@@ -1593,15 +1653,17 @@ class AstraDBVectorStore(VectorStore):
         ids: list[str] | None = None,
         filter: dict[str, Any] | None = None,  # noqa: A002
         sort: dict[str, Any] | None = None,
-        include_similarity: bool = False,
+        include_similarity: bool | None = None,
         include_sort_vector: bool = False,
         include_embeddings: bool = False,
-    ) -> tuple[list[float] | None, Iterable[AstraDBQueryResult]]:
+    ) -> (
+        tuple[list[float] | None, Iterable[AstraDBQueryResult]]
+        | Iterable[AstraDBQueryResult]
+    ):
         """Execute a generic query on stored documents, returning Documents+other info.
 
-        The return value has a fixed format, which accommodates for possible quantities
-        that can be requested to the server together with the Documents. In case these
-        quantities are not requested/available, None values are returned in their place.
+        The return value has a variable format, depending on whether the 'sort vector'
+        is requested back from the server.
 
         Only the `n` parameter is required. Omitting all other parameters results
         in a query that matches each and every document found on the collection.
@@ -1609,7 +1671,7 @@ class AstraDBVectorStore(VectorStore):
         The method does not expose a projection directly, which is instead
         automatically determined based on the invocation options.
 
-        The returned Document objects are coded-independent.
+        The returned Document objects are codec-independent.
 
         Args:
             n: amount of items to return. Fewer items than `n` may be returned in the
@@ -1633,35 +1695,84 @@ class AstraDBVectorStore(VectorStore):
                 Requires vector sort.
             include_sort_vector: whether to return the very query vector used for the
                 ANN search alongside the iterable of results. Requires vector sort.
+                Note that the shape of the return value depends on this parameter.
             include_embeddings: whether to retrieve the matches' own embedding vectors.
 
         Returns:
-            A tuple `(query_vector, full_results_iterable)`, where:
-            * `query_vector` is the vector used in the ANN search, if requested
-                and applicable;
-            * `full_results_iterable` is an iterable over the AstraDBQueryResult items
-                returned by the query. Entries that fail the decoding step, if any,
-                are discarded after the query, which may lead to fewer items being
-                returned than the required `n`.
+            The shape of the return value depends on the value of `include_sort_vector`:
+            * if `include_sort_vector = False`, the return value is an iterable over
+                the AstraDBQueryResult items returned by the query. Entries that fail
+                the decoding step, if any, are discarded after the query, which may
+                lead to fewer items being returned than the required `n`.
+            * if `include_sort_vector = True`, the return value is a 2-item tuple
+                `(sort_v, results_ite)` tuple, where:
+                - `sort_v` is the sort vector, if requested, or None if not available.
+                - `results_ite` is an iterable over AstraDBQueryResult items as above.
         """
-        query_v, astra_docs_ite = self.run_query_raw(
+        if include_sort_vector:
+            query_v, astra_docs_ite = self.run_query_raw(
+                n=n,
+                ids=ids,
+                filter=filter,
+                sort=sort,
+                include_similarity=include_similarity,
+                include_sort_vector=True,
+                include_embeddings=include_embeddings,
+            )
+            return (
+                query_v,
+                (
+                    decoded_tuple
+                    for astra_db_doc in astra_docs_ite
+                    if (
+                        decoded_tuple := self.full_decode_astra_db_document(
+                            astra_db_doc
+                        )
+                    )
+                    is not None
+                ),
+            )
+        astra_docs_ite = self.run_query_raw(
             n=n,
             ids=ids,
             filter=filter,
             sort=sort,
             include_similarity=include_similarity,
-            include_sort_vector=include_sort_vector,
+            include_sort_vector=False,
             include_embeddings=include_embeddings,
         )
         return (
-            query_v,
-            (
-                decoded_tuple
-                for astra_db_doc in astra_docs_ite
-                if (decoded_tuple := self.full_decode_astra_db_document(astra_db_doc))
-                is not None
-            ),
+            decoded_tuple
+            for astra_db_doc in astra_docs_ite
+            if (decoded_tuple := self.full_decode_astra_db_document(astra_db_doc))
+            is not None
         )
+
+    @overload
+    async def arun_query_raw(
+        self,
+        *,
+        n: int,
+        include_sort_vector: Literal[False] = False,
+        ids: list[str] | None = None,
+        filter: dict[str, Any] | None = None,
+        sort: dict[str, Any] | None = None,
+        include_similarity: bool | None = None,
+        include_embeddings: bool = False,
+    ) -> AsyncIterable[DocDict]: ...
+
+    @overload
+    async def arun_query_raw(
+        self,
+        *,
+        n: int,
+        include_sort_vector: Literal[True],
+        ids: list[str] | None = None,
+        filter: dict[str, Any] | None = None,
+        sort: dict[str, Any] | None = None,
+        include_similarity: bool | None = None,
+        include_embeddings: bool = False,
+    ) -> tuple[list[float] | None, AsyncIterable[DocDict]]: ...
 
     async def arun_query_raw(
         self,
@@ -1670,15 +1781,14 @@ class AstraDBVectorStore(VectorStore):
         ids: list[str] | None = None,
         filter: dict[str, Any] | None = None,  # noqa: A002
         sort: dict[str, Any] | None = None,
-        include_similarity: bool = False,
+        include_similarity: bool | None = None,
         include_sort_vector: bool = False,
         include_embeddings: bool = False,
-    ) -> tuple[list[float] | None, AsyncIterable[DocDict]]:
+    ) -> tuple[list[float] | None, AsyncIterable[DocDict]] | AsyncIterable[DocDict]:
         """Execute a generic query on stored documents, returning Astra DB documents.
 
-        The return value has a fixed format, which accommodates for the possible
-        'query vector' that can also be requested back from the server. In case
-        no query vector comes back, a None value is found in its place.
+        The return value has a variable format, depending on whether the 'sort vector'
+        is requested back from the server.
 
         Only the `n` parameter is required. Omitting all other parameters results
         in a query that matches each and every document found on the collection.
@@ -1716,11 +1826,16 @@ class AstraDBVectorStore(VectorStore):
                 Requires vector sort.
             include_sort_vector: whether to return the very query vector used for the
                 ANN search alongside the iterable of results. Requires vector sort.
+                Note that the shape of the return value depends on this parameter.
             include_embeddings: whether to retrieve the matches' own embedding vectors.
 
         Returns:
-            A two-item `(sort_v, astra_db_ite)` tuple, where:
-                - `sort_v` is the sort vector, if requested, or None.
+            The shape of the return value depends on the value of `include_sort_vector`:
+            * if `include_sort_vector = False`, the return value is an iterable over
+                Astra DB documents (dictionaries);
+            * if `include_sort_vector = True`, the return value is a 2-item tuple
+                `(sort_v, astra_db_ite)` tuple, where:
+                - `sort_v` is the sort vector, if requested, or None if not available.
                 - `astra_db_ite` is an iterable over Astra DB documents (dictionaries).
         """
         await self.astra_env.aensure_db_setup()
@@ -1746,10 +1861,40 @@ class AstraDBVectorStore(VectorStore):
         )
         # stripping down the Astra DB cursor details into a plain iterator:
         final_doc_iterator = (doc async for doc in find_raw_iterator)
-        sort_vector = (
-            await find_raw_iterator.get_sort_vector() if include_sort_vector else None
-        )
-        return sort_vector, final_doc_iterator
+        if include_sort_vector:
+            sort_vector = (
+                await find_raw_iterator.get_sort_vector()
+                if include_sort_vector
+                else None
+            )
+            return sort_vector, final_doc_iterator
+        return final_doc_iterator
+
+    @overload
+    async def arun_query(
+        self,
+        *,
+        n: int,
+        include_sort_vector: Literal[False] = False,
+        ids: list[str] | None = None,
+        filter: dict[str, Any] | None = None,
+        sort: dict[str, Any] | None = None,
+        include_similarity: bool | None = None,
+        include_embeddings: bool = False,
+    ) -> AsyncIterable[AstraDBQueryResult]: ...
+
+    @overload
+    async def arun_query(
+        self,
+        *,
+        n: int,
+        include_sort_vector: Literal[True],
+        ids: list[str] | None = None,
+        filter: dict[str, Any] | None = None,
+        sort: dict[str, Any] | None = None,
+        include_similarity: bool | None = None,
+        include_embeddings: bool = False,
+    ) -> tuple[list[float] | None, AsyncIterable[AstraDBQueryResult]]: ...
 
     async def arun_query(
         self,
@@ -1758,15 +1903,17 @@ class AstraDBVectorStore(VectorStore):
         ids: list[str] | None = None,
         filter: dict[str, Any] | None = None,  # noqa: A002
         sort: dict[str, Any] | None = None,
-        include_similarity: bool = False,
+        include_similarity: bool | None = None,
         include_sort_vector: bool = False,
         include_embeddings: bool = False,
-    ) -> tuple[list[float] | None, AsyncIterable[AstraDBQueryResult]]:
+    ) -> (
+        tuple[list[float] | None, AsyncIterable[AstraDBQueryResult]]
+        | AsyncIterable[AstraDBQueryResult]
+    ):
         """Execute a generic query on stored documents, returning Documents+other info.
 
-        The return value has a fixed format, which accommodates for possible quantities
-        that can be requested to the server together with the Documents. In case these
-        quantities are not requested/available, None values are returned in their place.
+        The return value has a variable format, depending on whether the 'sort vector'
+        is requested back from the server.
 
         Only the `n` parameter is required. Omitting all other parameters results
         in a query that matches each and every document found on the collection.
@@ -1774,7 +1921,7 @@ class AstraDBVectorStore(VectorStore):
         The method does not expose a projection directly, which is instead
         automatically determined based on the invocation options.
 
-        The returned Document objects are coded-independent.
+        The returned Document objects are codec-independent.
 
         Args:
             n: amount of items to return. Fewer items than `n` may be returned  if
@@ -1797,34 +1944,57 @@ class AstraDBVectorStore(VectorStore):
                 Requires vector sort.
             include_sort_vector: whether to return the very query vector used for the
                 ANN search alongside the iterable of results. Requires vector sort.
+                Note that the shape of the return value depends on this parameter.
             include_embeddings: whether to retrieve the matches' own embedding vectors.
 
         Returns:
-            A tuple `(query_vector, full_results_iterable)`, where:
-            * `query_vector` is the vector used in the ANN search, if requested
-                and applicable;
-            * `full_results_iterable` is an iterable over the AstraDBQueryResult items
-                returned by the query. Entries that fail the decoding step, if any,
-                are discarded after the query, which may lead to fewer items being
-                returned than the required `n`.
+            The shape of the return value depends on the value of `include_sort_vector`:
+            * if `include_sort_vector = False`, the return value is an iterable over
+                the AstraDBQueryResult items returned by the query. Entries that fail
+                the decoding step, if any, are discarded after the query, which may
+                lead to fewer items being returned than the required `n`.
+            * if `include_sort_vector = True`, the return value is a 2-item tuple
+                `(sort_v, results_ite)` tuple, where:
+                - `sort_v` is the sort vector, if requested, or None if not available.
+                - `results_ite` is an iterable over AstraDBQueryResult items as above.
         """
-        query_v, astra_docs_ite = await self.arun_query_raw(
+        if include_sort_vector:
+            query_v, astra_docs_ite = await self.arun_query_raw(
+                n=n,
+                ids=ids,
+                filter=filter,
+                sort=sort,
+                include_similarity=include_similarity,
+                include_sort_vector=True,
+                include_embeddings=include_embeddings,
+            )
+            return (
+                query_v,
+                (
+                    decoded_tuple
+                    async for astra_db_doc in astra_docs_ite
+                    if (
+                        decoded_tuple := self.full_decode_astra_db_document(
+                            astra_db_doc
+                        )
+                    )
+                    is not None
+                ),
+            )
+        astra_docs_ite = await self.arun_query_raw(
             n=n,
             ids=ids,
             filter=filter,
             sort=sort,
             include_similarity=include_similarity,
-            include_sort_vector=include_sort_vector,
+            include_sort_vector=False,
             include_embeddings=include_embeddings,
         )
         return (
-            query_v,
-            (
-                decoded_tuple
-                async for astra_db_doc in astra_docs_ite
-                if (decoded_tuple := self.full_decode_astra_db_document(astra_db_doc))
-                is not None
-            ),
+            decoded_tuple
+            async for astra_db_doc in astra_docs_ite
+            if (decoded_tuple := self.full_decode_astra_db_document(astra_db_doc))
+            is not None
         )
 
     def metadata_search(
@@ -1838,7 +2008,7 @@ class AstraDBVectorStore(VectorStore):
             filter: the metadata to query for.
             n: the maximum number of documents to return.
         """
-        _, docs_ite = self.run_query(n=n, filter=filter)
+        docs_ite = self.run_query(n=n, filter=filter)
         return [doc for doc, _, _, _ in docs_ite]
 
     async def ametadata_search(
@@ -1852,7 +2022,7 @@ class AstraDBVectorStore(VectorStore):
             filter: the metadata to query for.
             n: the maximum number of documents to return.
         """
-        _, docs_ite = await self.arun_query(n=n, filter=filter)
+        docs_ite = await self.arun_query(n=n, filter=filter)
         return [doc async for doc, _, _, _ in docs_ite]
 
     def get_by_document_id(self, document_id: str) -> Document | None:
@@ -1864,7 +2034,7 @@ class AstraDBVectorStore(VectorStore):
         Returns:
             The the document if it exists. Otherwise None.
         """
-        _, hits_ite = self.run_query(
+        hits_ite = self.run_query(
             n=1,
             ids=[document_id],
         )
@@ -1883,7 +2053,7 @@ class AstraDBVectorStore(VectorStore):
         Returns:
             The the document if it exists. Otherwise None.
         """
-        _, hits_ite = await self.arun_query(
+        hits_ite = await self.arun_query(
             n=1,
             ids=[document_id],
         )
@@ -2067,7 +2237,7 @@ class AstraDBVectorStore(VectorStore):
         filter: dict[str, Any] | None = None,  # noqa: A002
     ) -> list[tuple[Document, float, str]]:
         """Run ANN search with a provided sort clause."""
-        _, hits_ite = self.run_query(
+        hits_ite = self.run_query(
             n=k,
             filter=filter,
             sort=sort,
@@ -2423,7 +2593,7 @@ class AstraDBVectorStore(VectorStore):
         filter: dict[str, Any] | None = None,  # noqa: A002
     ) -> list[tuple[Document, float, str]]:
         """Run ANN search with a provided sort clause."""
-        _, hits_ite = await self.arun_query(
+        hits_ite = await self.arun_query(
             n=k,
             filter=filter,
             sort=sort,
