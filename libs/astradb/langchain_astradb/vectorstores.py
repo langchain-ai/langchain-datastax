@@ -19,7 +19,6 @@ from typing import (
     Sequence,
     TypeVar,
     cast,
-    overload,
 )
 
 import numpy as np
@@ -65,7 +64,6 @@ if TYPE_CHECKING:
 
 T = TypeVar("T")
 U = TypeVar("U")
-V = TypeVar("V")
 DocDict = Dict[str, Any]  # dicts expressing entries to insert
 
 # error code to check for during bulk insertions
@@ -1447,59 +1445,22 @@ class AstraDBVectorStore(VectorStore):
 
         return sum(u_res.update_info["n"] for u_res in update_results)
 
-    @overload
-    def run_query(
+    def run_query_raw(
         self,
         *,
         n: int,
-        raw_document_mapper: None = ...,
-        ids: list[str] | None = None,
-        filter: dict[str, Any] | None = None,
-        sort: dict[str, Any] | None = None,
-        include_similarity: bool | None = None,
-        include_sort_vector: bool | None = None,
-        include_embeddings: bool | None = None,
-    ) -> tuple[
-        list[float] | None,
-        Iterable[tuple[Document, str, list[float] | None, float | None]],
-    ]: ...
-
-    @overload
-    def run_query(
-        self,
-        *,
-        n: int,
-        raw_document_mapper: Callable[[DocDict], V | None],
-        ids: list[str] | None = None,
-        filter: dict[str, Any] | None = None,
-        sort: dict[str, Any] | None = None,
-        include_similarity: bool | None = None,
-        include_sort_vector: bool | None = None,
-        include_embeddings: bool | None = None,
-    ) -> tuple[
-        list[float] | None, Iterable[tuple[V, str, list[float] | None, float | None]]
-    ]: ...
-
-    def run_query(
-        self,
-        *,
-        n: int,
-        raw_document_mapper: Callable[[DocDict], V | None] | None = None,
         ids: list[str] | None = None,
         filter: dict[str, Any] | None = None,  # noqa: A002
         sort: dict[str, Any] | None = None,
         include_similarity: bool | None = None,
         include_sort_vector: bool | None = None,
         include_embeddings: bool | None = None,
-    ) -> tuple[
-        list[float] | None,
-        Iterable[tuple[V | Document, str, list[float] | None, float | None]],
-    ]:
-        """Execute a generic query on stored documents.
+    ) -> tuple[list[float] | None, Iterable[DocDict]]:
+        """Execute a generic query on stored documents, returning Astra DB documents.
 
-        The return value has a fixed format, which accommodates all items that
-        can be possibly retrieved by the query depending on various settings.
-        Items that are not requested/unavailable are replaced by `None`.
+        The return value has a fixed format, which accommodates for the possible
+        'query vector' that can also be requested back from the server. In case
+        no query vector comes back, a None value is found in its place.
 
         Only the `n` parameter is required. Omitting all other parameters results
         in a query that matches each and every document found on the collection.
@@ -1507,20 +1468,17 @@ class AstraDBVectorStore(VectorStore):
         The method does not expose a projection directly, which is instead
         automatically determined based on the invocation options.
 
-        The returned documents are converted into `Document` instances by default
-        according to the codec in use by the vector store, but custom mapping
-        functions can be supplied for arbitrary transformations from
-        the Astra DB document.
-
-        Since the mapping function (whether from the coded or user-supplied) is
-        applied after collecting the results, in case documents are discarded
-        (for instance because they are invalid) the amount of returned items may
-        be lower than the requested `n`, even if the database has more matches.
+        The returned documents are exactly as they come back from Astra DB (taking
+        into account the projection as well). A further step, namely subsequent
+        invocation of the `convert_astra_db_document` method, is required to reconstruct
+        codec-independent Document objects.
+        The reason for keeping the retrieval and the decoding steps separate is that
+        a caller may want to first deduplicate/discard items, in order to convert only
+        the items actually needed.
 
         Args:
-            n: amount of items to return. Fewer items than `n` may be returned in the
-                following cases: (a) the document mapper skips some raw entries from
-                the server; (b) the collection has not enough matches.
+            n: amount of items to return. Fewer items than `n` may be returned  if
+                the collection has not enough matches.
             ids: a list of document IDs to restrict the query to. If this is supplied,
                 only document with an ID among the provided one will match. If further
                 query filters are provided (i.e. metadata), matches must satisfy both
@@ -1540,28 +1498,11 @@ class AstraDBVectorStore(VectorStore):
             include_sort_vector: whether to return the very query vector used for the
                 ANN search alongside the iterable of results. Requires vector sort.
             include_embeddings: whether to retrieve the matches' own embedding vectors.
-            raw_document_mapper: if provided, an arbitrary function to process the raw
-                documents, as found on Astra DB, and possibly convert them into another
-                format (`V`). If passed, it must be `Callable[[dict], V | None]`.
-                If omitted, the vector store's codec is used, returning Documents.
-                When providing a custom mapper, it is the caller's responsibility to
-                deal with different encoding (such as the main text being found in
-                "$vectorize" or in "content", or the flat vs. nested structure of the
-                metadata). Matches that are converted into `None` by the mapper function
-                are silently discarded from the final iterable of results: this is
-                a possible way to take care of invalid documents that could be
-                encountered when querying the collection (documents which the codec,
-                conversely, may be configured to skip automatically).
 
         Returns:
-            A structure (nested tuple) packing all requested information as follows:
-            `(sort_v, results_ite)`, where:
+            A two-item `(sort_v, astra_db_ite)` tuple, where:
                 - `sort_v` is the sort vector, if requested, or None.
-                - `results_ite` is an iterable over `(match, id, emb, sim)` tuples:
-                    - `match` is the Document (or the `V` under a generic mapping);
-                    - `id` is the document ID;
-                    - `emb` is the embedding vector if requested, None otherwise;
-                    - `sim` is the numeric similarity, if requested, None otherwise.
+                - `astra_db_ite` is an iterable over Astra DB documents (dictionaries).
         """
         self.astra_env.ensure_db_setup()
 
@@ -1575,11 +1516,6 @@ class AstraDBVectorStore(VectorStore):
             if include_embeddings
             else self.document_codec.base_projection
         )
-        mapper: Callable[[DocDict], Any | None]
-        if raw_document_mapper:
-            mapper = raw_document_mapper
-        else:
-            mapper = self.document_codec.decode
 
         find_raw_iterator = self.astra_env.collection.find(
             filter=find_query,
@@ -1589,65 +1525,49 @@ class AstraDBVectorStore(VectorStore):
             include_sort_vector=include_sort_vector,
             sort=find_sort,
         )
-
+        # stripping down the Astra DB cursor details into a plain iterator:
+        final_doc_iterator = (doc for doc in find_raw_iterator)
         sort_vector = (
             find_raw_iterator.get_sort_vector() if include_sort_vector else None
         )
-        final_doc_iterator = (
-            (
-                mapped_doc,
-                self.document_codec.get_id(raw_doc),
-                self.document_codec.decode_vector(raw_doc)
-                if include_embeddings
-                else None,
-                self.document_codec.get_similarity(raw_doc)
-                if include_similarity
-                else None,
-            )
-            for raw_doc in find_raw_iterator
-            if (mapped_doc := mapper(raw_doc)) is not None
-        )
         return sort_vector, final_doc_iterator
 
-    @overload
-    async def arun_query(
+    def full_decode_astra_db_document(
         self,
-        *,
-        n: int,
-        raw_document_mapper: None = ...,
-        ids: list[str] | None = None,
-        filter: dict[str, Any] | None = None,
-        sort: dict[str, Any] | None = None,
-        include_similarity: bool | None = None,
-        include_sort_vector: bool | None = None,
-        include_embeddings: bool | None = None,
-    ) -> tuple[
-        list[float] | None,
-        AsyncIterable[tuple[Document, str, list[float] | None, float | None]],
-    ]: ...
+        astra_db_document: DocDict,
+    ) -> tuple[Document, str, list[float] | None, float | None] | None:
+        """Decode an Astra DB document in full, i.e. into Document+embedding/similarity.
 
-    @overload
-    async def arun_query(
-        self,
-        *,
-        n: int,
-        raw_document_mapper: Callable[[DocDict], V | None],
-        ids: list[str] | None = None,
-        filter: dict[str, Any] | None = None,
-        sort: dict[str, Any] | None = None,
-        include_similarity: bool | None = None,
-        include_sort_vector: bool | None = None,
-        include_embeddings: bool | None = None,
-    ) -> tuple[
-        list[float] | None,
-        AsyncIterable[tuple[V, str, list[float] | None, float | None]],
-    ]: ...
+        This operation returns a representation that is independent of the codec
+        being used in the collection (whereas the input, a 'raw' Astra DB document,
+        is codec-dependent).
 
-    async def arun_query(
+        The input raw document can carry information on embedding and similarity,
+        depending on details of the query used to retrieve it. These can be set
+        to None in the resulf if not found.
+
+        The whole method can return a None, to signal that the codec has refused
+        the conversion (e.g. because the input document is deemed faulty).
+
+        Args:
+            astra_db_document: a dictionary obtained through `run_query_raw` from
+                the collection.
+
+        Returns:
+            TODO: a tuple (...) or None.
+        """
+        decoded = self.document_codec.decode(astra_db_document)
+        if decoded is not None:
+            doc_id = self.document_codec.get_id(astra_db_document)
+            doc_embedding = self.document_codec.decode_vector(astra_db_document)
+            doc_similarity = self.document_codec.get_similarity(astra_db_document)
+            return (decoded, doc_id, doc_embedding, doc_similarity)
+        return None
+
+    def run_query(
         self,
         *,
         n: int,
-        raw_document_mapper: Callable[[DocDict], V | None] | None = None,
         ids: list[str] | None = None,
         filter: dict[str, Any] | None = None,  # noqa: A002
         sort: dict[str, Any] | None = None,
@@ -1656,13 +1576,13 @@ class AstraDBVectorStore(VectorStore):
         include_embeddings: bool | None = None,
     ) -> tuple[
         list[float] | None,
-        AsyncIterable[tuple[V | Document, str, list[float] | None, float | None]],
+        Iterable[tuple[Document, str, list[float] | None, float | None]],
     ]:
-        """Execute a generic query on stored documents.
+        """Execute a generic query on stored documents, returning Documents+other info.
 
-        The return value has a fixed format, which accommodates all items that
-        can be possibly retrieved by the query depending on various settings.
-        Items that are not requested/unavailable are replaced by `None`.
+        The return value has a fixed format, which accommodates for possible quantities
+        that can be requested to the server together with the Documents. In case these
+        quantities are not requested/available, None values are returned in their place.
 
         Only the `n` parameter is required. Omitting all other parameters results
         in a query that matches each and every document found on the collection.
@@ -1670,19 +1590,11 @@ class AstraDBVectorStore(VectorStore):
         The method does not expose a projection directly, which is instead
         automatically determined based on the invocation options.
 
-        The returned documents are converted into `Document` instances by default
-        according to the codec in use by the vector store, but custom mapping
-        functions can be supplied for arbitrary transformations from
-        the Astra DB document.
-
-        Since the mapping function (whether from the coded or user-supplied) is
-        applied after collecting the results, in case documents are discarded
-        (for instance because they are invalid) the amount of returned items may
-        be lower than the requested `n`, even if the database has more matches.
+        The returned Document objects are coded-independent.
 
         Args:
             n: amount of items to return. Fewer items than `n` may be returned in the
-                following cases: (a) the document mapper skips some raw entries from
+                following cases: (a) the decoding skips some raw entries from
                 the server; (b) the collection has not enough matches.
             ids: a list of document IDs to restrict the query to. If this is supplied,
                 only document with an ID among the provided one will match. If further
@@ -1703,28 +1615,89 @@ class AstraDBVectorStore(VectorStore):
             include_sort_vector: whether to return the very query vector used for the
                 ANN search alongside the iterable of results. Requires vector sort.
             include_embeddings: whether to retrieve the matches' own embedding vectors.
-            raw_document_mapper: if provided, an arbitrary function to process the raw
-                documents, as found on Astra DB, and possibly convert them into another
-                format (`V`). If passed, it must be `Callable[[dict], V | None]`.
-                If omitted, the vector store's codec is used, returning Documents.
-                When providing a custom mapper, it is the caller's responsibility to
-                deal with different encoding (such as the main text being found in
-                "$vectorize" or in "content", or the flat vs. nested structure of the
-                metadata). Matches that are converted into `None` by the mapper function
-                are silently discarded from the final iterable of results: this is
-                a possible way to take care of invalid documents that could be
-                encountered when querying the collection (documents which the codec,
-                conversely, may be configured to skip automatically).
 
         Returns:
-            A structure (nested tuple) packing all requested information as follows:
-            `(sort_v, results_ite)`, where:
+            TODO: a tuple(tuple (...)) or None
+        """
+        query_v, astra_docs_ite = self.run_query_raw(
+            n=n,
+            ids=ids,
+            filter=filter,
+            sort=sort,
+            include_similarity=include_similarity,
+            include_sort_vector=include_sort_vector,
+            include_embeddings=include_embeddings,
+        )
+        # TODO: fix the tuple
+        return (
+            query_v,
+            (
+                decoded_tuple
+                for astra_db_doc in astra_docs_ite
+                if (decoded_tuple := self.full_decode_astra_db_document(astra_db_doc))
+                is not None
+            ),
+        )
+
+    async def arun_query_raw(
+        self,
+        *,
+        n: int,
+        ids: list[str] | None = None,
+        filter: dict[str, Any] | None = None,  # noqa: A002
+        sort: dict[str, Any] | None = None,
+        include_similarity: bool | None = None,
+        include_sort_vector: bool | None = None,
+        include_embeddings: bool | None = None,
+    ) -> tuple[list[float] | None, AsyncIterable[DocDict]]:
+        """Execute a generic query on stored documents, returning Astra DB documents.
+
+        The return value has a fixed format, which accommodates for the possible
+        'query vector' that can also be requested back from the server. In case
+        no query vector comes back, a None value is found in its place.
+
+        Only the `n` parameter is required. Omitting all other parameters results
+        in a query that matches each and every document found on the collection.
+
+        The method does not expose a projection directly, which is instead
+        automatically determined based on the invocation options.
+
+        The returned documents are exactly as they come back from Astra DB (taking
+        into account the projection as well). A further step, namely subsequent
+        invocation of the `convert_astra_db_document` method, is required to reconstruct
+        codec-independent Document objects.
+        The reason for keeping the retrieval and the decoding steps separate is that
+        a caller may want to first deduplicate/discard items, in order to convert only
+        the items actually needed.
+
+        Args:
+            n: amount of items to return. Fewer items than `n` may be returned in the
+                following cases: (a) the decoding skips some raw entries from
+                the server; (b) the collection has not enough matches.
+            ids: a list of document IDs to restrict the query to. If this is supplied,
+                only document with an ID among the provided one will match. If further
+                query filters are provided (i.e. metadata), matches must satisfy both
+                requirements.
+            filter: a metadata filtering part. If provided, it must refer to
+                metadata keys by their bare name (such as `{"key": 123}`).
+                This filter can combine nested conditions with "$or"/"$and" connectors,
+                for example:
+                - `{"tag": "a"}`
+                - `{"$or": [{"tag": "a"}, "label": "b"]}`
+                - `{"$and": [{"tag": {"$in": ["a", "z"]}}, "label": "b"]}`
+            sort: a 'sort' clause for the query, such as `{"$vector": [...]}`,
+                `{"$vectorize": "..."}` or `{"mdkey": 1}`. Metadata sort conditions
+                must be expressed by their 'bare' name.
+            include_similarity: whether to return similarity scores with each match.
+                Requires vector sort.
+            include_sort_vector: whether to return the very query vector used for the
+                ANN search alongside the iterable of results. Requires vector sort.
+            include_embeddings: whether to retrieve the matches' own embedding vectors.
+
+        Returns:
+            A two-item `(sort_v, astra_db_ite)` tuple, where:
                 - `sort_v` is the sort vector, if requested, or None.
-                - `results_ite` is an iterable over `(match, id, emb, sim)` tuples:
-                    - `match` is the Document (or the `V` under a generic mapping);
-                    - `id` is the document ID;
-                    - `emb` is the embedding vector if requested, None otherwise;
-                    - `sim` is the numeric similarity, if requested, None otherwise.
+                - `astra_db_ite` is an iterable over Astra DB documents (dictionaries).
         """
         await self.astra_env.aensure_db_setup()
 
@@ -1738,11 +1711,6 @@ class AstraDBVectorStore(VectorStore):
             if include_embeddings
             else self.document_codec.base_projection
         )
-        mapper: Callable[[DocDict], Any | None]
-        if raw_document_mapper:
-            mapper = raw_document_mapper
-        else:
-            mapper = self.document_codec.decode
 
         find_raw_iterator = self.astra_env.async_collection.find(
             filter=find_query,
@@ -1752,25 +1720,86 @@ class AstraDBVectorStore(VectorStore):
             include_sort_vector=include_sort_vector,
             sort=find_sort,
         )
-
+        # stripping down the Astra DB cursor details into a plain iterator:
+        final_doc_iterator = (doc async for doc in find_raw_iterator)
         sort_vector = (
-            (await find_raw_iterator.get_sort_vector()) if include_sort_vector else None
-        )
-        final_doc_iterator = (
-            (
-                mapped_doc,
-                self.document_codec.get_id(raw_doc),
-                self.document_codec.decode_vector(raw_doc)
-                if include_embeddings
-                else None,
-                self.document_codec.get_similarity(raw_doc)
-                if include_similarity
-                else None,
-            )
-            async for raw_doc in find_raw_iterator
-            if (mapped_doc := mapper(raw_doc)) is not None
+            await find_raw_iterator.get_sort_vector() if include_sort_vector else None
         )
         return sort_vector, final_doc_iterator
+
+    async def arun_query(
+        self,
+        *,
+        n: int,
+        ids: list[str] | None = None,
+        filter: dict[str, Any] | None = None,  # noqa: A002
+        sort: dict[str, Any] | None = None,
+        include_similarity: bool | None = None,
+        include_sort_vector: bool | None = None,
+        include_embeddings: bool | None = None,
+    ) -> tuple[
+        list[float] | None,
+        AsyncIterable[tuple[Document, str, list[float] | None, float | None]],
+    ]:
+        """Execute a generic query on stored documents, returning Documents+other info.
+
+        The return value has a fixed format, which accommodates for possible quantities
+        that can be requested to the server together with the Documents. In case these
+        quantities are not requested/available, None values are returned in their place.
+
+        Only the `n` parameter is required. Omitting all other parameters results
+        in a query that matches each and every document found on the collection.
+
+        The method does not expose a projection directly, which is instead
+        automatically determined based on the invocation options.
+
+        The returned Document objects are coded-independent.
+
+        Args:
+            n: amount of items to return. Fewer items than `n` may be returned  if
+                the collection has not enough matches.
+            ids: a list of document IDs to restrict the query to. If this is supplied,
+                only document with an ID among the provided one will match. If further
+                query filters are provided (i.e. metadata), matches must satisfy both
+                requirements.
+            filter: a metadata filtering part. If provided, it must refer to
+                metadata keys by their bare name (such as `{"key": 123}`).
+                This filter can combine nested conditions with "$or"/"$and" connectors,
+                for example:
+                - `{"tag": "a"}`
+                - `{"$or": [{"tag": "a"}, "label": "b"]}`
+                - `{"$and": [{"tag": {"$in": ["a", "z"]}}, "label": "b"]}`
+            sort: a 'sort' clause for the query, such as `{"$vector": [...]}`,
+                `{"$vectorize": "..."}` or `{"mdkey": 1}`. Metadata sort conditions
+                must be expressed by their 'bare' name.
+            include_similarity: whether to return similarity scores with each match.
+                Requires vector sort.
+            include_sort_vector: whether to return the very query vector used for the
+                ANN search alongside the iterable of results. Requires vector sort.
+            include_embeddings: whether to retrieve the matches' own embedding vectors.
+
+        Returns:
+            TODO: a tuple(tuple (...)) or None
+        """
+        query_v, astra_docs_ite = await self.arun_query_raw(
+            n=n,
+            ids=ids,
+            filter=filter,
+            sort=sort,
+            include_similarity=include_similarity,
+            include_sort_vector=include_sort_vector,
+            include_embeddings=include_embeddings,
+        )
+        # TODO: fix the tuple
+        return (
+            query_v,
+            (
+                decoded_tuple
+                async for astra_db_doc in astra_docs_ite
+                if (decoded_tuple := self.full_decode_astra_db_document(astra_db_doc))
+                is not None
+            ),
+        )
 
     def metadata_search(
         self,

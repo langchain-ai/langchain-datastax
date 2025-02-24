@@ -218,12 +218,9 @@ class _AstraDBVectorStoreDocumentCodec(ABC):
         """Return the ID of an encoded document (= a raw JSON read from DB)."""
         return astra_document["_id"]
 
-    def get_similarity(self, astra_document: dict[str, Any]) -> float:
-        """Return the similarity of an encoded document (= a raw JSON read from DB).
-
-        This method assumes its argument comes from a suitable vector search.
-        """
-        return astra_document[SIMILARITY_FIELD_NAME]
+    def get_similarity(self, astra_document: dict[str, Any]) -> float | None:
+        """Return the similarity of an encoded document (= a raw JSON read from DB)."""
+        return astra_document.get(SIMILARITY_FIELD_NAME)
 
     def encode_query(
         self,

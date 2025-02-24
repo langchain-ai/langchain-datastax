@@ -2008,28 +2008,6 @@ class TestAstraDBVectorStore:
         assert isinstance(hits7_l[0][2][0], (int, float))
         assert hits7_l[0][3] is None
 
-        # use a custom mapper
-        search_vector8, hits8 = vstore.run_query(
-            n=2,
-            ids=["1", "2", "6", "7", "9", "10"],
-            filter={"$or": [{"a": "a"}, {"b": "b"}]},
-            sort=sort_clause,
-            include_similarity=False,
-            include_sort_vector=False,
-            include_embeddings=False,
-            raw_document_mapper=lambda raw_doc: "/".join(sorted(raw_doc.keys())),
-        )
-        hits8_l = list(hits8)
-        assert search_vector8 is None
-        assert len(hits8_l) >= 2  # sometimes _id-based queries return more.
-        assert len(hits8_l) <= 4
-        assert hits8_l[0][0] == (
-            "$vectorize/_id/metadata" if is_vectorize else "_id/content/metadata"
-        )
-        assert hits8_l[0][1] in {"1", "2", "6", "7"}
-        assert hits8_l[0][2] is None
-        assert hits8_l[0][3] is None
-
         # nonvector sort
         _, hits9a = vstore.run_query(
             n=3,
@@ -2223,28 +2201,6 @@ class TestAstraDBVectorStore:
         assert isinstance(hits7_l[0][2], list)
         assert isinstance(hits7_l[0][2][0], (int, float))
         assert hits7_l[0][3] is None
-
-        # use a custom mapper
-        search_vector8, hits8 = await vstore.arun_query(
-            n=2,
-            ids=["1", "2", "6", "7", "9", "10"],
-            filter={"$or": [{"a": "a"}, {"b": "b"}]},
-            sort=sort_clause,
-            include_similarity=False,
-            include_sort_vector=False,
-            include_embeddings=False,
-            raw_document_mapper=lambda raw_doc: "/".join(sorted(raw_doc.keys())),
-        )
-        hits8_l = [tpl async for tpl in hits8]
-        assert search_vector8 is None
-        assert len(hits8_l) >= 2  # sometimes _id-based queries return more.
-        assert len(hits8_l) <= 4
-        assert hits8_l[0][0] == (
-            "$vectorize/_id/metadata" if is_vectorize else "_id/content/metadata"
-        )
-        assert hits8_l[0][1] in {"1", "2", "6", "7"}
-        assert hits8_l[0][2] is None
-        assert hits8_l[0][3] is None
 
         # nonvector sort
         _, hits9a = await vstore.arun_query(
