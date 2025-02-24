@@ -68,7 +68,7 @@ U = TypeVar("U")
 DocDict = Dict[str, Any]  # dicts expressing entries to insert
 
 
-class FullQueryResult(NamedTuple):
+class AstraDBQueryResult(NamedTuple):
     """The complete information contained in a vector store entry.
 
     This class represents all that can be returned from the collection when running
@@ -1463,7 +1463,7 @@ class AstraDBVectorStore(VectorStore):
     def full_decode_astra_db_document(
         self,
         astra_db_document: DocDict,
-    ) -> FullQueryResult | None:
+    ) -> AstraDBQueryResult | None:
         """Decode an Astra DB document in full, i.e. into Document+embedding/similarity.
 
         This operation returns a representation that is independent of the codec
@@ -1482,7 +1482,7 @@ class AstraDBVectorStore(VectorStore):
                 the collection.
 
         Returns:
-            a FullQueryResult named tuple with Document, id, embedding
+            a AstraDBQueryResult named tuple with Document, id, embedding
                 (where applicable) and similarity (where applicable),
                 or an overall None if the decoding is refused by the codec.
         """
@@ -1491,7 +1491,7 @@ class AstraDBVectorStore(VectorStore):
             doc_id = self.document_codec.get_id(astra_db_document)
             doc_embedding = self.document_codec.decode_vector(astra_db_document)
             doc_similarity = self.document_codec.get_similarity(astra_db_document)
-            return FullQueryResult(
+            return AstraDBQueryResult(
                 document=decoded,
                 id=doc_id,
                 embedding=doc_embedding,
@@ -1506,9 +1506,9 @@ class AstraDBVectorStore(VectorStore):
         ids: list[str] | None = None,
         filter: dict[str, Any] | None = None,  # noqa: A002
         sort: dict[str, Any] | None = None,
-        include_similarity: bool | None = None,
-        include_sort_vector: bool | None = None,
-        include_embeddings: bool | None = None,
+        include_similarity: bool = False,
+        include_sort_vector: bool = False,
+        include_embeddings: bool = False,
     ) -> tuple[list[float] | None, Iterable[DocDict]]:
         """Execute a generic query on stored documents, returning Astra DB documents.
 
@@ -1593,10 +1593,10 @@ class AstraDBVectorStore(VectorStore):
         ids: list[str] | None = None,
         filter: dict[str, Any] | None = None,  # noqa: A002
         sort: dict[str, Any] | None = None,
-        include_similarity: bool | None = None,
-        include_sort_vector: bool | None = None,
-        include_embeddings: bool | None = None,
-    ) -> tuple[list[float] | None, Iterable[FullQueryResult]]:
+        include_similarity: bool = False,
+        include_sort_vector: bool = False,
+        include_embeddings: bool = False,
+    ) -> tuple[list[float] | None, Iterable[AstraDBQueryResult]]:
         """Execute a generic query on stored documents, returning Documents+other info.
 
         The return value has a fixed format, which accommodates for possible quantities
@@ -1639,7 +1639,7 @@ class AstraDBVectorStore(VectorStore):
             A tuple `(query_vector, full_results_iterable)`, where:
             * `query_vector` is the vector used in the ANN search, if requested
                 and applicable;
-            * `full_results_iterable` is an iterable over the FullQueryResult items
+            * `full_results_iterable` is an iterable over the AstraDBQueryResult items
                 returned by the query. Entries that fail the decoding step, if any,
                 are discarded after the query, which may lead to fewer items being
                 returned than the required `n`.
@@ -1670,9 +1670,9 @@ class AstraDBVectorStore(VectorStore):
         ids: list[str] | None = None,
         filter: dict[str, Any] | None = None,  # noqa: A002
         sort: dict[str, Any] | None = None,
-        include_similarity: bool | None = None,
-        include_sort_vector: bool | None = None,
-        include_embeddings: bool | None = None,
+        include_similarity: bool = False,
+        include_sort_vector: bool = False,
+        include_embeddings: bool = False,
     ) -> tuple[list[float] | None, AsyncIterable[DocDict]]:
         """Execute a generic query on stored documents, returning Astra DB documents.
 
@@ -1758,10 +1758,10 @@ class AstraDBVectorStore(VectorStore):
         ids: list[str] | None = None,
         filter: dict[str, Any] | None = None,  # noqa: A002
         sort: dict[str, Any] | None = None,
-        include_similarity: bool | None = None,
-        include_sort_vector: bool | None = None,
-        include_embeddings: bool | None = None,
-    ) -> tuple[list[float] | None, AsyncIterable[FullQueryResult]]:
+        include_similarity: bool = False,
+        include_sort_vector: bool = False,
+        include_embeddings: bool = False,
+    ) -> tuple[list[float] | None, AsyncIterable[AstraDBQueryResult]]:
         """Execute a generic query on stored documents, returning Documents+other info.
 
         The return value has a fixed format, which accommodates for possible quantities
@@ -1803,7 +1803,7 @@ class AstraDBVectorStore(VectorStore):
             A tuple `(query_vector, full_results_iterable)`, where:
             * `query_vector` is the vector used in the ANN search, if requested
                 and applicable;
-            * `full_results_iterable` is an iterable over the FullQueryResult items
+            * `full_results_iterable` is an iterable over the AstraDBQueryResult items
                 returned by the query. Entries that fail the decoding step, if any,
                 are discarded after the query, which may lead to fewer items being
                 returned than the required `n`.
