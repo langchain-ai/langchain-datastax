@@ -16,6 +16,7 @@ from typing import (
     Callable,
     Dict,
     Iterable,
+    NamedTuple,
     Sequence,
     TypeVar,
     cast,
@@ -65,6 +66,20 @@ if TYPE_CHECKING:
 T = TypeVar("T")
 U = TypeVar("U")
 DocDict = Dict[str, Any]  # dicts expressing entries to insert
+
+
+class FullQueryResult(NamedTuple):
+    """The complete information contained in a vector store entry.
+
+    This class represents all that can be returned from the collection when running
+    a query, which goes beyond just the corresponding Document.
+    """
+
+    document: Document
+    id: str
+    embedding: list[float] | None
+    similarity: float | None
+
 
 # error code to check for during bulk insertions
 DOCUMENT_ALREADY_EXISTS_API_ERROR_CODE = "DOCUMENT_ALREADY_EXISTS"
@@ -1445,6 +1460,45 @@ class AstraDBVectorStore(VectorStore):
 
         return sum(u_res.update_info["n"] for u_res in update_results)
 
+    def full_decode_astra_db_document(
+        self,
+        astra_db_document: DocDict,
+    ) -> FullQueryResult | None:
+        """Decode an Astra DB document in full, i.e. into Document+embedding/similarity.
+
+        This operation returns a representation that is independent of the codec
+        being used in the collection (whereas the input, a 'raw' Astra DB document,
+        is codec-dependent).
+
+        The input raw document can carry information on embedding and similarity,
+        depending on details of the query used to retrieve it. These can be set
+        to None in the resulf if not found.
+
+        The whole method can return a None, to signal that the codec has refused
+        the conversion (e.g. because the input document is deemed faulty).
+
+        Args:
+            astra_db_document: a dictionary obtained through `run_query_raw` from
+                the collection.
+
+        Returns:
+            a FullQueryResult named tuple with Document, id, embedding
+                (where applicable) and similarity (where applicable),
+                or an overall None if the decoding is refused by the codec.
+        """
+        decoded = self.document_codec.decode(astra_db_document)
+        if decoded is not None:
+            doc_id = self.document_codec.get_id(astra_db_document)
+            doc_embedding = self.document_codec.decode_vector(astra_db_document)
+            doc_similarity = self.document_codec.get_similarity(astra_db_document)
+            return FullQueryResult(
+                document=decoded,
+                id=doc_id,
+                embedding=doc_embedding,
+                similarity=doc_similarity,
+            )
+        return None
+
     def run_query_raw(
         self,
         *,
@@ -1532,38 +1586,6 @@ class AstraDBVectorStore(VectorStore):
         )
         return sort_vector, final_doc_iterator
 
-    def full_decode_astra_db_document(
-        self,
-        astra_db_document: DocDict,
-    ) -> tuple[Document, str, list[float] | None, float | None] | None:
-        """Decode an Astra DB document in full, i.e. into Document+embedding/similarity.
-
-        This operation returns a representation that is independent of the codec
-        being used in the collection (whereas the input, a 'raw' Astra DB document,
-        is codec-dependent).
-
-        The input raw document can carry information on embedding and similarity,
-        depending on details of the query used to retrieve it. These can be set
-        to None in the resulf if not found.
-
-        The whole method can return a None, to signal that the codec has refused
-        the conversion (e.g. because the input document is deemed faulty).
-
-        Args:
-            astra_db_document: a dictionary obtained through `run_query_raw` from
-                the collection.
-
-        Returns:
-            TODO: a tuple (...) or None.
-        """
-        decoded = self.document_codec.decode(astra_db_document)
-        if decoded is not None:
-            doc_id = self.document_codec.get_id(astra_db_document)
-            doc_embedding = self.document_codec.decode_vector(astra_db_document)
-            doc_similarity = self.document_codec.get_similarity(astra_db_document)
-            return (decoded, doc_id, doc_embedding, doc_similarity)
-        return None
-
     def run_query(
         self,
         *,
@@ -1574,10 +1596,7 @@ class AstraDBVectorStore(VectorStore):
         include_similarity: bool | None = None,
         include_sort_vector: bool | None = None,
         include_embeddings: bool | None = None,
-    ) -> tuple[
-        list[float] | None,
-        Iterable[tuple[Document, str, list[float] | None, float | None]],
-    ]:
+    ) -> tuple[list[float] | None, Iterable[FullQueryResult]]:
         """Execute a generic query on stored documents, returning Documents+other info.
 
         The return value has a fixed format, which accommodates for possible quantities
@@ -1617,7 +1636,13 @@ class AstraDBVectorStore(VectorStore):
             include_embeddings: whether to retrieve the matches' own embedding vectors.
 
         Returns:
-            TODO: a tuple(tuple (...)) or None
+            A tuple `(query_vector, full_results_iterable)`, where:
+            * `query_vector` is the vector used in the ANN search, if requested
+                and applicable;
+            * `full_results_iterable` is an iterable over the FullQueryResult items
+                returned by the query. Entries that fail the decoding step, if any,
+                are discarded after the query, which may lead to fewer items being
+                returned than the required `n`.
         """
         query_v, astra_docs_ite = self.run_query_raw(
             n=n,
@@ -1628,7 +1653,6 @@ class AstraDBVectorStore(VectorStore):
             include_sort_vector=include_sort_vector,
             include_embeddings=include_embeddings,
         )
-        # TODO: fix the tuple
         return (
             query_v,
             (
@@ -1737,10 +1761,7 @@ class AstraDBVectorStore(VectorStore):
         include_similarity: bool | None = None,
         include_sort_vector: bool | None = None,
         include_embeddings: bool | None = None,
-    ) -> tuple[
-        list[float] | None,
-        AsyncIterable[tuple[Document, str, list[float] | None, float | None]],
-    ]:
+    ) -> tuple[list[float] | None, AsyncIterable[FullQueryResult]]:
         """Execute a generic query on stored documents, returning Documents+other info.
 
         The return value has a fixed format, which accommodates for possible quantities
@@ -1779,7 +1800,13 @@ class AstraDBVectorStore(VectorStore):
             include_embeddings: whether to retrieve the matches' own embedding vectors.
 
         Returns:
-            TODO: a tuple(tuple (...)) or None
+            A tuple `(query_vector, full_results_iterable)`, where:
+            * `query_vector` is the vector used in the ANN search, if requested
+                and applicable;
+            * `full_results_iterable` is an iterable over the FullQueryResult items
+                returned by the query. Entries that fail the decoding step, if any,
+                are discarded after the query, which may lead to fewer items being
+                returned than the required `n`.
         """
         query_v, astra_docs_ite = await self.arun_query_raw(
             n=n,
@@ -1790,7 +1817,6 @@ class AstraDBVectorStore(VectorStore):
             include_sort_vector=include_sort_vector,
             include_embeddings=include_embeddings,
         )
-        # TODO: fix the tuple
         return (
             query_v,
             (
