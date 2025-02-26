@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 from astrapy.authentication import EmbeddingAPIKeyHeaderProvider, StaticTokenProvider
+from astrapy.constants import SortDocuments
 from langchain_core.documents import Document
 
 from langchain_astradb.utils.astradb import COMPONENT_NAME_VECTORSTORE, SetupMode
@@ -1828,3 +1829,375 @@ class TestAstraDBVectorStore:
         assert vstore2.astra_env.ext_callers == [("cnx", "cvx")]
         assert vstore2.astra_env.component_name == "component_name2"
         assert vstore2.astra_env.collection_embedding_api_key == apikey2
+
+    @pytest.mark.parametrize(
+        ("vector_store", "is_vectorize"),
+        [
+            ("vector_store_d2", False),
+            ("vector_store_vz", True),
+        ],
+        ids=[
+            "nonvectorize_store",
+            "vectorize_store",
+        ],
+    )
+    def test_astradb_vectorstore_run_query(
+        self,
+        *,
+        vector_store: str,
+        is_vectorize: bool,
+        request: pytest.FixtureRequest,
+    ) -> None:
+        """Structure of the metadata/vector for the 'run_query' test:
+        ID      a       b       c       vec(when 2d)
+        --------------------------------------------
+         '1'    'a'                     [1,1]
+         '2'    'a'                     [1,2]
+         '3'    'a'                     ...
+         '4'    'a'     'b'             ...
+         '5'    'a'     'b'
+         '6'            'b'     'c'
+         '7'            'b'     'c'
+         '8'                    'c'
+         '9'                    'c'
+        '10'                    'c'     [1,10]
+        """
+        vstore: AstraDBVectorStore = request.getfixturevalue(vector_store)
+
+        documents_to_insert = [
+            Document(
+                page_content=f"This is number {i+1}" if is_vectorize else f"[1,{i+1}]",
+                metadata={
+                    **({"a": "a"} if i < 5 else {}),
+                    **({"b": "b"} if i < 7 and i >= 3 else {}),
+                    **({"c": "c"} if i >= 5 else {}),
+                    "int_index": i + 1,
+                },
+                id=f"{i+1}",
+            )
+            for i in range(10)
+        ]
+        vstore.add_documents(documents_to_insert)
+        sort_clause: dict[str, list[float] | str] = (
+            {"$vectorize": "This is number 6"} if is_vectorize else {"$vector": [1, 6]}
+        )
+
+        # baseline
+        hits0 = vstore.run_query(n=5)
+        hits0_l = list(hits0)
+        assert len(hits0_l) == 5
+        assert isinstance(hits0_l[0][0], Document)
+        assert isinstance(hits0_l[0][1], str)
+        assert hits0_l[0][2] is None
+        assert hits0_l[0][3] is None
+
+        # just id
+        hits1 = vstore.run_query(
+            n=2,
+            ids=["5", "6", "7", "8"],
+        )
+        hits1_l = list(hits1)
+        assert len(hits1_l) >= 2  # sometimes _id-based queries return more.
+        assert len(hits1_l) <= 4
+        assert isinstance(hits1_l[0][0], Document)
+        assert hits1_l[0][1] in {"5", "6", "7", "8"}
+        assert hits1_l[0][2] is None
+        assert hits1_l[0][3] is None
+
+        # just simple filters
+        hits2 = vstore.run_query(
+            n=20,
+            filter={"a": "a"},
+        )
+        hits2_l = list(hits2)
+        assert len(hits2_l) == 5
+        assert isinstance(hits2_l[0][0], Document)
+        assert hits2_l[0][1] in {"1", "2", "3", "4", "5"}
+        assert hits2_l[0][2] is None
+        assert hits2_l[0][3] is None
+
+        # just elaborate filters
+        hits3 = vstore.run_query(
+            n=30,
+            filter={"$or": [{"a": "a"}, {"b": "b"}]},
+        )
+        hits3_l = list(hits3)
+        assert len(hits3_l) == 7
+        assert isinstance(hits3_l[0][0], Document)
+        assert hits3_l[0][1] in {"1", "2", "3", "4", "5", "6", "7"}
+        assert all(hit[1] in {"1", "2", "3", "4", "5", "6", "7"} for hit in hits3_l)
+        assert hits3_l[0][2] is None
+        assert hits3_l[0][3] is None
+
+        # id + filters
+        hits4 = vstore.run_query(
+            n=2,
+            ids=["1", "2", "6", "7", "9", "10"],
+            filter={"$or": [{"a": "a"}, {"b": "b"}]},
+        )
+        hits4_l = list(hits4)
+        assert len(hits4_l) >= 2  # sometimes _id-based queries return more.
+        assert len(hits4_l) <= 4
+        assert isinstance(hits4_l[0][0], Document)
+        assert hits4_l[0][1] in {"1", "2", "6", "7"}
+        assert all(hit[1] in {"1", "2", "6", "7"} for hit in hits4_l)
+        assert hits4_l[0][2] is None
+        assert hits4_l[0][3] is None
+
+        # get similarity
+        hits5 = vstore.run_query(
+            n=2,
+            ids=["1", "2", "6", "7", "9", "10"],
+            filter={"$or": [{"a": "a"}, {"b": "b"}]},
+            sort=sort_clause,
+            include_similarity=True,
+            include_sort_vector=False,
+            include_embeddings=False,
+        )
+        hits5_l = list(hits5)
+        assert len(hits5_l) >= 2  # sometimes _id-based queries return more.
+        assert len(hits5_l) <= 4
+        assert isinstance(hits5_l[0][0], Document)
+        assert hits5_l[0][1] in {"1", "2", "6", "7"}
+        assert hits5_l[0][2] is None
+        assert isinstance(hits5_l[0][3], float)
+
+        # get sortvector
+        search_vector6, hits6 = vstore.run_query(
+            n=2,
+            ids=["1", "2", "6", "7", "9", "10"],
+            filter={"$or": [{"a": "a"}, {"b": "b"}]},
+            sort=sort_clause,
+            include_similarity=False,
+            include_sort_vector=True,
+            include_embeddings=False,
+        )
+        hits6_l = list(hits6)
+        assert isinstance(search_vector6, list)
+        assert isinstance(search_vector6[0], (int, float))
+        assert len(hits6_l) >= 2  # sometimes _id-based queries return more.
+        assert len(hits6_l) <= 4
+        assert isinstance(hits6_l[0][0], Document)
+        assert hits6_l[0][1] in {"1", "2", "6", "7"}
+        assert hits6_l[0][2] is None
+        assert hits6_l[0][3] is None
+
+        # get embeddings
+        hits7 = vstore.run_query(
+            n=2,
+            ids=["1", "2", "6", "7", "9", "10"],
+            filter={"$or": [{"a": "a"}, {"b": "b"}]},
+            sort=sort_clause,
+            include_similarity=False,
+            include_sort_vector=False,
+            include_embeddings=True,
+        )
+        hits7_l = list(hits7)
+        assert len(hits7_l) >= 2  # sometimes _id-based queries return more.
+        assert len(hits7_l) <= 4
+        assert isinstance(hits7_l[0][0], Document)
+        assert hits7_l[0][1] in {"1", "2", "6", "7"}
+        assert isinstance(hits7_l[0][2], list)
+        assert isinstance(hits7_l[0][2][0], (int, float))
+        assert hits7_l[0][3] is None
+
+        # nonvector sort
+        hits9a = vstore.run_query(
+            n=3,
+            sort={"int_index": SortDocuments.ASCENDING},
+        )
+        hits9a_l = list(hits9a)
+        assert [doc_id for _, doc_id, _, _ in hits9a_l] == ["1", "2", "3"]
+        hits9d = vstore.run_query(
+            n=3,
+            sort={"int_index": SortDocuments.DESCENDING},
+        )
+        hits9d_l = list(hits9d)
+        assert [doc_id for _, doc_id, _, _ in hits9d_l] == ["10", "9", "8"]
+
+    @pytest.mark.parametrize(
+        ("vector_store", "is_vectorize"),
+        [
+            ("vector_store_d2", False),
+            ("vector_store_vz", True),
+        ],
+        ids=[
+            "nonvectorize_store",
+            "vectorize_store",
+        ],
+    )
+    async def test_astradb_vectorstore_arun_query(
+        self,
+        *,
+        vector_store: str,
+        is_vectorize: bool,
+        request: pytest.FixtureRequest,
+    ) -> None:
+        """Structure of the metadata/vector for the 'run_query' test:
+        ID      a       b       c       vec(when 2d)
+        --------------------------------------------
+         '1'    'a'                     [1,1]
+         '2'    'a'                     [1,2]
+         '3'    'a'                     ...
+         '4'    'a'     'b'             ...
+         '5'    'a'     'b'
+         '6'            'b'     'c'
+         '7'            'b'     'c'
+         '8'                    'c'
+         '9'                    'c'
+        '10'                    'c'     [1,10]
+        """
+        vstore: AstraDBVectorStore = await asyncio.to_thread(
+            request.getfixturevalue, vector_store
+        )
+
+        documents_to_insert = [
+            Document(
+                page_content=f"This is number {i+1}" if is_vectorize else f"[1,{i+1}]",
+                metadata={
+                    **({"a": "a"} if i < 5 else {}),
+                    **({"b": "b"} if i < 7 and i >= 3 else {}),
+                    **({"c": "c"} if i >= 5 else {}),
+                    "int_index": i + 1,
+                },
+                id=f"{i+1}",
+            )
+            for i in range(10)
+        ]
+        await vstore.aadd_documents(documents_to_insert)
+        sort_clause: dict[str, list[float] | str] = (
+            {"$vectorize": "This is number 6"} if is_vectorize else {"$vector": [1, 6]}
+        )
+
+        # baseline
+        hits0 = await vstore.arun_query(n=5)
+        hits0_l = [tpl async for tpl in hits0]
+        assert len(hits0_l) == 5
+        assert isinstance(hits0_l[0][0], Document)
+        assert isinstance(hits0_l[0][1], str)
+        assert hits0_l[0][2] is None
+        assert hits0_l[0][3] is None
+
+        # just id
+        hits1 = await vstore.arun_query(
+            n=2,
+            ids=["5", "6", "7", "8"],
+        )
+        hits1_l = [tpl async for tpl in hits1]
+        assert len(hits1_l) >= 2  # sometimes _id-based queries return more.
+        assert len(hits1_l) <= 4
+        assert isinstance(hits1_l[0][0], Document)
+        assert hits1_l[0][1] in {"5", "6", "7", "8"}
+        assert hits1_l[0][2] is None
+        assert hits1_l[0][3] is None
+
+        # just simple filters
+        hits2 = await vstore.arun_query(
+            n=20,
+            filter={"a": "a"},
+        )
+        hits2_l = [tpl async for tpl in hits2]
+        assert len(hits2_l) == 5
+        assert isinstance(hits2_l[0][0], Document)
+        assert hits2_l[0][1] in {"1", "2", "3", "4", "5"}
+        assert hits2_l[0][2] is None
+        assert hits2_l[0][3] is None
+
+        # just elaborate filters
+        hits3 = await vstore.arun_query(
+            n=30,
+            filter={"$or": [{"a": "a"}, {"b": "b"}]},
+        )
+        hits3_l = [tpl async for tpl in hits3]
+        assert len(hits3_l) == 7
+        assert isinstance(hits3_l[0][0], Document)
+        assert hits3_l[0][1] in {"1", "2", "3", "4", "5", "6", "7"}
+        assert all(hit[1] in {"1", "2", "3", "4", "5", "6", "7"} for hit in hits3_l)
+        assert hits3_l[0][2] is None
+        assert hits3_l[0][3] is None
+
+        # id + filters
+        hits4 = await vstore.arun_query(
+            n=2,
+            ids=["1", "2", "6", "7", "9", "10"],
+            filter={"$or": [{"a": "a"}, {"b": "b"}]},
+        )
+        hits4_l = [tpl async for tpl in hits4]
+        assert len(hits4_l) >= 2  # sometimes _id-based queries return more.
+        assert len(hits4_l) <= 4
+        assert isinstance(hits4_l[0][0], Document)
+        assert hits4_l[0][1] in {"1", "2", "6", "7"}
+        assert all(hit[1] in {"1", "2", "6", "7"} for hit in hits4_l)
+        assert hits4_l[0][2] is None
+        assert hits4_l[0][3] is None
+
+        # get similarity
+        hits5 = await vstore.arun_query(
+            n=2,
+            ids=["1", "2", "6", "7", "9", "10"],
+            filter={"$or": [{"a": "a"}, {"b": "b"}]},
+            sort=sort_clause,
+            include_similarity=True,
+            include_sort_vector=False,
+            include_embeddings=False,
+        )
+        hits5_l = [tpl async for tpl in hits5]
+        assert len(hits5_l) >= 2  # sometimes _id-based queries return more.
+        assert len(hits5_l) <= 4
+        assert isinstance(hits5_l[0][0], Document)
+        assert hits5_l[0][1] in {"1", "2", "6", "7"}
+        assert hits5_l[0][2] is None
+        assert isinstance(hits5_l[0][3], float)
+
+        # get sortvector
+        search_vector6, hits6 = await vstore.arun_query(
+            n=2,
+            ids=["1", "2", "6", "7", "9", "10"],
+            filter={"$or": [{"a": "a"}, {"b": "b"}]},
+            sort=sort_clause,
+            include_similarity=False,
+            include_sort_vector=True,
+            include_embeddings=False,
+        )
+        hits6_l = [tpl async for tpl in hits6]
+        assert isinstance(search_vector6, list)
+        assert isinstance(search_vector6[0], (int, float))
+        assert len(hits6_l) >= 2  # sometimes _id-based queries return more.
+        assert len(hits6_l) <= 4
+        assert isinstance(hits6_l[0][0], Document)
+        assert hits6_l[0][1] in {"1", "2", "6", "7"}
+        assert hits6_l[0][2] is None
+        assert hits6_l[0][3] is None
+
+        # get embeddings
+        hits7 = await vstore.arun_query(
+            n=2,
+            ids=["1", "2", "6", "7", "9", "10"],
+            filter={"$or": [{"a": "a"}, {"b": "b"}]},
+            sort=sort_clause,
+            include_similarity=False,
+            include_sort_vector=False,
+            include_embeddings=True,
+        )
+        hits7_l = [tpl async for tpl in hits7]
+        assert len(hits7_l) >= 2  # sometimes _id-based queries return more.
+        assert len(hits7_l) <= 4
+        assert isinstance(hits7_l[0][0], Document)
+        assert hits7_l[0][1] in {"1", "2", "6", "7"}
+        assert isinstance(hits7_l[0][2], list)
+        assert isinstance(hits7_l[0][2][0], (int, float))
+        assert hits7_l[0][3] is None
+
+        # nonvector sort
+        hits9a = await vstore.arun_query(
+            n=3,
+            sort={"int_index": SortDocuments.ASCENDING},
+        )
+        hits9a_l = [tpl async for tpl in hits9a]
+        assert [doc_id for _, doc_id, _, _ in hits9a_l] == ["1", "2", "3"]
+        hits9d = await vstore.arun_query(
+            n=3,
+            sort={"int_index": SortDocuments.DESCENDING},
+        )
+        hits9d_l = [tpl async for tpl in hits9d]
+        assert [doc_id for _, doc_id, _, _ in hits9d_l] == ["10", "9", "8"]
