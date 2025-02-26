@@ -19,6 +19,7 @@ class TestAstraDB:
             "https://01234567-89ab-cdef-0123-456789abcdef-us-east1"
             ".apps.astra.datastax.com"
         )
+        embedding = ParserEmbeddings(dimension=2)
 
         # With an embedding class
         AstraDBVectorStore(

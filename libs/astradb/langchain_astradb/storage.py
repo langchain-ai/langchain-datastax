@@ -16,7 +16,7 @@ from typing import (
     TypeVar,
 )
 
-from astrapy.exceptions import InsertManyException
+from astrapy.exceptions import CollectionInsertManyException
 from langchain_core.stores import BaseStore, ByteStore
 from typing_extensions import override
 
@@ -31,7 +31,7 @@ from langchain_astradb.utils.astradb import (
 
 if TYPE_CHECKING:
     from astrapy.authentication import TokenProvider
-    from astrapy.results import UpdateResult
+    from astrapy.results import CollectionUpdateResult
 
 V = TypeVar("V")
 
@@ -103,7 +103,7 @@ class AstraDBBaseStore(BaseStore[str, V], Generic[V]):
                 concurrency=MAX_CONCURRENT_DOCUMENT_INSERTIONS,
             )
             ids_to_replace = []
-        except InsertManyException as err:
+        except CollectionInsertManyException as err:
             inserted_ids_set = set(err.partial_result.inserted_ids)
             ids_to_replace = [
                 document["_id"]
@@ -123,7 +123,9 @@ class AstraDBBaseStore(BaseStore[str, V], Generic[V]):
                 max_workers=MAX_CONCURRENT_DOCUMENT_REPLACEMENTS
             ) as executor:
 
-                def _replace_document(document: dict[str, Any]) -> UpdateResult:
+                def _replace_document(
+                    document: dict[str, Any],
+                ) -> CollectionUpdateResult:
                     return self.collection.replace_one(
                         {"_id": document["_id"]},
                         document,
@@ -159,7 +161,7 @@ class AstraDBBaseStore(BaseStore[str, V], Generic[V]):
                 ordered=False,
             )
             ids_to_replace = []
-        except InsertManyException as err:
+        except CollectionInsertManyException as err:
             inserted_ids_set = set(err.partial_result.inserted_ids)
             ids_to_replace = [
                 document["_id"]
@@ -179,7 +181,9 @@ class AstraDBBaseStore(BaseStore[str, V], Generic[V]):
 
             _async_collection = self.async_collection
 
-            async def _replace_document(document: dict[str, Any]) -> UpdateResult:
+            async def _replace_document(
+                document: dict[str, Any],
+            ) -> CollectionUpdateResult:
                 async with sem:
                     return await _async_collection.replace_one(
                         {"_id": document["_id"]},

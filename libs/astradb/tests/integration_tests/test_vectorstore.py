@@ -5,13 +5,12 @@ from __future__ import annotations
 import asyncio
 import json
 import math
-import os
 import random
 from typing import TYPE_CHECKING, Any
 
 import pytest
 from astrapy.authentication import EmbeddingAPIKeyHeaderProvider, StaticTokenProvider
-from astrapy.constants import SortDocuments
+from astrapy.constants import SortMode
 from langchain_core.documents import Document
 
 from langchain_astradb.utils.astradb import COMPONENT_NAME_VECTORSTORE, SetupMode
@@ -1936,13 +1935,13 @@ class TestAstraDBVectorStore:
         # nonvector sort
         hits9a = vstore.run_query(
             n=3,
-            sort={"int_index": SortDocuments.ASCENDING},
+            sort={"int_index": SortMode.ASCENDING},
         )
         hits9a_l = list(hits9a)
         assert [doc_id for _, doc_id, _, _ in hits9a_l] == ["1", "2", "3"]
         hits9d = vstore.run_query(
             n=3,
-            sort={"int_index": SortDocuments.DESCENDING},
+            sort={"int_index": SortMode.DESCENDING},
         )
         hits9d_l = list(hits9d)
         assert [doc_id for _, doc_id, _, _ in hits9d_l] == ["10", "9", "8"]
@@ -2123,13 +2122,13 @@ class TestAstraDBVectorStore:
         # nonvector sort
         hits9a = await vstore.arun_query(
             n=3,
-            sort={"int_index": SortDocuments.ASCENDING},
+            sort={"int_index": SortMode.ASCENDING},
         )
         hits9a_l = [tpl async for tpl in hits9a]
         assert [doc_id for _, doc_id, _, _ in hits9a_l] == ["1", "2", "3"]
         hits9d = await vstore.arun_query(
             n=3,
-            sort={"int_index": SortDocuments.DESCENDING},
+            sort={"int_index": SortMode.DESCENDING},
         )
         hits9d_l = [tpl async for tpl in hits9d]
         assert [doc_id for _, doc_id, _, _ in hits9d_l] == ["10", "9", "8"]

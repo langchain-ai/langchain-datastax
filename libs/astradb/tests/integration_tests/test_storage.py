@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 from typing import TYPE_CHECKING
 
 import pytest
@@ -20,7 +19,6 @@ from .conftest import (
 
 if TYPE_CHECKING:
     from astrapy import Collection, Database
-    from astrapy.db import AstraDB
 
 
 @pytest.fixture

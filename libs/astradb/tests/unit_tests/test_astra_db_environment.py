@@ -26,10 +26,6 @@ class TestAstraDBEnvironment:
             "https://01234567-89ab-cdef-0123-456789abcdef-us-east1"
             ".apps.astra.datastax.com"
         )
-        a_e_string_2 = (
-            "https://98765432-10fe-dcba-9876-543210fedcba-us-east1"
-            ".apps.astra.datastax.com"
-        )
 
         env_vars_to_restore = {}
         try:

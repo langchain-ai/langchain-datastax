@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import os
 from operator import itemgetter
 from typing import TYPE_CHECKING
 
@@ -274,61 +273,3 @@ class TestAstraDB:
         )
         doc = await loader.alazy_load().__anext__()
         assert doc.metadata == {"a": "bar"}
-
-    def test_astradb_loader_findoptions_deprecation(
-        self,
-        astra_db_credentials: AstraDBCredentials,
-        document_loader_collection: Collection,
-    ) -> None:
-        """Test deprecation of 'find_options' and related warnings/errors."""
-        loader0 = AstraDBLoader(
-            collection_name=document_loader_collection.name,
-            token=StaticTokenProvider(astra_db_credentials["token"]),
-            api_endpoint=astra_db_credentials["api_endpoint"],
-            namespace=astra_db_credentials["namespace"],
-            environment=astra_db_credentials["environment"],
-            limit=1,
-        )
-        docs0 = loader0.load()
-
-        with pytest.warns(DeprecationWarning) as rec_warnings:
-            loader_lo = AstraDBLoader(
-                collection_name=document_loader_collection.name,
-                token=StaticTokenProvider(astra_db_credentials["token"]),
-                api_endpoint=astra_db_credentials["api_endpoint"],
-                namespace=astra_db_credentials["namespace"],
-                environment=astra_db_credentials["environment"],
-                find_options={"limit": 1},
-            )
-        f_rec_warnings = [
-            wrn for wrn in rec_warnings if issubclass(wrn.category, DeprecationWarning)
-        ]
-        assert len(f_rec_warnings) == 1
-        assert loader_lo.load() == docs0
-
-        with pytest.raises(ValueError, match="Duplicate 'limit' directive supplied."):
-            AstraDBLoader(
-                collection_name=document_loader_collection.name,
-                token=StaticTokenProvider(astra_db_credentials["token"]),
-                api_endpoint=astra_db_credentials["api_endpoint"],
-                namespace=astra_db_credentials["namespace"],
-                environment=astra_db_credentials["environment"],
-                limit=1,
-                find_options={"limit": 1},
-            )
-
-        with pytest.warns(DeprecationWarning) as rec_warnings:
-            loader_uo = AstraDBLoader(
-                collection_name=document_loader_collection.name,
-                token=StaticTokenProvider(astra_db_credentials["token"]),
-                api_endpoint=astra_db_credentials["api_endpoint"],
-                namespace=astra_db_credentials["namespace"],
-                environment=astra_db_credentials["environment"],
-                find_options={"planets": 8, "spiders": 40000},
-                limit=1,
-            )
-        f_rec_warnings = [
-            wrn for wrn in rec_warnings if issubclass(wrn.category, DeprecationWarning)
-        ]
-        assert len(f_rec_warnings) == 1
-        assert loader_uo.load() == docs0

@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING, Any, Awaitable
 import langchain_core
 from astrapy import AsyncDatabase, DataAPIClient, Database
 from astrapy.admin import parse_api_endpoint
+from astrapy.api_options import APIOptions, SerdesOptions
 from astrapy.authentication import (
     EmbeddingAPIKeyHeaderProvider,
     EmbeddingHeadersProvider,
@@ -77,6 +78,20 @@ class SetupMode(Enum):
     SYNC = 1
     ASYNC = 2
     OFF = 3
+
+
+def _unpack_indexing_policy(
+    indexing_dict: dict[str, list[str]] | None,
+) -> tuple[str | None, list[str] | None]:
+    """{} => (None, None); {"a": "b"} => ("a", "b"); multikey => error."""
+    _indexing_dict = indexing_dict or {}
+    if _indexing_dict:
+        if len(_indexing_dict) != 1:
+            msg = "Unexpected indexing policy requested: " f"{indexing_dict}"
+            raise ValueError(msg)
+        keys, vals = list(zip(*_indexing_dict.items()))
+        return keys[0], vals[0]
+    return None, None
 
 
 def _survey_collection(
@@ -163,11 +178,10 @@ class _AstraDBEnvironment:
                 TOKEN_ENV_VAR,
             )
             self.token = StaticTokenProvider(os.environ.get(TOKEN_ENV_VAR))
+        elif isinstance(token, TokenProvider):
+            self.token = token
         else:
-            if isinstance(token, TokenProvider):
-                self.token = token
-            else:
-                self.token = StaticTokenProvider(token)
+            self.token = StaticTokenProvider(token)
 
         if api_endpoint is None:
             logger.info(
@@ -227,6 +241,9 @@ class _AstraDBEnvironment:
         self.data_api_client = DataAPIClient(
             environment=self.environment,
             callers=full_callers,
+            api_options=APIOptions(
+                serdes_options=SerdesOptions(custom_datatypes_in_reading=False)
+            ),
         )
 
         self.database = self.data_api_client.get_database(
@@ -300,18 +317,9 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
                 )
                 raise ValueError(msg)
             try:
-                _idx_mode: str | None
-                _idx_target: list[str] | None
-                if requested_indexing_policy:
-                    if len(requested_indexing_policy) != 1:
-                        msg = (
-                            "Unexpected indexing policy requested: "
-                            f"{requested_indexing_policy}"
-                        )
-                        raise ValueError(msg)
-                else:
-                    _idx_mode = None
-                    _idx_target = None
+                _idx_mode, _idx_target = _unpack_indexing_policy(
+                    requested_indexing_policy,
+                )
                 self.database.create_collection(
                     name=collection_name,
                     definition=(
@@ -410,18 +418,7 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
             dimension = embedding_dimension
 
         try:
-            _idx_mode: str | None
-            _idx_target: list[str] | None
-            if requested_indexing_policy:
-                if len(requested_indexing_policy) != 1:
-                    msg = (
-                        "Unexpected indexing policy requested: "
-                        f"{requested_indexing_policy}"
-                    )
-                    raise ValueError(msg)
-            else:
-                _idx_mode = None
-                _idx_target = None
+            _idx_mode, _idx_target = _unpack_indexing_policy(requested_indexing_policy)
             await self.async_database.create_collection(
                 name=self.collection_name,
                 definition=(

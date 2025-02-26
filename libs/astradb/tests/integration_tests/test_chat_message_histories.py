@@ -1,7 +1,10 @@
-import os
+"""Test of Astra DB chat message history class `AstraDBChatMessageHistory`"""
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 import pytest
-from astrapy import Collection
 from langchain.memory import ConversationBufferMemory
 from langchain_core.messages import AIMessage, HumanMessage
 
@@ -14,6 +17,9 @@ from .conftest import (
     AstraDBCredentials,
     astra_db_env_vars_available,
 )
+
+if TYPE_CHECKING:
+    from astrapy import Collection
 
 
 @pytest.fixture

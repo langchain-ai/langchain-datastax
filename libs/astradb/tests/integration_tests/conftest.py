@@ -185,7 +185,7 @@ def database(
         if astra_db_credentials["namespace"] is None:
             msg = "Cannot test on non-Astra without a namespace set."
             raise ValueError(msg)
-        db.get_database_admin().create_namespace(astra_db_credentials["namespace"])
+        db.get_database_admin().create_keyspace(astra_db_credentials["namespace"])
 
     return db
 
