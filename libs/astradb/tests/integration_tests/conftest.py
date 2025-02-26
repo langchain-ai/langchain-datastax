@@ -28,8 +28,7 @@ from typing import TYPE_CHECKING, Iterable, TypedDict
 import pytest
 from astrapy import DataAPIClient
 from astrapy.authentication import StaticTokenProvider
-from astrapy.db import AstraDB
-from astrapy.info import CollectionVectorServiceOptions
+from astrapy.info import VectorServiceOptions
 
 from langchain_astradb.utils.astradb import SetupMode
 from langchain_astradb.utils.vector_store_codecs import (
@@ -110,15 +109,15 @@ def astra_db_env_vars_available() -> bool:
 _load_env()
 
 
-OPENAI_VECTORIZE_OPTIONS_HEADER = CollectionVectorServiceOptions(
+OPENAI_VECTORIZE_OPTIONS_HEADER = VectorServiceOptions(
     provider="openai",
     model_name="text-embedding-3-small",
 )
 
 OPENAI_SHARED_SECRET_KEY_NAME = os.environ.get("SHARED_SECRET_NAME_OPENAI")
-OPENAI_VECTORIZE_OPTIONS_KMS: CollectionVectorServiceOptions | None
+OPENAI_VECTORIZE_OPTIONS_KMS: VectorServiceOptions | None
 if OPENAI_SHARED_SECRET_KEY_NAME:
-    OPENAI_VECTORIZE_OPTIONS_KMS = CollectionVectorServiceOptions(
+    OPENAI_VECTORIZE_OPTIONS_KMS = VectorServiceOptions(
         provider="openai",
         model_name="text-embedding-3-small",
         authentication={
@@ -189,16 +188,6 @@ def database(
         db.get_database_admin().create_namespace(astra_db_credentials["namespace"])
 
     return db
-
-
-@pytest.fixture(scope="session")
-def core_astra_db(astra_db_credentials: AstraDBCredentials) -> AstraDB:
-    """An instance of the 'core' (pre-1.0, legacy) astrapy database."""
-    return AstraDB(
-        token=astra_db_credentials["token"],
-        api_endpoint=astra_db_credentials["api_endpoint"],
-        namespace=astra_db_credentials["namespace"],
-    )
 
 
 @pytest.fixture(scope="module")

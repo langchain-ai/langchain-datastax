@@ -28,9 +28,7 @@ from langchain_astradb.vectorstores import AstraDBVectorStore
 
 if TYPE_CHECKING:
     from astrapy.authentication import EmbeddingHeadersProvider, TokenProvider
-    from astrapy.db import AstraDB as AstraDBClient
-    from astrapy.db import AsyncAstraDB as AsyncAstraDBClient
-    from astrapy.info import CollectionVectorServiceOptions
+    from astrapy.info import VectorServiceOptions
     from langchain_core.embeddings import Embeddings
 
 DEFAULT_INDEXING_OPTIONS = {"allow": ["metadata"]}
@@ -121,15 +119,13 @@ class AstraDBGraphVectorStore(GraphVectorStore):
         metadata_indexing_include: Iterable[str] | None = None,
         metadata_indexing_exclude: Iterable[str] | None = None,
         collection_indexing_policy: dict[str, Any] | None = None,
-        collection_vector_service_options: CollectionVectorServiceOptions | None = None,
+        collection_vector_service_options: VectorServiceOptions | None = None,
         collection_embedding_api_key: str | EmbeddingHeadersProvider | None = None,
         content_field: str | None = None,
         ignore_invalid_documents: bool = False,
         autodetect_collection: bool = False,
         ext_callers: list[tuple[str | None, str | None] | str | None] | None = None,
         component_name: str = COMPONENT_NAME_GRAPHVECTORSTORE,
-        astra_db_client: AstraDBClient | None = None,
-        async_astra_db_client: AsyncAstraDBClient | None = None,
     ):
         """Graph Vector Store backed by AstraDB.
 
@@ -234,16 +230,6 @@ class AstraDBGraphVectorStore(GraphVectorStore):
                 stack of usage info passed as the User-Agent string to the Data API.
                 Defaults to "langchain_graphvectorstore", but can be overridden if this
                 component actually serves as the building block for another component.
-            astra_db_client:
-                *DEPRECATED starting from version 0.3.5.*
-                *Please use 'token', 'api_endpoint' and optionally 'environment'.*
-                you can pass an already-created 'astrapy.db.AstraDB' instance
-                (alternatively to 'token', 'api_endpoint' and 'environment').
-            async_astra_db_client:
-                *DEPRECATED starting from version 0.3.5.*
-                *Please use 'token', 'api_endpoint' and optionally 'environment'.*
-                you can pass an already-created 'astrapy.db.AsyncAstraDB' instance
-                (alternatively to 'token', 'api_endpoint' and 'environment').
 
         Note:
             For concurrency in synchronous :meth:`~add_texts`:, as a rule of thumb,
@@ -300,8 +286,6 @@ class AstraDBGraphVectorStore(GraphVectorStore):
                 autodetect_collection=autodetect_collection,
                 ext_callers=ext_callers,
                 component_name=component_name,
-                astra_db_client=astra_db_client,
-                async_astra_db_client=async_astra_db_client,
             )
 
             # for the test search, if setup_mode is ASYNC,
@@ -331,8 +315,6 @@ class AstraDBGraphVectorStore(GraphVectorStore):
                     autodetect_collection=autodetect_collection,
                     ext_callers=ext_callers,
                     component_name=component_name,
-                    astra_db_client=astra_db_client,
-                    async_astra_db_client=async_astra_db_client,
                 )
             else:
                 test_vs = self.vector_store
@@ -457,7 +439,7 @@ class AstraDBGraphVectorStore(GraphVectorStore):
         embedding: Embeddings | None = None,
         metadatas: list[dict] | None = None,
         ids: Iterable[str] | None = None,
-        collection_vector_service_options: CollectionVectorServiceOptions | None = None,
+        collection_vector_service_options: VectorServiceOptions | None = None,
         collection_embedding_api_key: str | EmbeddingHeadersProvider | None = None,
         **kwargs: Any,
     ) -> AstraDBGraphVectorStore:
@@ -479,7 +461,7 @@ class AstraDBGraphVectorStore(GraphVectorStore):
         embedding: Embeddings | None = None,
         metadatas: list[dict] | None = None,
         ids: Iterable[str] | None = None,
-        collection_vector_service_options: CollectionVectorServiceOptions | None = None,
+        collection_vector_service_options: VectorServiceOptions | None = None,
         collection_embedding_api_key: str | EmbeddingHeadersProvider | None = None,
         **kwargs: Any,
     ) -> AstraDBGraphVectorStore:
@@ -501,7 +483,7 @@ class AstraDBGraphVectorStore(GraphVectorStore):
         documents: Iterable[Document],
         embedding: Embeddings | None = None,
         ids: Iterable[str] | None = None,
-        collection_vector_service_options: CollectionVectorServiceOptions | None = None,
+        collection_vector_service_options: VectorServiceOptions | None = None,
         collection_embedding_api_key: str | EmbeddingHeadersProvider | None = None,
         **kwargs: Any,
     ) -> AstraDBGraphVectorStore:
@@ -522,7 +504,7 @@ class AstraDBGraphVectorStore(GraphVectorStore):
         documents: Iterable[Document],
         embedding: Embeddings | None = None,
         ids: Iterable[str] | None = None,
-        collection_vector_service_options: CollectionVectorServiceOptions | None = None,
+        collection_vector_service_options: VectorServiceOptions | None = None,
         collection_embedding_api_key: str | EmbeddingHeadersProvider | None = None,
         **kwargs: Any,
     ) -> AstraDBGraphVectorStore:

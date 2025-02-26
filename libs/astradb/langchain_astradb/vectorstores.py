@@ -27,7 +27,7 @@ from typing import (
 import numpy as np
 from astrapy.constants import Environment
 from astrapy.exceptions import InsertManyException
-from astrapy.info import CollectionVectorServiceOptions
+from astrapy.info import VectorServiceOptions
 from langchain_community.vectorstores.utils import maximal_marginal_relevance
 from langchain_core.documents import Document
 from langchain_core.runnables.utils import gather_with_concurrency
@@ -56,12 +56,6 @@ from langchain_astradb.utils.vector_store_codecs import (
 
 if TYPE_CHECKING:
     from astrapy.authentication import EmbeddingHeadersProvider, TokenProvider
-    from astrapy.db import (
-        AstraDB as AstraDBClient,
-    )
-    from astrapy.db import (
-        AsyncAstraDB as AsyncAstraDBClient,
-    )
     from astrapy.results import UpdateResult
     from langchain_core.embeddings import Embeddings
 
@@ -134,7 +128,7 @@ def _validate_autodetect_init_params(
     metadata_indexing_include: Iterable[str] | None,
     metadata_indexing_exclude: Iterable[str] | None,
     collection_indexing_policy: dict[str, Any] | None,
-    collection_vector_service_options: CollectionVectorServiceOptions | None,
+    collection_vector_service_options: VectorServiceOptions | None,
 ) -> None:
     """Check that the passed parameters do not violate the autodetect constraints."""
     forbidden_parameters = [
@@ -439,15 +433,13 @@ class AstraDBVectorStore(VectorStore):
         metadata_indexing_include: Iterable[str] | None = None,
         metadata_indexing_exclude: Iterable[str] | None = None,
         collection_indexing_policy: dict[str, Any] | None = None,
-        collection_vector_service_options: CollectionVectorServiceOptions | None = None,
+        collection_vector_service_options: VectorServiceOptions | None = None,
         collection_embedding_api_key: str | EmbeddingHeadersProvider | None = None,
         content_field: str | None = None,
         ignore_invalid_documents: bool = False,
         autodetect_collection: bool = False,
         ext_callers: list[tuple[str | None, str | None] | str | None] | None = None,
         component_name: str = COMPONENT_NAME_VECTORSTORE,
-        astra_db_client: AstraDBClient | None = None,
-        async_astra_db_client: AsyncAstraDBClient | None = None,
     ) -> None:
         """Wrapper around DataStax Astra DB for vector-store workloads.
 
@@ -554,16 +546,6 @@ class AstraDBVectorStore(VectorStore):
                 Defaults to "langchain_vectorstore", but can be overridden if this
                 component actually serves as the building block for another component
                 (such as a Graph Vector Store).
-            astra_db_client:
-                *DEPRECATED starting from version 0.3.5.*
-                *Please use 'token', 'api_endpoint' and optionally 'environment'.*
-                you can pass an already-created 'astrapy.db.AstraDB' instance
-                (alternatively to 'token', 'api_endpoint' and 'environment').
-            async_astra_db_client:
-                *DEPRECATED starting from version 0.3.5.*
-                *Please use 'token', 'api_endpoint' and optionally 'environment'.*
-                you can pass an already-created 'astrapy.db.AsyncAstraDB' instance
-                (alternatively to 'token', 'api_endpoint' and 'environment').
 
         Note:
             For concurrency in synchronous :meth:`~add_texts`:, as a rule of thumb,
@@ -668,8 +650,6 @@ class AstraDBVectorStore(VectorStore):
                 environment=self.environment,
                 ext_callers=ext_callers,
                 component_name=component_name,
-                astra_db_client=astra_db_client,
-                async_astra_db_client=async_astra_db_client,
             )
             if c_descriptor is None:
                 msg = f"Collection '{self.collection_name}' not found."
@@ -737,8 +717,6 @@ class AstraDBVectorStore(VectorStore):
             collection_embedding_api_key=self.collection_embedding_api_key,
             ext_callers=ext_callers,
             component_name=component_name,
-            astra_db_client=astra_db_client,
-            async_astra_db_client=async_astra_db_client,
         )
 
     def _get_safe_embedding(self) -> Embeddings:
@@ -831,7 +809,7 @@ class AstraDBVectorStore(VectorStore):
             environment=Environment.OTHER,
             namespace="moot",
             setup_mode=SetupMode.OFF,
-            collection_vector_service_options=CollectionVectorServiceOptions(
+            collection_vector_service_options=VectorServiceOptions(
                 provider="moot",
                 model_name="moot",
             ),

@@ -250,57 +250,6 @@ class TestAstraDBStore:
         astra_db_empty_byte_store.mdelete(["key1", "key2"])
         assert astra_db_empty_byte_store.mget(["key1", "key2"]) == [None, None]
 
-    @pytest.mark.skipif(
-        os.environ.get("ASTRA_DB_ENVIRONMENT", "prod").upper() != "PROD",
-        reason="Can run on Astra DB production environment only",
-    )
-    def test_store_coreclients_init_sync(
-        self,
-        core_astra_db: AstraDB,
-        astra_db_empty_store: AstraDBStore,
-    ) -> None:
-        """A deprecation warning from passing a (core) AstraDB, but it works."""
-        astra_db_empty_store.mset([("key", "val123")])
-
-        # create an equivalent store with core AstraDB in init
-        with pytest.warns(DeprecationWarning) as rec_warnings:
-            store_init_core = AstraDBStore(
-                collection_name=astra_db_empty_store.collection.name,
-                astra_db_client=core_astra_db,
-            )
-        f_rec_warnings = [
-            wrn for wrn in rec_warnings if issubclass(wrn.category, DeprecationWarning)
-        ]
-        assert len(f_rec_warnings) == 1
-        assert store_init_core.mget(["key"]) == ["val123"]
-
-    @pytest.mark.skipif(
-        os.environ.get("ASTRA_DB_ENVIRONMENT", "prod").upper() != "PROD",
-        reason="Can run on Astra DB production environment only",
-    )
-    async def test_store_coreclients_init_async(
-        self,
-        core_astra_db: AstraDB,
-        astra_db_empty_store_async: AstraDBStore,
-    ) -> None:
-        """
-        A deprecation warning from passing a (core) AstraDB, but it works.
-        Async version.
-        """
-        await astra_db_empty_store_async.amset([("key", "val123")])
-        # create an equivalent store with core AstraDB in init
-        with pytest.warns(DeprecationWarning) as rec_warnings:
-            store_init_core = AstraDBStore(
-                collection_name=astra_db_empty_store_async.async_collection.name,
-                astra_db_client=core_astra_db,
-                setup_mode=SetupMode.ASYNC,
-            )
-        f_rec_warnings = [
-            wrn for wrn in rec_warnings if issubclass(wrn.category, DeprecationWarning)
-        ]
-        assert len(f_rec_warnings) == 1
-        assert await store_init_core.amget(["key"]) == ["val123"]
-
     @pytest.mark.usefixtures("ephemeral_indexing_collections_cleaner")
     def test_store_indexing_default_sync(
         self,

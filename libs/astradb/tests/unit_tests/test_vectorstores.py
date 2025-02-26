@@ -1,6 +1,5 @@
 import pytest
-from astrapy.db import AstraDB
-from astrapy.info import CollectionVectorServiceOptions
+from astrapy.info import VectorServiceOptions
 
 from langchain_astradb.utils.astradb import SetupMode
 from langchain_astradb.utils.vector_store_codecs import (
@@ -16,24 +15,10 @@ FAKE_TOKEN = "t"  # noqa: S105
 class TestAstraDB:
     def test_initialization(self) -> None:
         """Unit test of vector store initialization modes."""
-        # Using a 'core' AstraDB class (as opposed to secret-based)
         a_e_string = (
             "https://01234567-89ab-cdef-0123-456789abcdef-us-east1"
             ".apps.astra.datastax.com"
         )
-        mock_astra_db = AstraDB(
-            token=FAKE_TOKEN,
-            api_endpoint=a_e_string,
-            namespace="n",
-        )
-        embedding = ParserEmbeddings(dimension=2)
-        with pytest.warns(DeprecationWarning):
-            AstraDBVectorStore(
-                embedding=embedding,
-                collection_name="mock_coll_name",
-                astra_db_client=mock_astra_db,
-                setup_mode=SetupMode.OFF,
-            )
 
         # With an embedding class
         AstraDBVectorStore(
@@ -46,9 +31,7 @@ class TestAstraDB:
         )
 
         # With server-side embeddings ('vectorize')
-        vector_options = CollectionVectorServiceOptions(
-            provider="test", model_name="test"
-        )
+        vector_options = VectorServiceOptions(provider="test", model_name="test")
         AstraDBVectorStore(
             collection_name="mock_coll_name",
             token=FAKE_TOKEN,

@@ -1,6 +1,6 @@
 """Astra DB integration for LangChain."""
 
-from astrapy.info import CollectionVectorServiceOptions
+from astrapy.info import VectorServiceOptions
 
 from langchain_astradb.cache import AstraDBCache, AstraDBSemanticCache
 from langchain_astradb.chat_message_histories import AstraDBChatMessageHistory
@@ -19,5 +19,5 @@ __all__ = [
     "AstraDBStore",
     "AstraDBVectorStore",
     "AstraDBVectorStoreError",
-    "CollectionVectorServiceOptions",
+    "VectorServiceOptions",
 ]

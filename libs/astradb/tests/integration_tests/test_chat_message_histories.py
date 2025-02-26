@@ -2,7 +2,6 @@ import os
 
 import pytest
 from astrapy import Collection
-from astrapy.db import AstraDB
 from langchain.memory import ConversationBufferMemory
 from langchain_core.messages import AIMessage, HumanMessage
 
@@ -198,73 +197,3 @@ class TestAstraDBChatMessageHistories:
         assert await memory1.chat_memory.aget_messages() != []
         await memory1.chat_memory.aclear()
         assert await memory1.chat_memory.aget_messages() == []
-
-    @pytest.mark.skipif(
-        os.environ.get("ASTRA_DB_ENVIRONMENT", "prod").upper() != "PROD",
-        reason="Can run on Astra DB production environment only",
-    )
-    def test_chatmsh_coreclients_init_sync(
-        self,
-        astra_db_credentials: AstraDBCredentials,
-        core_astra_db: AstraDB,
-        empty_collection_idxall: Collection,
-    ) -> None:
-        """A deprecation warning from passing a (core) AstraDB, but it works."""
-        test_messages = [AIMessage(content="Meow.")]
-        chatmh_init_ok = AstraDBChatMessageHistory(
-            session_id="gattini",
-            collection_name=empty_collection_idxall.name,
-            token=astra_db_credentials["token"],
-            api_endpoint=astra_db_credentials["api_endpoint"],
-            namespace=astra_db_credentials["namespace"],
-            setup_mode=SetupMode.OFF,
-        )
-        chatmh_init_ok.add_messages(test_messages)
-        # create an equivalent cache with core AstraDB in init
-        with pytest.warns(DeprecationWarning) as rec_warnings:
-            chatmh_init_core = AstraDBChatMessageHistory(
-                collection_name=empty_collection_idxall.name,
-                session_id="gattini",
-                astra_db_client=core_astra_db,
-            )
-        f_rec_warnings = [
-            wrn for wrn in rec_warnings if issubclass(wrn.category, DeprecationWarning)
-        ]
-        assert len(f_rec_warnings) == 1
-        assert chatmh_init_core.messages == test_messages
-
-    @pytest.mark.skipif(
-        os.environ.get("ASTRA_DB_ENVIRONMENT", "prod").upper() != "PROD",
-        reason="Can run on Astra DB production environment only",
-    )
-    async def test_chatmsh_coreclients_init_async(
-        self,
-        astra_db_credentials: AstraDBCredentials,
-        core_astra_db: AstraDB,
-        empty_collection_idxall: Collection,
-    ) -> None:
-        """A deprecation warning from passing a (core) AstraDB, but it works."""
-        test_messages = [AIMessage(content="Ameow.")]
-        chatmh_init_ok = AstraDBChatMessageHistory(
-            session_id="gattini",
-            collection_name=empty_collection_idxall.name,
-            token=astra_db_credentials["token"],
-            api_endpoint=astra_db_credentials["api_endpoint"],
-            namespace=astra_db_credentials["namespace"],
-            setup_mode=SetupMode.OFF,
-        )
-        await chatmh_init_ok.aadd_messages(test_messages)
-        # create an equivalent cache with core AstraDB in init
-        with pytest.warns(DeprecationWarning) as rec_warnings:
-            chatmh_init_core = AstraDBChatMessageHistory(
-                collection_name=empty_collection_idxall.name,
-                session_id="gattini",
-                astra_db_client=core_astra_db,
-                setup_mode=SetupMode.ASYNC,
-            )
-        # cleaning out 'spurious' "unclosed socket/transport..." warnings
-        f_rec_warnings = [
-            wrn for wrn in rec_warnings if issubclass(wrn.category, DeprecationWarning)
-        ]
-        assert len(f_rec_warnings) == 1
-        assert await chatmh_init_core.aget_messages() == test_messages

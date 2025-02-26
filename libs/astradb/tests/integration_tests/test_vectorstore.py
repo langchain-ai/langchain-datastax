@@ -26,7 +26,6 @@ from .conftest import (
 
 if TYPE_CHECKING:
     from astrapy import Collection
-    from astrapy.db import AstraDB
     from langchain_core.embeddings import Embeddings
 
     from .conftest import AstraDBCredentials
@@ -1718,73 +1717,6 @@ class TestAstraDBVectorStore:
         assert len(euclidean_triples) == 1
         assert cosine_triples[0][2] == "scaled"
         assert euclidean_triples[0][2] == "rotated"
-
-    @pytest.mark.skipif(
-        os.environ.get("ASTRA_DB_ENVIRONMENT", "prod").upper() != "PROD",
-        reason="Can run on Astra DB production environment only",
-    )
-    def test_astradb_vectorstore_coreclients_init_sync(
-        self,
-        core_astra_db: AstraDB,
-        embedding_d2: Embeddings,
-        vector_store_d2: AstraDBVectorStore,
-    ) -> None:
-        """
-        Expect a deprecation warning from passing a (core) AstraDB class,
-        but it must work.
-        """
-        vector_store_d2.add_texts(["[1,2]"])
-
-        with pytest.warns(DeprecationWarning) as rec_warnings:
-            v_store_init_core = AstraDBVectorStore(
-                embedding=embedding_d2,
-                collection_name=vector_store_d2.collection_name,
-                astra_db_client=core_astra_db,
-                metric="euclidean",
-            )
-
-        results = v_store_init_core.similarity_search("[-1,-1]", k=1)
-        # cleaning out 'spurious' "unclosed socket/transport..." warnings
-        f_rec_warnings = [
-            wrn for wrn in rec_warnings if issubclass(wrn.category, DeprecationWarning)
-        ]
-        assert len(f_rec_warnings) == 1
-        assert len(results) == 1
-        assert results[0].page_content == "[1,2]"
-
-    @pytest.mark.skipif(
-        os.environ.get("ASTRA_DB_ENVIRONMENT", "prod").upper() != "PROD",
-        reason="Can run on Astra DB production environment only",
-    )
-    async def test_astradb_vectorstore_coreclients_init_async(
-        self,
-        core_astra_db: AstraDB,
-        embedding_d2: Embeddings,
-        vector_store_d2: AstraDBVectorStore,
-    ) -> None:
-        """
-        Expect a deprecation warning from passing a (core) AstraDB class,
-        but it must work. Async version.
-        """
-        await vector_store_d2.aadd_texts(["[1,2]"])
-
-        with pytest.warns(DeprecationWarning) as rec_warnings:
-            v_store_init_core = AstraDBVectorStore(
-                embedding=embedding_d2,
-                collection_name=vector_store_d2.collection_name,
-                astra_db_client=core_astra_db,
-                metric="euclidean",
-                setup_mode=SetupMode.ASYNC,
-            )
-
-        results = await v_store_init_core.asimilarity_search("[-1,-1]", k=1)
-        # cleaning out 'spurious' "unclosed socket/transport..." warnings
-        f_rec_warnings = [
-            wrn for wrn in rec_warnings if issubclass(wrn.category, DeprecationWarning)
-        ]
-        assert len(f_rec_warnings) == 1
-        assert len(results) == 1
-        assert results[0].page_content == "[1,2]"
 
     @pytest.mark.parametrize(
         "vector_store",
