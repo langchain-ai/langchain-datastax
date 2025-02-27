@@ -17,18 +17,65 @@ pip install langchain-astradb
 
 See the [LangChain docs page](https://python.langchain.com/docs/integrations/providers/astradb) and the [API reference](https://api.python.langchain.com/en/latest/astradb_api_reference.html) for more details.
 
-### Vector Store
+### Instantiating a Vector Store
+
+#### BYOE (Bring Your Own Embeddings)
+This can be use to connect to an exist or a create a new collection.
 
 ```python
 from langchain_astradb import AstraDBVectorStore
+from langchain_openai import OpenAIEmbeddings
+
+OPENAI_API_KEY = "sk-..."
 
 my_store = AstraDBVectorStore(
-  embedding=my_embedding,
+  embedding=OpenAIEmbeddings(model="text-embedding-3-small", api_key=OPENAI_API_KEY),
   collection_name="my_store",
   api_endpoint="https://...",
   token="AstraCS:...",
 )
 ```
+
+#### With Vectorize (server-side embeddings)
+You can use [vectorize](https://docs.datastax.com/en/astra-db-serverless/databases/embedding-generation.html) to generate embeddings on the server-side.
+
+If you have an existing collection w/ Vectorize already enabled, connect like so
+
+```python
+from langchain_astradb import AstraDBVectorStore
+
+my_store = AstraDBVectorStore(
+  collection_name="my_store",
+  api_endpoint="https://...",
+  token="AstraCS:...",
+  autodetect_collection=True,
+)
+```
+
+If you want to create a collection with vectorize enabled, you can do so as well. 
+
+```python
+from astrapy.info import CollectionVectorServiceOptions
+from langchain_astradb import AstraDBVectorStore
+
+openai_vectorize_options = CollectionVectorServiceOptions(
+    provider="openai",
+    model_name="text-embedding-3-small",
+    authentication={
+        "providerKey": "OPENAI_API_KEY",
+    },
+)
+
+vector_store_integrated = AstraDBVectorStore(
+    collection_name="astra_vector_langchain_integrated",
+    api_endpoint=ASTRA_DB_API_ENDPOINT,
+    token=ASTRA_DB_APPLICATION_TOKEN,
+    namespace=ASTRA_DB_NAMESPACE,
+    collection_vector_service_options=openai_vectorize_options,
+)
+```
+
+Keep in mind that the `providerKey` here is not the actual value of your API key, but the [name you give your API key](https://docs.datastax.com/en/astra-db-serverless/administration/customer-keys-overview.html) when setting up your vectorize integration.
 
 ### Chat message history
 
