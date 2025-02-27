@@ -100,7 +100,7 @@ class TestCallers:
                 "User-Agent": "",
             },
             header_value_matcher=hv_prefix_matcher_factory("langchain_my_compo"),
-        ).respond_with_json({})
+        ).respond_with_json({"status": {"ok": 1}})
         _AstraDBCollectionEnvironment(
             "my_coll",
             api_endpoint=base_endpoint,
@@ -117,7 +117,7 @@ class TestCallers:
                 "User-Agent": "",
             },
             header_value_matcher=hv_prefix_matcher_factory(),
-        ).respond_with_json({})
+        ).respond_with_json({"status": {"ok": 1}})
         _AstraDBCollectionEnvironment(
             "my_coll",
             api_endpoint=base_endpoint,
@@ -133,7 +133,7 @@ class TestCallers:
                 "User-Agent": "ec0/ev0",
             },
             header_value_matcher=hv_prefix_matcher_factory("langchain_my_compo"),
-        ).respond_with_json({})
+        ).respond_with_json({"status": {"ok": 1}})
         _AstraDBCollectionEnvironment(
             "my_coll",
             api_endpoint=base_endpoint,
@@ -151,7 +151,7 @@ class TestCallers:
                 "User-Agent": "ec0/ev0",
             },
             header_value_matcher=hv_prefix_matcher_factory(),
-        ).respond_with_json({})
+        ).respond_with_json({"status": {"ok": 1}})
         _AstraDBCollectionEnvironment(
             "my_coll",
             api_endpoint=base_endpoint,
@@ -168,7 +168,7 @@ class TestCallers:
                 "User-Agent": "ec0/ev0 ec1/ev1",
             },
             header_value_matcher=hv_prefix_matcher_factory("langchain_my_compo"),
-        ).respond_with_json({})
+        ).respond_with_json({"status": {"ok": 1}})
         _AstraDBCollectionEnvironment(
             "my_coll",
             api_endpoint=base_endpoint,
@@ -186,7 +186,7 @@ class TestCallers:
                 "User-Agent": "ic0 ic1 ic2",
             },
             header_value_matcher=hv_prefix_matcher_factory("langchain_my_compo"),
-        ).respond_with_json({})
+        ).respond_with_json({"status": {"ok": 1}})
         _AstraDBCollectionEnvironment(
             "my_coll",
             api_endpoint=base_endpoint,
@@ -246,7 +246,7 @@ class TestCallers:
                 "User-Agent": "ec0/ev0",
             },
             header_value_matcher=hv_prefix_matcher_factory(COMPONENT_NAME_VECTORSTORE),
-        ).respond_with_json({})
+        ).respond_with_json({"status": {"ok": 1}})
 
         AstraDBVectorStore(
             collection_name="my_coll",
@@ -316,7 +316,7 @@ class TestCallers:
                 "User-Agent": "ec0/ev0",
             },
             header_value_matcher=hv_prefix_matcher_factory(COMPONENT_NAME_VECTORSTORE),
-        ).respond_with_json({})
+        ).respond_with_json({"status": {"ok": 1}})
 
         vs0 = AstraDBVectorStore(
             collection_name=coll_name,
@@ -369,7 +369,7 @@ class TestCallers:
             header_value_matcher=hv_prefix_matcher_factory(
                 COMPONENT_NAME_GRAPHVECTORSTORE
             ),
-        ).respond_with_json({})
+        ).respond_with_json({"status": {"ok": 1}})
 
         # the metadata_search test call
         httpserver.expect_oneshot_request(
@@ -442,7 +442,7 @@ class TestCallers:
                 "User-Agent": "ec0/ev0",
             },
             header_value_matcher=hv_prefix_matcher_factory(component_name),
-        ).respond_with_json({})
+        ).respond_with_json({"status": {"ok": 1}})
 
         component_class(  # type: ignore[operator]
             collection_name="my_coll",

@@ -20,14 +20,15 @@ from typing import (
     NamedTuple,
     Sequence,
     TypeVar,
+    Union,
     cast,
     overload,
 )
 
 import numpy as np
 from astrapy.constants import Environment
-from astrapy.exceptions import InsertManyException
-from astrapy.info import CollectionVectorServiceOptions
+from astrapy.exceptions import CollectionInsertManyException
+from astrapy.info import VectorServiceOptions
 from langchain_community.vectorstores.utils import maximal_marginal_relevance
 from langchain_core.documents import Document
 from langchain_core.runnables.utils import gather_with_concurrency
@@ -56,13 +57,7 @@ from langchain_astradb.utils.vector_store_codecs import (
 
 if TYPE_CHECKING:
     from astrapy.authentication import EmbeddingHeadersProvider, TokenProvider
-    from astrapy.db import (
-        AstraDB as AstraDBClient,
-    )
-    from astrapy.db import (
-        AsyncAstraDB as AsyncAstraDBClient,
-    )
-    from astrapy.results import UpdateResult
+    from astrapy.results import CollectionUpdateResult
     from langchain_core.embeddings import Embeddings
 
 T = TypeVar("T")
@@ -134,7 +129,7 @@ def _validate_autodetect_init_params(
     metadata_indexing_include: Iterable[str] | None,
     metadata_indexing_exclude: Iterable[str] | None,
     collection_indexing_policy: dict[str, Any] | None,
-    collection_vector_service_options: CollectionVectorServiceOptions | None,
+    collection_vector_service_options: VectorServiceOptions | None,
 ) -> None:
     """Check that the passed parameters do not violate the autodetect constraints."""
     forbidden_parameters = [
@@ -166,11 +161,12 @@ def _validate_autodetect_init_params(
         raise ValueError(msg)
 
 
-def _insertmany_error_message(err: InsertManyException) -> str:
+def _insertmany_error_message(err: CollectionInsertManyException) -> str:
     """Format an astrapy insert exception into an error message.
 
-    This utility prepares a detailed message from an astrapy InsertManyException,
-    to be used in raising an exception within a vectorstore multiple insertion.
+    This utility prepares a detailed message from an astrapy
+    CollectionInsertManyException, to be used in raising an exception within a
+    vectorstore multiple insertion.
 
     This operation must filter out duplicate-id specific errors
     (which the vector store could actually handle, if they were the only ondes).
@@ -439,15 +435,13 @@ class AstraDBVectorStore(VectorStore):
         metadata_indexing_include: Iterable[str] | None = None,
         metadata_indexing_exclude: Iterable[str] | None = None,
         collection_indexing_policy: dict[str, Any] | None = None,
-        collection_vector_service_options: CollectionVectorServiceOptions | None = None,
+        collection_vector_service_options: VectorServiceOptions | None = None,
         collection_embedding_api_key: str | EmbeddingHeadersProvider | None = None,
         content_field: str | None = None,
         ignore_invalid_documents: bool = False,
         autodetect_collection: bool = False,
         ext_callers: list[tuple[str | None, str | None] | str | None] | None = None,
         component_name: str = COMPONENT_NAME_VECTORSTORE,
-        astra_db_client: AstraDBClient | None = None,
-        async_astra_db_client: AsyncAstraDBClient | None = None,
     ) -> None:
         """Wrapper around DataStax Astra DB for vector-store workloads.
 
@@ -554,16 +548,6 @@ class AstraDBVectorStore(VectorStore):
                 Defaults to "langchain_vectorstore", but can be overridden if this
                 component actually serves as the building block for another component
                 (such as a Graph Vector Store).
-            astra_db_client:
-                *DEPRECATED starting from version 0.3.5.*
-                *Please use 'token', 'api_endpoint' and optionally 'environment'.*
-                you can pass an already-created 'astrapy.db.AstraDB' instance
-                (alternatively to 'token', 'api_endpoint' and 'environment').
-            async_astra_db_client:
-                *DEPRECATED starting from version 0.3.5.*
-                *Please use 'token', 'api_endpoint' and optionally 'environment'.*
-                you can pass an already-created 'astrapy.db.AsyncAstraDB' instance
-                (alternatively to 'token', 'api_endpoint' and 'environment').
 
         Note:
             For concurrency in synchronous :meth:`~add_texts`:, as a rule of thumb,
@@ -668,18 +652,17 @@ class AstraDBVectorStore(VectorStore):
                 environment=self.environment,
                 ext_callers=ext_callers,
                 component_name=component_name,
-                astra_db_client=astra_db_client,
-                async_astra_db_client=async_astra_db_client,
             )
             if c_descriptor is None:
                 msg = f"Collection '{self.collection_name}' not found."
                 raise ValueError(msg)
             # use the collection info to set the store properties
-            if c_descriptor.options.vector is None:
+            c_vector_options = c_descriptor.definition.as_dict().get("vector") or {}
+            if not c_vector_options:
                 msg = "Non-vector collection detected."
                 raise ValueError(msg)
-            _embedding_dimension = c_descriptor.options.vector.dimension
-            self.collection_vector_service_options = c_descriptor.options.vector.service
+            _embedding_dimension = c_vector_options.get("dimension")
+            self.collection_vector_service_options = c_vector_options.get("service")
             has_vectorize = self.collection_vector_service_options is not None
             logger.info("vector store autodetect: has_vectorize = %s", has_vectorize)
             norm_content_field = _normalize_content_field(
@@ -696,7 +679,7 @@ class AstraDBVectorStore(VectorStore):
             self.indexing_policy = self._normalize_metadata_indexing_policy(
                 metadata_indexing_include=None,
                 metadata_indexing_exclude=None,
-                collection_indexing_policy=c_descriptor.options.indexing,
+                collection_indexing_policy=c_descriptor.definition.indexing,
                 document_codec=self.document_codec,
             )
 
@@ -737,8 +720,6 @@ class AstraDBVectorStore(VectorStore):
             collection_embedding_api_key=self.collection_embedding_api_key,
             ext_callers=ext_callers,
             component_name=component_name,
-            astra_db_client=astra_db_client,
-            async_astra_db_client=async_astra_db_client,
         )
 
     def _get_safe_embedding(self) -> Embeddings:
@@ -831,7 +812,7 @@ class AstraDBVectorStore(VectorStore):
             environment=Environment.OTHER,
             namespace="moot",
             setup_mode=SetupMode.OFF,
-            collection_vector_service_options=CollectionVectorServiceOptions(
+            collection_vector_service_options=VectorServiceOptions(
                 provider="moot",
                 model_name="moot",
             ),
@@ -1167,7 +1148,7 @@ class AstraDBVectorStore(VectorStore):
             )
             ids_to_replace = []
             inserted_ids = insert_many_result.inserted_ids
-        except InsertManyException as err:
+        except CollectionInsertManyException as err:
             # check that the error is solely due to already-existing documents
             error_codes = {err_desc.error_code for err_desc in err.error_descriptors}
             if error_codes == {DOCUMENT_ALREADY_EXISTS_API_ERROR_CODE}:
@@ -1200,7 +1181,7 @@ class AstraDBVectorStore(VectorStore):
 
                 def _replace_document(
                     document: DocDict,
-                ) -> tuple[UpdateResult, str]:
+                ) -> tuple[CollectionUpdateResult, str]:
                     doc_id = self.document_codec.get_id(document)
                     return self.astra_env.collection.replace_one(
                         self.document_codec.encode_query(ids=[doc_id]),
@@ -1299,7 +1280,7 @@ class AstraDBVectorStore(VectorStore):
             )
             ids_to_replace = []
             inserted_ids = insert_many_result.inserted_ids
-        except InsertManyException as err:
+        except CollectionInsertManyException as err:
             # check that the error is solely due to already-existing documents
             error_codes = {err_desc.error_code for err_desc in err.error_descriptors}
             if error_codes == {DOCUMENT_ALREADY_EXISTS_API_ERROR_CODE}:
@@ -1331,7 +1312,7 @@ class AstraDBVectorStore(VectorStore):
 
             async def _replace_document(
                 document: DocDict,
-            ) -> tuple[UpdateResult, str]:
+            ) -> tuple[CollectionUpdateResult, str]:
                 async with sem:
                     doc_id = self.document_codec.get_id(document)
                     return await _async_collection.replace_one(
@@ -1392,7 +1373,7 @@ class AstraDBVectorStore(VectorStore):
 
             def _update_document(
                 id_md_pair: tuple[str, dict],
-            ) -> UpdateResult:
+            ) -> CollectionUpdateResult:
                 document_id, update_metadata = id_md_pair
                 encoded_metadata = self.filter_to_query(update_metadata)
                 return self.astra_env.collection.update_one(
@@ -1444,7 +1425,7 @@ class AstraDBVectorStore(VectorStore):
 
         async def _update_document(
             id_md_pair: tuple[str, dict],
-        ) -> UpdateResult:
+        ) -> CollectionUpdateResult:
             document_id, update_metadata = id_md_pair
             encoded_metadata = self.filter_to_query(update_metadata)
             async with sem:
@@ -1614,8 +1595,10 @@ class AstraDBVectorStore(VectorStore):
         # stripping down the Astra DB cursor details into a plain iterator:
         final_doc_iterator = (doc for doc in find_raw_iterator)
         if include_sort_vector:
-            sort_vector = (
-                find_raw_iterator.get_sort_vector() if include_sort_vector else None
+            # the codec option in the AstraDBEnv class disables DataAPIVectors here:
+            sort_vector = cast(
+                Union[list[float], None],
+                (find_raw_iterator.get_sort_vector() if include_sort_vector else None),
             )
             return sort_vector, final_doc_iterator
         return final_doc_iterator
@@ -1862,10 +1845,14 @@ class AstraDBVectorStore(VectorStore):
         # stripping down the Astra DB cursor details into a plain iterator:
         final_doc_iterator = (doc async for doc in find_raw_iterator)
         if include_sort_vector:
-            sort_vector = (
-                await find_raw_iterator.get_sort_vector()
-                if include_sort_vector
-                else None
+            # the codec option in the AstraDBEnv class disables DataAPIVectors here:
+            sort_vector = cast(
+                Union[list[float], None],
+                (
+                    await find_raw_iterator.get_sort_vector()
+                    if include_sort_vector
+                    else None
+                ),
             )
             return sort_vector, final_doc_iterator
         return final_doc_iterator

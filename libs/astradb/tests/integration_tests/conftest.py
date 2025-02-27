@@ -28,10 +28,9 @@ from typing import TYPE_CHECKING, Iterable, TypedDict
 import pytest
 from astrapy import DataAPIClient
 from astrapy.authentication import StaticTokenProvider
-from astrapy.db import AstraDB
-from astrapy.info import CollectionVectorServiceOptions
+from astrapy.info import CollectionDefinition, VectorServiceOptions
 
-from langchain_astradb.utils.astradb import SetupMode
+from langchain_astradb.utils.astradb import SetupMode, unpack_indexing_policy
 from langchain_astradb.utils.vector_store_codecs import (
     STANDARD_INDEXING_OPTIONS_DEFAULT,
 )
@@ -110,15 +109,15 @@ def astra_db_env_vars_available() -> bool:
 _load_env()
 
 
-OPENAI_VECTORIZE_OPTIONS_HEADER = CollectionVectorServiceOptions(
+OPENAI_VECTORIZE_OPTIONS_HEADER = VectorServiceOptions(
     provider="openai",
     model_name="text-embedding-3-small",
 )
 
 OPENAI_SHARED_SECRET_KEY_NAME = os.environ.get("SHARED_SECRET_NAME_OPENAI")
-OPENAI_VECTORIZE_OPTIONS_KMS: CollectionVectorServiceOptions | None
+OPENAI_VECTORIZE_OPTIONS_KMS: VectorServiceOptions | None
 if OPENAI_SHARED_SECRET_KEY_NAME:
-    OPENAI_VECTORIZE_OPTIONS_KMS = CollectionVectorServiceOptions(
+    OPENAI_VECTORIZE_OPTIONS_KMS = VectorServiceOptions(
         provider="openai",
         model_name="text-embedding-3-small",
         authentication={
@@ -186,19 +185,9 @@ def database(
         if astra_db_credentials["namespace"] is None:
             msg = "Cannot test on non-Astra without a namespace set."
             raise ValueError(msg)
-        db.get_database_admin().create_namespace(astra_db_credentials["namespace"])
+        db.get_database_admin().create_keyspace(astra_db_credentials["namespace"])
 
     return db
-
-
-@pytest.fixture(scope="session")
-def core_astra_db(astra_db_credentials: AstraDBCredentials) -> AstraDB:
-    """An instance of the 'core' (pre-1.0, legacy) astrapy database."""
-    return AstraDB(
-        token=astra_db_credentials["token"],
-        api_endpoint=astra_db_credentials["api_endpoint"],
-        namespace=astra_db_credentials["namespace"],
-    )
 
 
 @pytest.fixture(scope="module")
@@ -208,10 +197,13 @@ def collection_d2(
     """A general-purpose D=2(Euclidean) collection for per-test reuse."""
     collection = database.create_collection(
         COLLECTION_NAME_D2,
-        dimension=2,
-        check_exists=False,
-        indexing=STANDARD_INDEXING_OPTIONS_DEFAULT,
-        metric="euclidean",
+        definition=(
+            CollectionDefinition.builder()
+            .set_vector_dimension(2)
+            .set_vector_metric("euclidean")
+            .set_indexing(*unpack_indexing_policy(STANDARD_INDEXING_OPTIONS_DEFAULT))
+            .build()
+        ),
     )
     yield collection
 
@@ -289,10 +281,7 @@ def collection_idxall(
     A general-purpose collection for per-test reuse.
     This one has default indexing (i.e. all fields are covered).
     """
-    collection = database.create_collection(
-        COLLECTION_NAME_IDXALL,
-        check_exists=False,
-    )
+    collection = database.create_collection(COLLECTION_NAME_IDXALL)
     yield collection
 
     collection.drop()
@@ -320,8 +309,9 @@ def collection_idxid(
     """
     collection = database.create_collection(
         COLLECTION_NAME_IDXID,
-        indexing={"allow": ["_id"]},
-        check_exists=False,
+        definition=(
+            CollectionDefinition.builder().set_indexing("allow", ["_id"]).build()
+        ),
     )
     yield collection
 
@@ -338,9 +328,12 @@ def collection_idxall_d2(
     """
     collection = database.create_collection(
         COLLECTION_NAME_IDXALL_D2,
-        dimension=2,
-        check_exists=False,
-        metric="euclidean",
+        definition=(
+            CollectionDefinition.builder()
+            .set_vector_dimension(2)
+            .set_vector_metric("euclidean")
+            .build()
+        ),
     )
     yield collection
 
@@ -401,11 +394,14 @@ def collection_vz(
     """A general-purpose $vectorize collection for per-test reuse."""
     collection = database.create_collection(
         COLLECTION_NAME_VZ,
-        dimension=1536,
-        check_exists=False,
-        indexing=STANDARD_INDEXING_OPTIONS_DEFAULT,
-        metric="euclidean",
-        service=OPENAI_VECTORIZE_OPTIONS_HEADER,
+        definition=(
+            CollectionDefinition.builder()
+            .set_vector_dimension(1536)
+            .set_vector_metric("euclidean")
+            .set_indexing(*unpack_indexing_policy(STANDARD_INDEXING_OPTIONS_DEFAULT))
+            .set_vector_service(OPENAI_VECTORIZE_OPTIONS_HEADER)
+            .build()
+        ),
         embedding_api_key=openai_api_key,
     )
     yield collection
@@ -467,10 +463,13 @@ def collection_idxall_vz(
     """
     collection = database.create_collection(
         COLLECTION_NAME_IDXALL_VZ,
-        dimension=1536,
-        check_exists=False,
-        metric="euclidean",
-        service=OPENAI_VECTORIZE_OPTIONS_HEADER,
+        definition=(
+            CollectionDefinition.builder()
+            .set_vector_dimension(1536)
+            .set_vector_metric("euclidean")
+            .set_vector_service(OPENAI_VECTORIZE_OPTIONS_HEADER)
+            .build()
+        ),
         embedding_api_key=openai_api_key,
     )
     yield collection
