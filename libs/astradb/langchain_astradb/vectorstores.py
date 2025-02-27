@@ -20,6 +20,7 @@ from typing import (
     NamedTuple,
     Sequence,
     TypeVar,
+    Union,
     cast,
     overload,
 )
@@ -1596,7 +1597,7 @@ class AstraDBVectorStore(VectorStore):
         if include_sort_vector:
             # the codec option in the AstraDBEnv class disables DataAPIVectors here:
             sort_vector = cast(
-                list[float] | None,
+                Union[list[float], None],
                 (find_raw_iterator.get_sort_vector() if include_sort_vector else None),
             )
             return sort_vector, final_doc_iterator
@@ -1846,7 +1847,7 @@ class AstraDBVectorStore(VectorStore):
         if include_sort_vector:
             # the codec option in the AstraDBEnv class disables DataAPIVectors here:
             sort_vector = cast(
-                list[float] | None,
+                Union[list[float], None],
                 (
                     await find_raw_iterator.get_sort_vector()
                     if include_sort_vector

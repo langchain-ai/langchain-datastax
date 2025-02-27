@@ -83,14 +83,12 @@ class SetupMode(Enum):
 def unpack_indexing_policy(
     indexing_dict: dict[str, list[str]] | None,
 ) -> tuple[str | None, list[str] | None]:
-    """{} => (None, None); {"a": "b"} => ("a", "b"); multikey => error."""
-    _indexing_dict = indexing_dict or {}
-    if _indexing_dict:
-        if len(_indexing_dict) != 1:
-            msg = "Unexpected indexing policy requested: " f"{indexing_dict}"
+    """{} or None => (None, None); {"a": "b"} => ("a", "b"); multikey => error."""
+    if indexing_dict:
+        if len(indexing_dict) != 1:
+            msg = "Unexpected indexing policy provided: " f"{indexing_dict}"
             raise ValueError(msg)
-        keys, vals = list(zip(*_indexing_dict.items()))
-        return keys[0], vals[0]
+        return next(iter(indexing_dict.items()))
     return None, None
 
 
