@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 from astrapy.authentication import StaticTokenProvider
+from astrapy.info import CollectionDefinition
 from langchain_community.graph_vectorstores.base import Node
 from langchain_community.graph_vectorstores.links import Link, add_links
 from langchain_core.documents import Document
@@ -228,9 +229,12 @@ def autodetect_populated_graph_vector_store_d2(
     """
     empty_collection_d2_idxall = database.create_collection(
         ephemeral_collection_cleaner_idxall_d2,
-        dimension=2,
-        check_exists=False,
-        metric="euclidean",
+        definition=(
+            CollectionDefinition.builder()
+            .set_vector_dimension(2)
+            .set_vector_metric("euclidean")
+            .build()
+        ),
     )
     empty_collection_d2_idxall.insert_many(
         [

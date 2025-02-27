@@ -1734,19 +1734,17 @@ class TestAstraDBVectorStore:
         """Verify changed attributes in 'copy', down in the astra_env of the store."""
         vstore0: AstraDBVectorStore = request.getfixturevalue(vector_store)
 
-        # component_name, deep test
-        # Note this line encodes assumptions on astrapy internals that will fail on 2.0:
-        caller_names0 = {caller[0] for caller in vstore0.astra_env.collection.callers}
+        # component_name, override test
+        caller_names0 = {caller[0] for caller in vstore0.astra_env.full_callers}
         assert COMPONENT_NAME_VECTORSTORE in caller_names0
 
         vstore1 = vstore0.copy(component_name="xyz_component")
 
-        # Note this line encodes assumptions on astrapy internals that will fail on 2.0:
-        caller_names1 = {caller[0] for caller in vstore1.astra_env.collection.callers}
+        caller_names1 = {caller[0] for caller in vstore1.astra_env.full_callers}
         assert COMPONENT_NAME_VECTORSTORE not in caller_names1
         assert "xyz_component" in caller_names1
 
-        # other changeable attributes (this check does not enter astrapy at all)
+        # other changeable attributes
         token2 = StaticTokenProvider("xyz")
         apikey2 = EmbeddingAPIKeyHeaderProvider(None)
         vstore2 = vstore0.copy(

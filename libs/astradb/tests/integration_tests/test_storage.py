@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 from astrapy.authentication import StaticTokenProvider
+from astrapy.info import CollectionDefinition
 
 from langchain_astradb.storage import AstraDBByteStore, AstraDBStore
 from langchain_astradb.utils.astradb import SetupMode
@@ -286,11 +287,7 @@ class TestAstraDBStore:
         database: Database,
     ) -> None:
         """Test of instantiation against a legacy collection."""
-        database.create_collection(
-            EPHEMERAL_LEGACY_IDX_NAME,
-            indexing=None,
-            check_exists=False,
-        )
+        database.create_collection(EPHEMERAL_LEGACY_IDX_NAME)
         with pytest.warns(UserWarning) as rec_warnings:
             AstraDBStore(
                 collection_name=EPHEMERAL_LEGACY_IDX_NAME,
@@ -311,11 +308,7 @@ class TestAstraDBStore:
         database: Database,
     ) -> None:
         """Test of instantiation against a legacy collection, async version."""
-        await database.to_async().create_collection(
-            EPHEMERAL_LEGACY_IDX_NAME,
-            indexing=None,
-            check_exists=False,
-        )
+        await database.to_async().create_collection(EPHEMERAL_LEGACY_IDX_NAME)
         with pytest.warns(UserWarning) as rec_warnings:
             await AstraDBStore(
                 collection_name=EPHEMERAL_LEGACY_IDX_NAME,
@@ -339,8 +332,11 @@ class TestAstraDBStore:
         """Test of instantiation against a legacy collection."""
         database.create_collection(
             EPHEMERAL_CUSTOM_IDX_NAME,
-            indexing={"deny": ["useless", "forgettable"]},
-            check_exists=False,
+            definition=(
+                CollectionDefinition.builder()
+                .set_indexing("deny", ["useless", "forgettable"])
+                .build()
+            ),
         )
         with pytest.raises(
             ValueError, match="is detected as having the following indexing policy"
@@ -362,8 +358,11 @@ class TestAstraDBStore:
         """Test of instantiation against a legacy collection, async version."""
         await database.to_async().create_collection(
             EPHEMERAL_CUSTOM_IDX_NAME,
-            indexing={"deny": ["useless", "forgettable"]},
-            check_exists=False,
+            definition=(
+                CollectionDefinition.builder()
+                .set_indexing("deny", ["useless", "forgettable"])
+                .build()
+            ),
         )
         with pytest.raises(
             ValueError, match="is detected as having the following indexing policy"

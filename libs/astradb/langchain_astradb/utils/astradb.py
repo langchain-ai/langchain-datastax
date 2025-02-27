@@ -80,7 +80,7 @@ class SetupMode(Enum):
     OFF = 3
 
 
-def _unpack_indexing_policy(
+def unpack_indexing_policy(
     indexing_dict: dict[str, list[str]] | None,
 ) -> tuple[str | None, list[str] | None]:
     """{} => (None, None); {"a": "b"} => ("a", "b"); multikey => error."""
@@ -232,7 +232,7 @@ class _AstraDBEnvironment:
             )
             if cpair[0] is not None or cpair[1] is not None
         ]
-        full_callers = [
+        self.full_callers = [
             *norm_ext_callers,
             LC_CORE_CALLER,
             (self.component_name, LC_ASTRADB_VERSION),
@@ -240,9 +240,9 @@ class _AstraDBEnvironment:
         # create the callers
         self.data_api_client = DataAPIClient(
             environment=self.environment,
-            callers=full_callers,
             api_options=APIOptions(
-                serdes_options=SerdesOptions(custom_datatypes_in_reading=False)
+                callers=self.full_callers,
+                serdes_options=SerdesOptions(custom_datatypes_in_reading=False),
             ),
         )
 
@@ -317,22 +317,23 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
                 )
                 raise ValueError(msg)
             try:
-                _idx_mode, _idx_target = _unpack_indexing_policy(
+                _idx_mode, _idx_target = unpack_indexing_policy(
                     requested_indexing_policy,
+                )
+                collection_definition = (
+                    CollectionDefinition.builder()
+                    .set_vector_dimension(embedding_dimension)  # type: ignore[arg-type]
+                    .set_vector_metric(metric)
+                    .set_indexing(
+                        indexing_mode=_idx_mode,
+                        indexing_target=_idx_target,
+                    )
+                    .set_vector_service(collection_vector_service_options)
+                    .build()
                 )
                 self.database.create_collection(
                     name=collection_name,
-                    definition=(
-                        CollectionDefinition.builder()
-                        .set_vector_dimension(embedding_dimension)  # type: ignore[arg-type]
-                        .set_vector_metric(metric)
-                        .set_indexing(
-                            indexing_mode=_idx_mode,
-                            indexing_target=_idx_target,
-                        )
-                        .set_vector_service(collection_vector_service_options)
-                        .build()
-                    ),
+                    definition=collection_definition,
                 )
             except DataAPIException as data_api_exception:
                 # possibly the collection is preexisting and may have legacy,
@@ -418,7 +419,7 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
             dimension = embedding_dimension
 
         try:
-            _idx_mode, _idx_target = _unpack_indexing_policy(requested_indexing_policy)
+            _idx_mode, _idx_target = unpack_indexing_policy(requested_indexing_policy)
             await self.async_database.create_collection(
                 name=self.collection_name,
                 definition=(
