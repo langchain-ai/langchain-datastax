@@ -41,6 +41,7 @@ from langchain_astradb.utils.astradb import (
     MAX_CONCURRENT_DOCUMENT_DELETIONS,
     MAX_CONCURRENT_DOCUMENT_INSERTIONS,
     MAX_CONCURRENT_DOCUMENT_REPLACEMENTS,
+    HybridSearchMode,
     SetupMode,
     _AstraDBCollectionEnvironment,
     _survey_collection,
@@ -442,6 +443,7 @@ class AstraDBVectorStore(VectorStore):
         autodetect_collection: bool = False,
         ext_callers: list[tuple[str | None, str | None] | str | None] | None = None,
         component_name: str = COMPONENT_NAME_VECTORSTORE,
+        hybrid_search: HybridSearchMode | None = None,
     ) -> None:
         """Wrapper around DataStax Astra DB for vector-store workloads.
 
@@ -548,6 +550,12 @@ class AstraDBVectorStore(VectorStore):
                 Defaults to "langchain_vectorstore", but can be overridden if this
                 component actually serves as the building block for another component
                 (such as a Graph Vector Store).
+            hybrid_search: whether to run hybrid similarity searches or not (DEFAULT,
+                FORCE or OFF). In case of DEFAULT, the vector store adapts its searches
+                to pre-existing collections, and new collections are created with hybrid
+                search enabled. FORCE may result in an API error if passed for a
+                pre-existing non-hybrid-enabled collection; OFF never runs hybrid
+                searches (nor does it set hybrid on new collections).
 
         Note:
             For concurrency in synchronous :meth:`~add_texts`:, as a rule of thumb,
@@ -597,6 +605,10 @@ class AstraDBVectorStore(VectorStore):
         _setup_mode: SetupMode
         _embedding_dimension: int | Awaitable[int] | None
 
+        # TODO: flip default to DEFAULT
+        _hybrid_search: HybridSearchMode = hybrid_search or HybridSearchMode.OFF
+        self.use_hybrid_search: bool  # as in 'actual behaviour'
+
         if not self.autodetect_collection:
             logger.info(
                 "vector store default init, collection '%s'", self.collection_name
@@ -627,6 +639,8 @@ class AstraDBVectorStore(VectorStore):
                 collection_indexing_policy=collection_indexing_policy,
                 document_codec=self.document_codec,
             )
+
+            self.use_hybrid_search = _hybrid_search != HybridSearchMode.OFF
         else:
             logger.info(
                 "vector store autodetect init, collection '%s'", self.collection_name
@@ -683,6 +697,19 @@ class AstraDBVectorStore(VectorStore):
                 document_codec=self.document_codec,
             )
 
+            if _hybrid_search == HybridSearchMode.OFF:
+                self.use_hybrid_search = False
+            elif _hybrid_search == HybridSearchMode.FORCE:
+                self.use_hybrid_search = True
+            else:
+                # hybrid usage is autodetected:
+                self.use_hybrid_search = (
+                    c_descriptor.definition.lexical is not None
+                    and c_descriptor.definition.reranking is not None
+                    and c_descriptor.definition.lexical.enabled
+                    and c_descriptor.definition.reranking.enabled
+                )
+
         # validate embedding/vectorize compatibility and such.
         # Embedding and the server-side embeddings are mutually exclusive,
         # as both specify how to produce embeddings.
@@ -720,6 +747,7 @@ class AstraDBVectorStore(VectorStore):
             collection_embedding_api_key=self.collection_embedding_api_key,
             ext_callers=ext_callers,
             component_name=component_name,
+            hybrid_search=_hybrid_search,
         )
 
     def _get_safe_embedding(self) -> Embeddings:
@@ -2120,17 +2148,15 @@ class AstraDBVectorStore(VectorStore):
         Returns:
             The list of (Document, score, id), the most similar to the query.
         """
+        sort: dict[str, Any]
         if self.document_codec.server_side_embeddings:
             sort = self.document_codec.encode_vectorize_sort(query)
-            return self._similarity_search_with_score_id_by_sort(
-                sort=sort,
-                k=k,
-                filter=filter,
-            )
+        else:
+            embedding_vector = self._get_safe_embedding().embed_query(query)
+            sort = self.document_codec.encode_vector_sort(embedding_vector)
 
-        embedding_vector = self._get_safe_embedding().embed_query(query)
-        return self.similarity_search_with_score_id_by_vector(
-            embedding=embedding_vector,
+        return self._similarity_search_with_score_id_by_sort(
+            sort=sort,
             k=k,
             filter=filter,
         )
@@ -2306,17 +2332,15 @@ class AstraDBVectorStore(VectorStore):
         Returns:
             The list of (Document, score, id), the most similar to the query.
         """
+        sort: dict[str, Any]
         if self.document_codec.server_side_embeddings:
             sort = self.document_codec.encode_vectorize_sort(query)
-            return await self._asimilarity_search_with_score_id_by_sort(
-                sort=sort,
-                k=k,
-                filter=filter,
-            )
+        else:
+            embedding_vector = await self._get_safe_embedding().aembed_query(query)
+            sort = self.document_codec.encode_vector_sort(embedding_vector)
 
-        embedding_vector = await self._get_safe_embedding().aembed_query(query)
-        return await self.asimilarity_search_with_score_id_by_vector(
-            embedding=embedding_vector,
+        return await self._asimilarity_search_with_score_id_by_sort(
+            sort=sort,
             k=k,
             filter=filter,
         )
@@ -2402,6 +2426,25 @@ class AstraDBVectorStore(VectorStore):
             k=k,
             filter=filter,
         )
+
+    async def _asimilarity_search_with_score_id_by_sort(
+        self,
+        sort: dict[str, Any],
+        k: int = 4,
+        filter: dict[str, Any] | None = None,  # noqa: A002
+    ) -> list[tuple[Document, float, str]]:
+        """Run ANN search with a provided sort clause."""
+        hits_ite = await self.arun_query(
+            n=k,
+            filter=filter,
+            sort=sort,
+            include_similarity=True,
+        )
+        # doc is a Document and sim is a float:
+        return [
+            cast(tuple[Document, float, str], (doc, sim, did))
+            async for doc, did, _, sim in hits_ite
+        ]
 
     def similarity_search_with_embedding_by_vector(
         self,
@@ -2572,25 +2615,6 @@ class AstraDBVectorStore(VectorStore):
                 for doc, _, emb, _ in hits_ite
             ],
         )
-
-    async def _asimilarity_search_with_score_id_by_sort(
-        self,
-        sort: dict[str, Any],
-        k: int = 4,
-        filter: dict[str, Any] | None = None,  # noqa: A002
-    ) -> list[tuple[Document, float, str]]:
-        """Run ANN search with a provided sort clause."""
-        hits_ite = await self.arun_query(
-            n=k,
-            filter=filter,
-            sort=sort,
-            include_similarity=True,
-        )
-        # doc is a Document and sim is a float:
-        return [
-            cast(tuple[Document, float, str], (doc, sim, did))
-            async for doc, did, _, sim in hits_ite
-        ]
 
     def _run_mmr_query_by_sort(
         self,
