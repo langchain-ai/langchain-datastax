@@ -605,7 +605,7 @@ class AstraDBVectorStore(VectorStore):
         _setup_mode: SetupMode
         _embedding_dimension: int | Awaitable[int] | None
 
-        # TODO: flip default to DEFAULT
+        # TODO: FARR: flip default to DEFAULT
         _hybrid_search: HybridSearchMode = hybrid_search or HybridSearchMode.OFF
         self.use_hybrid_search: bool  # as in 'actual behaviour'
 
@@ -623,14 +623,18 @@ class AstraDBVectorStore(VectorStore):
                 has_vectorize=has_vectorize,
             )
 
+            self.use_hybrid_search = _hybrid_search != HybridSearchMode.OFF
+
             if self.collection_vector_service_options is not None:
                 self.document_codec = _DefaultVectorizeVSDocumentCodec(
                     ignore_invalid_documents=ignore_invalid_documents,
+                    has_lexical=self.use_hybrid_search,
                 )
             else:
                 self.document_codec = _DefaultVSDocumentCodec(
                     content_field=_content_field,
                     ignore_invalid_documents=ignore_invalid_documents,
+                    has_lexical=self.use_hybrid_search,
                 )
             # indexing policy setting
             self.indexing_policy = self._normalize_metadata_indexing_policy(
@@ -639,8 +643,6 @@ class AstraDBVectorStore(VectorStore):
                 collection_indexing_policy=collection_indexing_policy,
                 document_codec=self.document_codec,
             )
-
-            self.use_hybrid_search = _hybrid_search != HybridSearchMode.OFF
         else:
             logger.info(
                 "vector store autodetect init, collection '%s'", self.collection_name
@@ -862,6 +864,7 @@ class AstraDBVectorStore(VectorStore):
         )
         copy.collection_vector_service_options = self.collection_vector_service_options
         copy.document_codec = self.document_codec
+        copy.use_hybrid_search = self.use_hybrid_search
         copy.batch_size = self.batch_size
         copy.bulk_insert_batch_concurrency = self.bulk_insert_batch_concurrency
         copy.bulk_insert_overwrite_concurrency = self.bulk_insert_overwrite_concurrency
@@ -1474,6 +1477,8 @@ class AstraDBVectorStore(VectorStore):
     def full_decode_astra_db_document(
         self,
         astra_db_document: DocDict,
+        *,
+        is_hybrid_search: bool,
     ) -> AstraDBQueryResult | None:
         """Decode an Astra DB document in full, i.e. into Document+embedding/similarity.
 
@@ -1491,6 +1496,9 @@ class AstraDBVectorStore(VectorStore):
         Args:
             astra_db_document: a dictionary obtained through `run_query_raw` from
                 the collection.
+            is_hybrid_search: a flag to mark the type of search used to fetch
+                the document, which translates in different logic to extract a
+                score (if any).
 
         Returns:
             a AstraDBQueryResult named tuple with Document, id, embedding
@@ -1501,7 +1509,11 @@ class AstraDBVectorStore(VectorStore):
         if decoded is not None:
             doc_id = self.document_codec.get_id(astra_db_document)
             doc_embedding = self.document_codec.decode_vector(astra_db_document)
-            doc_similarity = self.document_codec.get_similarity(astra_db_document)
+            doc_similarity: float | None
+            if is_hybrid_search:
+                doc_similarity = self.document_codec.get_rerank_score(astra_db_document)
+            else:
+                doc_similarity = self.document_codec.get_similarity(astra_db_document)
             return AstraDBQueryResult(
                 document=decoded,
                 id=doc_id,
@@ -1737,7 +1749,8 @@ class AstraDBVectorStore(VectorStore):
                     for astra_db_doc in astra_docs_ite
                     if (
                         decoded_tuple := self.full_decode_astra_db_document(
-                            astra_db_doc
+                            astra_db_doc,
+                            is_hybrid_search=False,
                         )
                     )
                     is not None
@@ -1755,7 +1768,12 @@ class AstraDBVectorStore(VectorStore):
         return (
             decoded_tuple
             for astra_db_doc in astra_docs_ite
-            if (decoded_tuple := self.full_decode_astra_db_document(astra_db_doc))
+            if (
+                decoded_tuple := self.full_decode_astra_db_document(
+                    astra_db_doc,
+                    is_hybrid_search=False,
+                )
+            )
             is not None
         )
 
@@ -1990,7 +2008,8 @@ class AstraDBVectorStore(VectorStore):
                     async for astra_db_doc in astra_docs_ite
                     if (
                         decoded_tuple := self.full_decode_astra_db_document(
-                            astra_db_doc
+                            astra_db_doc,
+                            is_hybrid_search=False,
                         )
                     )
                     is not None
@@ -2008,7 +2027,12 @@ class AstraDBVectorStore(VectorStore):
         return (
             decoded_tuple
             async for astra_db_doc in astra_docs_ite
-            if (decoded_tuple := self.full_decode_astra_db_document(astra_db_doc))
+            if (
+                decoded_tuple := self.full_decode_astra_db_document(
+                    astra_db_doc,
+                    is_hybrid_search=False,
+                )
+            )
             is not None
         )
 

@@ -19,7 +19,11 @@ VECTORIZE_NOT_AVAILABLE_MSG = "Vectorize not available for this codec."
 
 VECTOR_FIELD_NAME = "$vector"
 VECTORIZE_FIELD_NAME = "$vectorize"
+LEXICAL_FIELD_NAME = "$lexical"
 SIMILARITY_FIELD_NAME = "$similarity"
+RERANK_SCORE_FIELD_NAME_0 = "$hybrid"
+RERANK_SCORE_FIELD_NAME_1 = "scores"
+RERANK_SCORE_FIELD_NAME_2 = "$rerank"
 DEFAULT_METADATA_FIELD_NAME = "metadata"
 
 STANDARD_INDEXING_OPTIONS_DEFAULT = {"allow": [DEFAULT_METADATA_FIELD_NAME]}
@@ -128,6 +132,7 @@ class _AstraDBVectorStoreDocumentCodec(ABC):
     """
 
     server_side_embeddings: bool
+    has_lexical: bool
     content_field: str
     base_projection: dict[str, bool]
     full_projection: dict[str, bool]
@@ -219,8 +224,23 @@ class _AstraDBVectorStoreDocumentCodec(ABC):
         return astra_document["_id"]
 
     def get_similarity(self, astra_document: dict[str, Any]) -> float | None:
-        """Return the similarity of an encoded document (= a raw JSON read from DB)."""
+        """Return the similarity of an encoded document (= a raw JSON read from DB).
+
+        This method gives no guarantees as to whether said score applies/is found.
+        """
         return astra_document.get(SIMILARITY_FIELD_NAME)
+
+    def get_rerank_score(self, astra_document: dict[str, Any]) -> float | None:
+        """Return the rerank score of an encoded document (= a raw JSON read from DB).
+
+        This method gives no guarantees as to whether said score applies/is found.
+        """
+        return (
+            (astra_document.get(RERANK_SCORE_FIELD_NAME_0) or {}).get(
+                RERANK_SCORE_FIELD_NAME_1
+            )
+            or {}
+        ).get(RERANK_SCORE_FIELD_NAME_2)
 
     def encode_query(
         self,
@@ -290,15 +310,19 @@ class _DefaultVSDocumentCodec(_AstraDBVectorStoreDocumentCodec):
 
     server_side_embeddings = False
 
-    def __init__(self, content_field: str, *, ignore_invalid_documents: bool) -> None:
+    def __init__(
+        self, content_field: str, *, ignore_invalid_documents: bool, has_lexical: bool
+    ) -> None:
         """Initialize a new DefaultVSDocumentCodec.
 
         Args:
             content_field: name of the (top-level) field for textual content.
             ignore_invalid_documents: if True, noncompliant inputs to `decode`
                 are logged and a None is returned (instead of raising an exception).
+            has_lexical: whether the codec should use the lexical field (hybrid search)
         """
         self.content_field = content_field
+        self.has_lexical = has_lexical
         self.base_projection = {
             "_id": True,
             self.content_field: True,
@@ -327,6 +351,7 @@ class _DefaultVSDocumentCodec(_AstraDBVectorStoreDocumentCodec):
             "_id": document_id,
             VECTOR_FIELD_NAME: vector,
             DEFAULT_METADATA_FIELD_NAME: metadata or {},
+            **({LEXICAL_FIELD_NAME: content} if self.has_lexical else {}),
         }
 
     @override
@@ -378,12 +403,13 @@ class _DefaultVectorizeVSDocumentCodec(_AstraDBVectorStoreDocumentCodec):
     server_side_embeddings = True
     content_field = VECTORIZE_FIELD_NAME
 
-    def __init__(self, *, ignore_invalid_documents: bool) -> None:
+    def __init__(self, *, ignore_invalid_documents: bool, has_lexical: bool) -> None:
         """Initialize a new DefaultVectorizeVSDocumentCodec.
 
         Args:
             ignore_invalid_documents: if True, noncompliant inputs to `decode`
                 are logged and a None is returned (instead of raising an exception).
+            has_lexical: whether the codec should use the lexical field (hybrid search)
         """
         self.base_projection = {
             "_id": True,
@@ -397,6 +423,7 @@ class _DefaultVectorizeVSDocumentCodec(_AstraDBVectorStoreDocumentCodec):
             VECTOR_FIELD_NAME: True,
         }
         self.ignore_invalid_documents = ignore_invalid_documents
+        self.has_lexical = has_lexical
 
     @override
     def encode(
@@ -413,6 +440,7 @@ class _DefaultVectorizeVSDocumentCodec(_AstraDBVectorStoreDocumentCodec):
             VECTORIZE_FIELD_NAME: content,
             "_id": document_id,
             DEFAULT_METADATA_FIELD_NAME: metadata or {},
+            **({LEXICAL_FIELD_NAME: content} if self.has_lexical else {}),
         }
 
     @override
@@ -465,18 +493,22 @@ class _FlatVSDocumentCodec(_AstraDBVectorStoreDocumentCodec):
 
     server_side_embeddings = False
 
-    def __init__(self, content_field: str, *, ignore_invalid_documents: bool) -> None:
+    def __init__(
+        self, content_field: str, *, ignore_invalid_documents: bool, has_lexical: bool
+    ) -> None:
         """Initialize a new DefaultVSDocumentCodec.
 
         Args:
             content_field: name of the (top-level) field for textual content.
             ignore_invalid_documents: if True, noncompliant inputs to `decode`
                 are logged and a None is returned (instead of raising an exception).
+            has_lexical: whether the codec should use the lexical field (hybrid search)
         """
         self.content_field = content_field
         self.base_projection = {"_id": True, VECTOR_FIELD_NAME: False}
         self.full_projection = {"*": True}
         self.ignore_invalid_documents = ignore_invalid_documents
+        self.has_lexical = has_lexical
         self._non_md_fields = {
             "_id",
             VECTOR_FIELD_NAME,
@@ -503,6 +535,7 @@ class _FlatVSDocumentCodec(_AstraDBVectorStoreDocumentCodec):
             "_id": document_id,
             VECTOR_FIELD_NAME: vector,
             **(metadata or {}),
+            **({LEXICAL_FIELD_NAME: content} if self.has_lexical else {}),
         }
 
     @override
@@ -555,12 +588,13 @@ class _FlatVectorizeVSDocumentCodec(_AstraDBVectorStoreDocumentCodec):
     server_side_embeddings = True
     content_field = VECTORIZE_FIELD_NAME
 
-    def __init__(self, *, ignore_invalid_documents: bool) -> None:
+    def __init__(self, *, ignore_invalid_documents: bool, has_lexical: bool) -> None:
         """Initialize a new DefaultVectorizeVSDocumentCodec.
 
         Args:
             ignore_invalid_documents: if True, noncompliant inputs to `decode`
                 are logged and a None is returned (instead of raising an exception).
+            has_lexical: whether the codec should use the lexical field (hybrid search)
         """
         self.base_projection = {
             "_id": True,
@@ -569,6 +603,7 @@ class _FlatVectorizeVSDocumentCodec(_AstraDBVectorStoreDocumentCodec):
         }
         self.full_projection = {"*": True}
         self.ignore_invalid_documents = ignore_invalid_documents
+        self.has_lexical = has_lexical
         self._non_md_fields = {
             "_id",
             VECTOR_FIELD_NAME,
@@ -594,6 +629,7 @@ class _FlatVectorizeVSDocumentCodec(_AstraDBVectorStoreDocumentCodec):
             VECTORIZE_FIELD_NAME: content,
             "_id": document_id,
             **(metadata or {}),
+            **({LEXICAL_FIELD_NAME: content} if self.has_lexical else {}),
         }
 
     @override

@@ -10,6 +10,7 @@ from typing import (
 )
 
 from langchain_astradb.utils.vector_store_codecs import (
+    LEXICAL_FIELD_NAME,
     _AstraDBVectorStoreDocumentCodec,
     _DefaultVectorizeVSDocumentCodec,
     _DefaultVSDocumentCodec,
@@ -89,6 +90,10 @@ def _detect_documents_content_field(
     return requested_content_field
 
 
+def _detect_documents_has_lexical(documents: list[dict[str, Any]]) -> bool:
+    return any(LEXICAL_FIELD_NAME in document for document in documents)
+
+
 def _detect_document_codec(
     documents: list[dict[str, Any]],
     *,
@@ -109,22 +114,29 @@ def _detect_document_codec(
         "vector store autodetect: final_content_field = %s", final_content_field
     )
 
+    has_lexical = _detect_documents_has_lexical(documents)
+    logger.info("vector store autodetect: has_lexical = %s", has_lexical)
+
     if has_vectorize:
         if is_flat:
             return _FlatVectorizeVSDocumentCodec(
                 ignore_invalid_documents=ignore_invalid_documents,
+                has_lexical=has_lexical,
             )
 
         return _DefaultVectorizeVSDocumentCodec(
             ignore_invalid_documents=ignore_invalid_documents,
+            has_lexical=has_lexical,
         )
     # no vectorize:
     if is_flat:
         return _FlatVSDocumentCodec(
             content_field=final_content_field,
             ignore_invalid_documents=ignore_invalid_documents,
+            has_lexical=has_lexical,
         )
     return _DefaultVSDocumentCodec(
         content_field=final_content_field,
         ignore_invalid_documents=ignore_invalid_documents,
+        has_lexical=has_lexical,
     )

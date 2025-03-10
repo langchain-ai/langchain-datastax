@@ -29,7 +29,7 @@ from astrapy.info import (
     CollectionDefinition,
     CollectionLexicalOptions,
     CollectionRerankingOptions,
-    RerankingServiceOptions,
+    # RerankingServiceOptions,  # TODO: FARR restore this
 )
 
 if TYPE_CHECKING:
@@ -111,13 +111,16 @@ def _prepare_hybrid_search_settings(
     if hybrid_search == HybridSearchMode.OFF:
         return None, None
 
-    lex_opt = CollectionLexicalOptions(analyzer="DEFAULT")
-    rrk_opt = CollectionRerankingOptions(
-        service=RerankingServiceOptions(
-            provider="reranking_provider",
-            model_name="reranking_model",
-        )
-    )
+    # TODO: FARR: restore these (and fill with actual values)
+    lex_opt = None
+    rrk_opt = None
+    # lex_opt = CollectionLexicalOptions(analyzer="DEFAULT")
+    # rrk_opt = CollectionRerankingOptions(
+    #     service=RerankingServiceOptions(
+    #         provider="reranking_provider",
+    #         model_name="reranking_model",
+    #     )
+    # )
     return lex_opt, rrk_opt
 
 

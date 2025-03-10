@@ -79,11 +79,13 @@ class TestAstraDB:
         the_f_codec = _FlatVSDocumentCodec(
             content_field="content_x",
             ignore_invalid_documents=False,
+            has_lexical=False,
         )
         the_f_default_policy = the_f_codec.default_collection_indexing_policy
         the_d_codec = _DefaultVSDocumentCodec(
             content_field="content_y",
             ignore_invalid_documents=False,
+            has_lexical=False,
         )
 
         # default (non-flat): hardcoding expected indexing from including
