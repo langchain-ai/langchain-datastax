@@ -260,8 +260,8 @@ class _AstraDBVectorStoreDocumentCodec(ABC):
         """Provide the default indexing policy if the collection must be created."""
 
     @property
-    def rerank_field(self) -> str | None:
-        """The value for 'rerank_field' in a find_and_rerank command, or None.
+    def rerank_on(self) -> str | None:
+        """The value for 'rerank_on' in a find_and_rerank command, or None.
 
         This property is not None if and only if the codec is a non-vectorize one.
         """

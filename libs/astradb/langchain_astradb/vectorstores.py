@@ -60,6 +60,7 @@ from langchain_astradb.utils.vector_store_codecs import (
 
 if TYPE_CHECKING:
     from astrapy.authentication import EmbeddingHeadersProvider, TokenProvider
+    from astrapy.cursors import RerankedResult
     from astrapy.results import CollectionUpdateResult
     from langchain_core.embeddings import Embeddings
 
@@ -1541,11 +1542,9 @@ class AstraDBVectorStore(VectorStore):
 
         return sum(u_res.update_info["n"] for u_res in update_results)
 
-    def full_decode_astra_db_document(
+    def full_decode_astra_db_found_document(
         self,
         astra_db_document: DocDict,
-        *,
-        is_hybrid_search: bool,
     ) -> AstraDBQueryResult | None:
         """Decode an Astra DB document in full, i.e. into Document+embedding/similarity.
 
@@ -1563,9 +1562,6 @@ class AstraDBVectorStore(VectorStore):
         Args:
             astra_db_document: a dictionary obtained through `run_query_raw` from
                 the collection.
-            is_hybrid_search: a flag to mark the type of search used to fetch
-                the document, which translates in different logic to extract a
-                score (if any).
 
         Returns:
             a AstraDBQueryResult named tuple with Document, id, embedding
@@ -1576,11 +1572,49 @@ class AstraDBVectorStore(VectorStore):
         if decoded is not None:
             doc_id = self.document_codec.get_id(astra_db_document)
             doc_embedding = self.document_codec.decode_vector(astra_db_document)
-            doc_similarity: float | None
-            if is_hybrid_search:
-                doc_similarity = self.document_codec.get_rerank_score(astra_db_document)
-            else:
-                doc_similarity = self.document_codec.get_similarity(astra_db_document)
+            doc_similarity = self.document_codec.get_similarity(astra_db_document)
+            return AstraDBQueryResult(
+                document=decoded,
+                id=doc_id,
+                embedding=doc_embedding,
+                similarity=doc_similarity,
+            )
+        return None
+
+    def full_decode_astra_db_reranked_result(
+        self,
+        astra_db_reranked_result: RerankedResult[DocDict],
+    ) -> AstraDBQueryResult | None:
+        """Full-decode an Astra DB find-and-rerank hit (Document+embedding/similarity).
+
+        This operation returns a representation that is independent of the codec
+        being used in the collection (whereas the 'document' part of the input,
+        a 'raw' Astra DB response from a find-and-rerank hybrid search, is
+        codec-dependent).
+
+        The input raw document is what the find_and_rerank Astrapy method returns,
+        i.e. an iterable over RerankedResult objects. Missing entries (such as
+        the embedding) are  set to None in the resulf if not found.
+
+        The whole method can return a None, to signal that the codec has refused
+        the conversion (e.g. because the input document is deemed faulty).
+
+        Args:
+            astra_db_reranked_result: a RerankedResult obtained by a `find_and_rerank`
+                method call on the collection.
+
+        Returns:
+            a AstraDBQueryResult named tuple with Document, id, embedding
+                (where applicable) and similarity (where applicable),
+                or an overall None if the decoding is refused by the codec.
+        """
+        astra_db_document = astra_db_reranked_result.document
+        astra_db_scores = astra_db_reranked_result.scores
+        decoded = self.document_codec.decode(astra_db_document)
+        if decoded is not None:
+            doc_id = self.document_codec.get_id(astra_db_document)
+            doc_embedding = self.document_codec.decode_vector(astra_db_document)
+            doc_similarity = astra_db_scores.get("$rerank")
             return AstraDBQueryResult(
                 document=decoded,
                 id=doc_id,
@@ -1815,9 +1849,8 @@ class AstraDBVectorStore(VectorStore):
                     decoded_tuple
                     for astra_db_doc in astra_docs_ite
                     if (
-                        decoded_tuple := self.full_decode_astra_db_document(
+                        decoded_tuple := self.full_decode_astra_db_found_document(
                             astra_db_doc,
-                            is_hybrid_search=False,
                         )
                     )
                     is not None
@@ -1836,9 +1869,8 @@ class AstraDBVectorStore(VectorStore):
             decoded_tuple
             for astra_db_doc in astra_docs_ite
             if (
-                decoded_tuple := self.full_decode_astra_db_document(
+                decoded_tuple := self.full_decode_astra_db_found_document(
                     astra_db_doc,
-                    is_hybrid_search=False,
                 )
             )
             is not None
@@ -2074,9 +2106,8 @@ class AstraDBVectorStore(VectorStore):
                     decoded_tuple
                     async for astra_db_doc in astra_docs_ite
                     if (
-                        decoded_tuple := self.full_decode_astra_db_document(
+                        decoded_tuple := self.full_decode_astra_db_found_document(
                             astra_db_doc,
-                            is_hybrid_search=False,
                         )
                     )
                     is not None
@@ -2095,9 +2126,8 @@ class AstraDBVectorStore(VectorStore):
             decoded_tuple
             async for astra_db_doc in astra_docs_ite
             if (
-                decoded_tuple := self.full_decode_astra_db_document(
+                decoded_tuple := self.full_decode_astra_db_found_document(
                     astra_db_doc,
-                    is_hybrid_search=False,
                 )
             )
             is not None
@@ -2242,7 +2272,7 @@ class AstraDBVectorStore(VectorStore):
         sort: dict[str, Any]
 
         if self.hybrid_search:
-            rerank_field = self.document_codec.rerank_field
+            rerank_on = self.document_codec.rerank_on
             if self.document_codec.server_side_embeddings:
                 sort = self.document_codec.encode_hybrid_sort(
                     vector=None,
@@ -2261,7 +2291,7 @@ class AstraDBVectorStore(VectorStore):
                 sort=sort,
                 k=k,
                 filter=filter,
-                rerank_field=rerank_field,
+                rerank_on=rerank_on,
             )
 
         if self.document_codec.server_side_embeddings:
@@ -2382,7 +2412,7 @@ class AstraDBVectorStore(VectorStore):
         sort: dict[str, Any],
         k: int,
         filter: dict[str, Any] | None,  # noqa: A002
-        rerank_field: str | None,
+        rerank_on: str | None,
     ) -> list[tuple[Document, float, str]]:
         """Run a hybrid search with a provided sort clause."""
         self.astra_env.ensure_db_setup()
@@ -2391,14 +2421,14 @@ class AstraDBVectorStore(VectorStore):
             hlk: max(int(hlf * k), 1)
             for hlk, hlf in self.hybrid_limit_factor_map.items()
         }
-        hybrid_hits = self.astra_env.collection.find_and_rerank(
+        hybrid_reranked_results = self.astra_env.collection.find_and_rerank(
             filter=encoded_filter,
             sort=sort,
             projection=self.document_codec.base_projection,
             limit=k,
             hybrid_limits=hybrid_limits,
             hybrid_projection="scores",
-            rerank_field=rerank_field,
+            rerank_on=rerank_on,
         )
         return [
             cast(
@@ -2409,11 +2439,10 @@ class AstraDBVectorStore(VectorStore):
                     decoded_tuple.id,
                 ),
             )
-            for astra_db_doc in hybrid_hits
+            for rrk_result in hybrid_reranked_results
             if (
-                decoded_tuple := self.full_decode_astra_db_document(
-                    astra_db_doc,
-                    is_hybrid_search=True,
+                decoded_tuple := self.full_decode_astra_db_reranked_result(
+                    rrk_result,
                 )
             )
             is not None
@@ -2492,7 +2521,7 @@ class AstraDBVectorStore(VectorStore):
         sort: dict[str, Any]
 
         if self.hybrid_search:
-            rerank_field = self.document_codec.rerank_field
+            rerank_on = self.document_codec.rerank_on
             if self.document_codec.server_side_embeddings:
                 sort = self.document_codec.encode_hybrid_sort(
                     vector=None,
@@ -2511,7 +2540,7 @@ class AstraDBVectorStore(VectorStore):
                 sort=sort,
                 k=k,
                 filter=filter,
-                rerank_field=rerank_field,
+                rerank_on=rerank_on,
             )
 
         if self.document_codec.server_side_embeddings:
@@ -2632,7 +2661,7 @@ class AstraDBVectorStore(VectorStore):
         sort: dict[str, Any],
         k: int,
         filter: dict[str, Any] | None,  # noqa: A002
-        rerank_field: str | None,
+        rerank_on: str | None,
     ) -> list[tuple[Document, float, str]]:
         """Run a hybrid search with a provided sort clause."""
         await self.astra_env.aensure_db_setup()
@@ -2641,14 +2670,14 @@ class AstraDBVectorStore(VectorStore):
             hlk: max(int(hlf * k), 1)
             for hlk, hlf in self.hybrid_limit_factor_map.items()
         }
-        hybrid_hits = self.astra_env.async_collection.find_and_rerank(
+        hybrid_reranked_results = self.astra_env.async_collection.find_and_rerank(
             filter=encoded_filter,
             sort=sort,
             projection=self.document_codec.base_projection,
             limit=k,
             hybrid_limits=hybrid_limits,
             hybrid_projection="scores",
-            rerank_field=rerank_field,
+            rerank_on=rerank_on,
         )
         return [
             cast(
@@ -2659,11 +2688,10 @@ class AstraDBVectorStore(VectorStore):
                     decoded_tuple.id,
                 ),
             )
-            async for astra_db_doc in hybrid_hits
+            async for rrk_result in hybrid_reranked_results
             if (
-                decoded_tuple := self.full_decode_astra_db_document(
-                    astra_db_doc,
-                    is_hybrid_search=True,
+                decoded_tuple := self.full_decode_astra_db_reranked_result(
+                    rrk_result,
                 )
             )
             is not None
