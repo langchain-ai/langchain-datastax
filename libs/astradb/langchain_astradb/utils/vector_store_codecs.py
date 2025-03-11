@@ -24,6 +24,7 @@ SIMILARITY_FIELD_NAME = "$similarity"
 RERANK_SCORE_FIELD_NAME_0 = "$hybrid"
 RERANK_SCORE_FIELD_NAME_1 = "scores"
 RERANK_SCORE_FIELD_NAME_2 = "$rerank"
+RERANK_SORT_TOP_FIELD_NAME = "$hybrid"
 DEFAULT_METADATA_FIELD_NAME = "metadata"
 
 STANDARD_INDEXING_OPTIONS_DEFAULT = {"allow": [DEFAULT_METADATA_FIELD_NAME]}
@@ -109,6 +110,32 @@ def _astra_generic_encode_vector_sort(vector: list[float]) -> dict[str, Any]:
 def _astra_generic_encode_vectorize_sort(query_text: str) -> dict[str, Any]:
     """Encoding of a vectorize-based sort as a query clause for an Astra DB document."""
     return {VECTORIZE_FIELD_NAME: query_text}
+
+
+def _astra_vector_encode_hybrid_sort(
+    vector: list[float],
+    lexical: str,
+) -> dict[str, Any]:
+    """Encoding of a sort clause for hybrid search in the non-vectorize case."""
+    return {
+        RERANK_SORT_TOP_FIELD_NAME: {
+            VECTOR_FIELD_NAME: vector,
+            LEXICAL_FIELD_NAME: lexical,
+        },
+    }
+
+
+def _astra_vectorize_encode_hybrid_sort(
+    vectorize: str,
+    lexical: str,
+) -> dict[str, Any]:
+    """Encoding of a sort clause for hybrid search in the vectorize case."""
+    return {
+        RERANK_SORT_TOP_FIELD_NAME: {
+            VECTORIZE_FIELD_NAME: vectorize,
+            LEXICAL_FIELD_NAME: lexical,
+        },
+    }
 
 
 class _AstraDBVectorStoreDocumentCodec(ABC):
@@ -203,10 +230,44 @@ class _AstraDBVectorStoreDocumentCodec(ABC):
             an order clause for use in Astra DB's find queries.
         """
 
+    @abstractmethod
+    def encode_hybrid_sort(
+        self,
+        *,
+        vector: list[float] | None,
+        vectorize: str | None,
+        lexical: str,
+    ) -> dict[str, Any]:
+        """Encode a 'sort' parameter for an Astra DB 'hybrid' search.
+
+        The input parameters must be appropriate for the particular codec:
+        supplying the wrong inputs (such as a vector on a vectorize-codec)
+        will result in an exception being thrown.
+
+        Args:
+            vector: a query vector (if applicable) or None.
+            vectorize: a query text for vectorize search (if applicable) or None.
+                Exactly one of `vector` and `vectorize` must not be None.
+            lexical: the search query text for the lexical part of the hybrid search.
+
+        Returns:
+            a sort clause for use in Astra DB's findAndRerank queries.
+        """
+
     @property
     @abstractmethod
     def default_collection_indexing_policy(self) -> dict[str, list[str]]:
         """Provide the default indexing policy if the collection must be created."""
+
+    @property
+    def rerank_field(self) -> str | None:
+        """The value for 'rerank_field' in a find_and_rerank command, or None.
+
+        This property is not None if and only if the codec is a non-vectorize one.
+        """
+        if self.server_side_embeddings:
+            return None
+        return self.content_field
 
     def decode_vector(self, astra_document: dict[str, Any]) -> list[float] | None:
         """Create a vector from a document retrieved from Astra DB.
@@ -386,6 +447,19 @@ class _DefaultVSDocumentCodec(_AstraDBVectorStoreDocumentCodec):
     def encode_vectorize_sort(self, query_text: str) -> dict[str, Any]:
         raise ValueError(VECTORIZE_NOT_AVAILABLE_MSG)
 
+    @override
+    def encode_hybrid_sort(
+        self,
+        *,
+        vector: list[float] | None,
+        vectorize: str | None,
+        lexical: str,
+    ) -> dict[str, Any]:
+        if vector is None or vectorize is not None:
+            msg = "This codec's hybrid sort requires `vectorize=None` and a vector."
+            raise ValueError(msg)
+        return _astra_vector_encode_hybrid_sort(vector=vector, lexical=lexical)
+
     @property
     @override
     def default_collection_indexing_policy(self) -> dict[str, list[str]]:
@@ -477,6 +551,19 @@ class _DefaultVectorizeVSDocumentCodec(_AstraDBVectorStoreDocumentCodec):
     @override
     def encode_vectorize_sort(self, query_text: str) -> dict[str, Any]:
         return _astra_generic_encode_vectorize_sort(query_text)
+
+    @override
+    def encode_hybrid_sort(
+        self,
+        *,
+        vector: list[float] | None,
+        vectorize: str | None,
+        lexical: str,
+    ) -> dict[str, Any]:
+        if vectorize is None or vector is not None:
+            msg = "This codec's hybrid sort requires `vector=None` and a vectorize."
+            raise ValueError(msg)
+        return _astra_vectorize_encode_hybrid_sort(vectorize=vectorize, lexical=lexical)
 
     @property
     @override
@@ -572,6 +659,19 @@ class _FlatVSDocumentCodec(_AstraDBVectorStoreDocumentCodec):
     def encode_vectorize_sort(self, query_text: str) -> dict[str, Any]:
         raise ValueError(VECTORIZE_NOT_AVAILABLE_MSG)
 
+    @override
+    def encode_hybrid_sort(
+        self,
+        *,
+        vector: list[float] | None,
+        vectorize: str | None,
+        lexical: str,
+    ) -> dict[str, Any]:
+        if vector is None or vectorize is not None:
+            msg = "This codec's hybrid sort requires `vectorize=None` and a vector."
+            raise ValueError(msg)
+        return _astra_vector_encode_hybrid_sort(vector=vector, lexical=lexical)
+
     @property
     @override
     def default_collection_indexing_policy(self) -> dict[str, list[str]]:
@@ -665,6 +765,19 @@ class _FlatVectorizeVSDocumentCodec(_AstraDBVectorStoreDocumentCodec):
     @override
     def encode_vectorize_sort(self, query_text: str) -> dict[str, Any]:
         return _astra_generic_encode_vectorize_sort(query_text)
+
+    @override
+    def encode_hybrid_sort(
+        self,
+        *,
+        vector: list[float] | None,
+        vectorize: str | None,
+        lexical: str,
+    ) -> dict[str, Any]:
+        if vectorize is None or vector is not None:
+            msg = "This codec's hybrid sort requires `vector=None` and a vectorize."
+            raise ValueError(msg)
+        return _astra_vectorize_encode_hybrid_sort(vectorize=vectorize, lexical=lexical)
 
     @property
     @override

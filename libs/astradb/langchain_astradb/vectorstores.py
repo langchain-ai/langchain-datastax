@@ -2173,6 +2173,30 @@ class AstraDBVectorStore(VectorStore):
             The list of (Document, score, id), the most similar to the query.
         """
         sort: dict[str, Any]
+
+        if self.use_hybrid_search:
+            rerank_field = self.document_codec.rerank_field
+            if self.document_codec.server_side_embeddings:
+                sort = self.document_codec.encode_hybrid_sort(
+                    vector=None,
+                    vectorize=query,
+                    lexical=query,
+                )
+            else:
+                embedding_vector = self._get_safe_embedding().embed_query(query)
+                sort = self.document_codec.encode_hybrid_sort(
+                    vector=embedding_vector,
+                    vectorize=None,
+                    lexical=query,
+                )
+
+            return self._hybrid_search_with_score_id_by_sort(
+                sort=sort,
+                k=k,
+                filter=filter,
+                rerank_field=rerank_field,
+            )
+
         if self.document_codec.server_side_embeddings:
             sort = self.document_codec.encode_vectorize_sort(query)
         else:
@@ -2270,8 +2294,8 @@ class AstraDBVectorStore(VectorStore):
     def _similarity_search_with_score_id_by_sort(
         self,
         sort: dict[str, Any],
-        k: int = 4,
-        filter: dict[str, Any] | None = None,  # noqa: A002
+        k: int,
+        filter: dict[str, Any] | None,  # noqa: A002
     ) -> list[tuple[Document, float, str]]:
         """Run ANN search with a provided sort clause."""
         hits_ite = self.run_query(
@@ -2284,6 +2308,43 @@ class AstraDBVectorStore(VectorStore):
         return [
             cast(tuple[Document, float, str], (doc, sim, did))
             for doc, did, _, sim in hits_ite
+        ]
+
+    def _hybrid_search_with_score_id_by_sort(
+        self,
+        sort: dict[str, Any],
+        k: int,
+        filter: dict[str, Any] | None,  # noqa: A002
+        rerank_field: str | None,
+    ) -> list[tuple[Document, float, str]]:
+        """Run a hybrid search with a provided sort clause."""
+        self.astra_env.ensure_db_setup()
+        encoded_filter = self.document_codec.encode_query(filter_dict=filter)
+        hybrid_hits = self.astra_env.collection.find_and_rerank(
+            filter=encoded_filter,
+            sort=sort,
+            projection=self.document_codec.base_projection,
+            limit=k,
+            hybrid_projection="scores",
+            rerank_field=rerank_field,
+        )
+        return [
+            cast(
+                tuple[Document, float, str],
+                (
+                    decoded_tuple.document,
+                    decoded_tuple.similarity,
+                    decoded_tuple.id,
+                ),
+            )
+            for astra_db_doc in hybrid_hits
+            if (
+                decoded_tuple := self.full_decode_astra_db_document(
+                    astra_db_doc,
+                    is_hybrid_search=True,
+                )
+            )
+            is not None
         ]
 
     @override
@@ -2357,6 +2418,30 @@ class AstraDBVectorStore(VectorStore):
             The list of (Document, score, id), the most similar to the query.
         """
         sort: dict[str, Any]
+
+        if self.use_hybrid_search:
+            rerank_field = self.document_codec.rerank_field
+            if self.document_codec.server_side_embeddings:
+                sort = self.document_codec.encode_hybrid_sort(
+                    vector=None,
+                    vectorize=query,
+                    lexical=query,
+                )
+            else:
+                embedding_vector = await self._get_safe_embedding().aembed_query(query)
+                sort = self.document_codec.encode_hybrid_sort(
+                    vector=embedding_vector,
+                    vectorize=None,
+                    lexical=query,
+                )
+
+            return await self._ahybrid_search_with_score_id_by_sort(
+                sort=sort,
+                k=k,
+                filter=filter,
+                rerank_field=rerank_field,
+            )
+
         if self.document_codec.server_side_embeddings:
             sort = self.document_codec.encode_vectorize_sort(query)
         else:
@@ -2454,8 +2539,8 @@ class AstraDBVectorStore(VectorStore):
     async def _asimilarity_search_with_score_id_by_sort(
         self,
         sort: dict[str, Any],
-        k: int = 4,
-        filter: dict[str, Any] | None = None,  # noqa: A002
+        k: int,
+        filter: dict[str, Any] | None,  # noqa: A002
     ) -> list[tuple[Document, float, str]]:
         """Run ANN search with a provided sort clause."""
         hits_ite = await self.arun_query(
@@ -2468,6 +2553,43 @@ class AstraDBVectorStore(VectorStore):
         return [
             cast(tuple[Document, float, str], (doc, sim, did))
             async for doc, did, _, sim in hits_ite
+        ]
+
+    async def _ahybrid_search_with_score_id_by_sort(
+        self,
+        sort: dict[str, Any],
+        k: int,
+        filter: dict[str, Any] | None,  # noqa: A002
+        rerank_field: str | None,
+    ) -> list[tuple[Document, float, str]]:
+        """Run a hybrid search with a provided sort clause."""
+        await self.astra_env.aensure_db_setup()
+        encoded_filter = self.document_codec.encode_query(filter_dict=filter)
+        hybrid_hits = self.astra_env.async_collection.find_and_rerank(
+            filter=encoded_filter,
+            sort=sort,
+            projection=self.document_codec.base_projection,
+            limit=k,
+            hybrid_projection="scores",
+            rerank_field=rerank_field,
+        )
+        return [
+            cast(
+                tuple[Document, float, str],
+                (
+                    decoded_tuple.document,
+                    decoded_tuple.similarity,
+                    decoded_tuple.id,
+                ),
+            )
+            async for astra_db_doc in hybrid_hits
+            if (
+                decoded_tuple := self.full_decode_astra_db_document(
+                    astra_db_doc,
+                    is_hybrid_search=True,
+                )
+            )
+            is not None
         ]
 
     def similarity_search_with_embedding_by_vector(
@@ -2535,6 +2657,18 @@ class AstraDBVectorStore(VectorStore):
             (The query embedding vector, The list of (Document, embedding),
             the most similar to the query vector.).
         """
+        if self.use_hybrid_search:
+            warnings.warn(
+                (
+                    "Method `similarity_search_with_embedding` was called on a vector "
+                    "store equipped with Hybrid capabilities. Since this method cannot "
+                    "make use of Hybrid search, the vector store will fall back to "
+                    "regular vector ANN similarity search."
+                ),
+                UserWarning,
+                stacklevel=2,
+            )
+
         if self.document_codec.server_side_embeddings:
             sort = self.document_codec.encode_vectorize_sort(query)
         else:
@@ -2567,6 +2701,18 @@ class AstraDBVectorStore(VectorStore):
             (The query embedding vector, The list of (Document, embedding),
             the most similar to the query vector.).
         """
+        if self.use_hybrid_search:
+            warnings.warn(
+                (
+                    "Method `asimilarity_search_with_embedding` was called on a vector "
+                    "store equipped with Hybrid capabilities. Since this method cannot "
+                    "make use of Hybrid search, the vector store will fall back to "
+                    "regular vector ANN similarity search."
+                ),
+                UserWarning,
+                stacklevel=2,
+            )
+
         if self.document_codec.server_side_embeddings:
             sort = self.document_codec.encode_vectorize_sort(query)
         else:
@@ -2819,6 +2965,18 @@ class AstraDBVectorStore(VectorStore):
         Returns:
             The list of Documents selected by maximal marginal relevance.
         """
+        if self.use_hybrid_search:
+            warnings.warn(
+                (
+                    "Method `max_marginal_relevance_search` was called on a vector "
+                    "store equipped with Hybrid capabilities. Since this method cannot "
+                    "make use of Hybrid search, the vector store will fall back to "
+                    "regular vector ANN similarity search."
+                ),
+                UserWarning,
+                stacklevel=2,
+            )
+
         if self.document_codec.server_side_embeddings:
             # this case goes directly to the "_by_sort" method
             # (and does its own filter normalization, as it cannot
@@ -2869,6 +3027,18 @@ class AstraDBVectorStore(VectorStore):
         Returns:
             The list of Documents selected by maximal marginal relevance.
         """
+        if self.use_hybrid_search:
+            warnings.warn(
+                (
+                    "Method `amax_marginal_relevance_search` was called on a vector "
+                    "store equipped with Hybrid capabilities. Since this method cannot "
+                    "make use of Hybrid search, the vector store will fall back to "
+                    "regular vector ANN similarity search."
+                ),
+                UserWarning,
+                stacklevel=2,
+            )
+
         if self.document_codec.server_side_embeddings:
             # this case goes directly to the "_by_sort" method
             # (and does its own filter normalization, as it cannot
