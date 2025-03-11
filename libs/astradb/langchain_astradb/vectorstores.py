@@ -83,6 +83,9 @@ class AstraDBQueryResult(NamedTuple):
 DOCUMENT_ALREADY_EXISTS_API_ERROR_CODE = "DOCUMENT_ALREADY_EXISTS"
 # max number of errors shown in full insertion error messages
 MAX_SHOWN_INSERTION_ERRORS = 8
+# default setting for creating hybrid-enabled collections
+# TODO: FARR: flip default to TRUE
+DEFAULT_HYBRID_COLLECTION = False
 
 logger = logging.getLogger(__name__)
 
@@ -131,6 +134,7 @@ def _validate_autodetect_init_params(
     metadata_indexing_exclude: Iterable[str] | None,
     collection_indexing_policy: dict[str, Any] | None,
     collection_vector_service_options: VectorServiceOptions | None,
+    hybrid_collection: bool | None,
 ) -> None:
     """Check that the passed parameters do not violate the autodetect constraints."""
     forbidden_parameters = [
@@ -141,6 +145,7 @@ def _validate_autodetect_init_params(
             ("metadata_indexing_exclude", metadata_indexing_exclude),
             ("collection_indexing_policy", collection_indexing_policy),
             ("collection_vector_service_options", collection_vector_service_options),
+            ("hybrid_collection", hybrid_collection),
         )
         if p_value is not None
     ]
@@ -160,6 +165,24 @@ def _validate_autodetect_init_params(
     if am_errors:
         msg = f"Invalid parameters for autodetect mode: {'; '.join(am_errors)}"
         raise ValueError(msg)
+
+
+def _decide_hybrid_search_setting(
+    *,
+    required_hybrid_search: HybridSearchMode | None,
+    hybrid_collection: bool,
+) -> bool:
+    """Determine whether searches must be hybrid.
+
+    Args:
+        required_hybrid_search: the hybrid_search parameter required in the constructor.
+        hybrid_collection: whether the collection actually is hybrid-capable.
+    """
+    if required_hybrid_search == HybridSearchMode.OFF:
+        return False
+    if required_hybrid_search == HybridSearchMode.ON:
+        return True
+    return hybrid_collection
 
 
 def _insertmany_error_message(err: CollectionInsertManyException) -> str:
@@ -443,6 +466,7 @@ class AstraDBVectorStore(VectorStore):
         autodetect_collection: bool = False,
         ext_callers: list[tuple[str | None, str | None] | str | None] | None = None,
         component_name: str = COMPONENT_NAME_VECTORSTORE,
+        hybrid_collection: bool | None = None,
         hybrid_search: HybridSearchMode | None = None,
     ) -> None:
         """Wrapper around DataStax Astra DB for vector-store workloads.
@@ -550,12 +574,16 @@ class AstraDBVectorStore(VectorStore):
                 Defaults to "langchain_vectorstore", but can be overridden if this
                 component actually serves as the building block for another component
                 (such as a Graph Vector Store).
-            hybrid_search: whether to run hybrid similarity searches or not (DEFAULT,
-                FORCE or OFF). In case of DEFAULT, the vector store adapts its searches
-                to pre-existing collections, and new collections are created with hybrid
-                search enabled. FORCE may result in an API error if passed for a
-                pre-existing non-hybrid-enabled collection; OFF never runs hybrid
-                searches (nor does it set hybrid on new collections).
+            hybrid_collection: in case a collection is created as part of the store
+                setup, this controls whether Hybrid search should be enabled on it.
+                Hybrid search must be set at collection-creation time and cannot
+                be changed later. Defaults to True.
+            hybrid_search: whether similarity searches should be run as Hybrid searches
+                or not. Values are DEFAULT, ON or OFF. In case of DEFAULT, searches
+                are performed as permitted by the collection configuration, with a
+                preference for hybrid search. Forcing this setting to ON for a
+                non-hybrid-enabled collection would result in a server error when
+                running searches.
 
         Note:
             For concurrency in synchronous :meth:`~add_texts`:, as a rule of thumb,
@@ -605,9 +633,8 @@ class AstraDBVectorStore(VectorStore):
         _setup_mode: SetupMode
         _embedding_dimension: int | Awaitable[int] | None
 
-        # TODO: FARR: flip default to DEFAULT
-        _hybrid_search: HybridSearchMode = hybrid_search or HybridSearchMode.OFF
-        self.use_hybrid_search: bool  # as in 'actual behaviour'
+        _hybrid_collection: bool  # dictating collection creation setting for the env.
+        self.hybrid_search: bool  # as in 'actual behaviour when running searches'
 
         if not self.autodetect_collection:
             logger.info(
@@ -623,18 +650,26 @@ class AstraDBVectorStore(VectorStore):
                 has_vectorize=has_vectorize,
             )
 
-            self.use_hybrid_search = _hybrid_search != HybridSearchMode.OFF
+            _hybrid_collection = (
+                DEFAULT_HYBRID_COLLECTION
+                if hybrid_collection is None
+                else hybrid_collection
+            )
+            self.hybrid_search = _decide_hybrid_search_setting(
+                required_hybrid_search=hybrid_search,
+                hybrid_collection=_hybrid_collection,
+            )
 
             if self.collection_vector_service_options is not None:
                 self.document_codec = _DefaultVectorizeVSDocumentCodec(
                     ignore_invalid_documents=ignore_invalid_documents,
-                    has_lexical=self.use_hybrid_search,
+                    has_lexical=self.hybrid_search,
                 )
             else:
                 self.document_codec = _DefaultVSDocumentCodec(
                     content_field=_content_field,
                     ignore_invalid_documents=ignore_invalid_documents,
-                    has_lexical=self.use_hybrid_search,
+                    has_lexical=self.hybrid_search,
                 )
             # indexing policy setting
             self.indexing_policy = self._normalize_metadata_indexing_policy(
@@ -656,6 +691,7 @@ class AstraDBVectorStore(VectorStore):
                 metadata_indexing_exclude=metadata_indexing_exclude,
                 collection_indexing_policy=collection_indexing_policy,
                 collection_vector_service_options=self.collection_vector_service_options,
+                hybrid_collection=hybrid_collection,
             )
             _setup_mode = SetupMode.OFF
 
@@ -699,18 +735,16 @@ class AstraDBVectorStore(VectorStore):
                 document_codec=self.document_codec,
             )
 
-            if _hybrid_search == HybridSearchMode.OFF:
-                self.use_hybrid_search = False
-            elif _hybrid_search == HybridSearchMode.FORCE:
-                self.use_hybrid_search = True
-            else:
-                # hybrid usage is autodetected:
-                self.use_hybrid_search = (
-                    c_descriptor.definition.lexical is not None
-                    and c_descriptor.definition.reranking is not None
-                    and c_descriptor.definition.lexical.enabled
-                    and c_descriptor.definition.reranking.enabled
-                )
+            _hybrid_collection = (
+                c_descriptor.definition.lexical is not None
+                and c_descriptor.definition.reranking is not None
+                and c_descriptor.definition.lexical.enabled
+                and c_descriptor.definition.reranking.enabled
+            )
+            self.hybrid_search = _decide_hybrid_search_setting(
+                required_hybrid_search=hybrid_search,
+                hybrid_collection=_hybrid_collection,
+            )
 
         # validate embedding/vectorize compatibility and such.
         # Embedding and the server-side embeddings are mutually exclusive,
@@ -749,7 +783,7 @@ class AstraDBVectorStore(VectorStore):
             collection_embedding_api_key=self.collection_embedding_api_key,
             ext_callers=ext_callers,
             component_name=component_name,
-            hybrid_search=_hybrid_search,
+            hybrid_collection=_hybrid_collection,
         )
 
     def _get_safe_embedding(self) -> Embeddings:
@@ -864,7 +898,7 @@ class AstraDBVectorStore(VectorStore):
         )
         copy.collection_vector_service_options = self.collection_vector_service_options
         copy.document_codec = self.document_codec
-        copy.use_hybrid_search = self.use_hybrid_search
+        copy.hybrid_search = self.hybrid_search
         copy.batch_size = self.batch_size
         copy.bulk_insert_batch_concurrency = self.bulk_insert_batch_concurrency
         copy.bulk_insert_overwrite_concurrency = self.bulk_insert_overwrite_concurrency
@@ -2174,7 +2208,7 @@ class AstraDBVectorStore(VectorStore):
         """
         sort: dict[str, Any]
 
-        if self.use_hybrid_search:
+        if self.hybrid_search:
             rerank_field = self.document_codec.rerank_field
             if self.document_codec.server_side_embeddings:
                 sort = self.document_codec.encode_hybrid_sort(
@@ -2419,7 +2453,7 @@ class AstraDBVectorStore(VectorStore):
         """
         sort: dict[str, Any]
 
-        if self.use_hybrid_search:
+        if self.hybrid_search:
             rerank_field = self.document_codec.rerank_field
             if self.document_codec.server_side_embeddings:
                 sort = self.document_codec.encode_hybrid_sort(
@@ -2657,7 +2691,7 @@ class AstraDBVectorStore(VectorStore):
             (The query embedding vector, The list of (Document, embedding),
             the most similar to the query vector.).
         """
-        if self.use_hybrid_search:
+        if self.hybrid_search:
             warnings.warn(
                 (
                     "Method `similarity_search_with_embedding` was called on a vector "
@@ -2701,7 +2735,7 @@ class AstraDBVectorStore(VectorStore):
             (The query embedding vector, The list of (Document, embedding),
             the most similar to the query vector.).
         """
-        if self.use_hybrid_search:
+        if self.hybrid_search:
             warnings.warn(
                 (
                     "Method `asimilarity_search_with_embedding` was called on a vector "
@@ -2965,7 +2999,7 @@ class AstraDBVectorStore(VectorStore):
         Returns:
             The list of Documents selected by maximal marginal relevance.
         """
-        if self.use_hybrid_search:
+        if self.hybrid_search:
             warnings.warn(
                 (
                     "Method `max_marginal_relevance_search` was called on a vector "
@@ -3027,7 +3061,7 @@ class AstraDBVectorStore(VectorStore):
         Returns:
             The list of Documents selected by maximal marginal relevance.
         """
-        if self.use_hybrid_search:
+        if self.hybrid_search:
             warnings.warn(
                 (
                     "Method `amax_marginal_relevance_search` was called on a vector "

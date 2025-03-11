@@ -89,7 +89,7 @@ class HybridSearchMode(Enum):
     """Hybrid Search mode for a Vector Store collection."""
 
     DEFAULT = 1
-    FORCE = 3
+    ON = 3
     OFF = 2
 
 
@@ -106,9 +106,10 @@ def unpack_indexing_policy(
 
 
 def _prepare_hybrid_search_settings(
-    hybrid_search: HybridSearchMode,
+    *,
+    hybrid_collection: bool,
 ) -> tuple[CollectionLexicalOptions | None, CollectionRerankingOptions | None]:
-    if hybrid_search == HybridSearchMode.OFF:
+    if not hybrid_collection:
         return None, None
 
     # TODO: FARR: restore these (and fill with actual values)
@@ -303,7 +304,7 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
         default_indexing_policy: dict[str, Any] | None = None,
         collection_vector_service_options: VectorServiceOptions | None = None,
         collection_embedding_api_key: str | EmbeddingHeadersProvider | None = None,
-        hybrid_search: HybridSearchMode = HybridSearchMode.OFF,
+        hybrid_collection: bool = False,
     ) -> None:
         super().__init__(
             token=token,
@@ -325,7 +326,7 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
             embedding_api_key=self.collection_embedding_api_key,
         )
         self.async_collection = self.collection.to_async()
-        self.hybrid_search = hybrid_search
+        self.hybrid_collection = hybrid_collection
 
         self.async_setup_db_task: Task | None = None
         if setup_mode == SetupMode.ASYNC:
@@ -337,7 +338,7 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
                     default_indexing_policy=default_indexing_policy,
                     requested_indexing_policy=requested_indexing_policy,
                     collection_vector_service_options=collection_vector_service_options,
-                    hybrid_search=self.hybrid_search,
+                    hybrid_collection=self.hybrid_collection,
                 )
             )
         elif setup_mode == SetupMode.SYNC:
@@ -354,7 +355,9 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
                     requested_indexing_policy,
                 )
                 hybrid_search_lexical, hybrid_search_reranking = (
-                    _prepare_hybrid_search_settings(self.hybrid_search)
+                    _prepare_hybrid_search_settings(
+                        hybrid_collection=self.hybrid_collection
+                    )
                 )
                 collection_definition = (
                     CollectionDefinition.builder()
@@ -437,7 +440,7 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
             collection_embedding_api_key=self.collection_embedding_api_key
             if collection_embedding_api_key
             else collection_embedding_api_key,
-            hybrid_search=self.hybrid_search,
+            hybrid_collection=self.hybrid_collection,
         )
 
     async def _asetup_db(
@@ -449,7 +452,7 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
         requested_indexing_policy: dict[str, Any] | None,
         default_indexing_policy: dict[str, Any] | None,
         collection_vector_service_options: VectorServiceOptions | None,
-        hybrid_search: HybridSearchMode,
+        hybrid_collection: bool,
     ) -> None:
         if pre_delete_collection:
             await self.async_database.drop_collection(self.collection_name)
@@ -461,7 +464,7 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
         try:
             _idx_mode, _idx_target = unpack_indexing_policy(requested_indexing_policy)
             hybrid_search_lexical, hybrid_search_reranking = (
-                _prepare_hybrid_search_settings(hybrid_search)
+                _prepare_hybrid_search_settings(hybrid_collection=hybrid_collection)
             )
             await self.async_database.create_collection(
                 name=self.collection_name,
