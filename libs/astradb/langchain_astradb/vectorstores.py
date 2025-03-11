@@ -50,6 +50,8 @@ from langchain_astradb.utils.vector_store_autodetect import (
     _detect_document_codec,
 )
 from langchain_astradb.utils.vector_store_codecs import (
+    LEXICAL_FIELD_NAME,
+    VECTOR_FIELD_NAME,
     VECTORIZE_FIELD_NAME,
     _AstraDBVectorStoreDocumentCodec,
     _DefaultVectorizeVSDocumentCodec,
@@ -86,6 +88,7 @@ MAX_SHOWN_INSERTION_ERRORS = 8
 # default setting for creating hybrid-enabled collections
 # TODO: FARR: flip default to TRUE
 DEFAULT_HYBRID_COLLECTION = False
+DEFAULT_HYBRID_LIMIT_FACTOR = 1.0
 
 logger = logging.getLogger(__name__)
 
@@ -183,6 +186,26 @@ def _decide_hybrid_search_setting(
     if required_hybrid_search == HybridSearchMode.ON:
         return True
     return hybrid_collection
+
+
+def _normalize_hybrid_limit_factor(
+    hybrid_limit_factor: float | None,
+    *,
+    has_vectorize: bool,
+) -> dict[str, float]:
+    """Bring `hybrid_limit_factor` to normal dict form."""
+    _ann_field_name = VECTORIZE_FIELD_NAME if has_vectorize else VECTOR_FIELD_NAME
+    if hybrid_limit_factor is None:
+        return {
+            _ann_field_name: DEFAULT_HYBRID_LIMIT_FACTOR,
+            LEXICAL_FIELD_NAME: DEFAULT_HYBRID_LIMIT_FACTOR,
+        }
+
+    # a number is passed:
+    return {
+        _ann_field_name: float(hybrid_limit_factor),
+        LEXICAL_FIELD_NAME: float(hybrid_limit_factor),
+    }
 
 
 def _insertmany_error_message(err: CollectionInsertManyException) -> str:
@@ -468,6 +491,7 @@ class AstraDBVectorStore(VectorStore):
         component_name: str = COMPONENT_NAME_VECTORSTORE,
         hybrid_collection: bool | None = None,
         hybrid_search: HybridSearchMode | None = None,
+        hybrid_limit_factor: float | None = None,
     ) -> None:
         """Wrapper around DataStax Astra DB for vector-store workloads.
 
@@ -584,6 +608,10 @@ class AstraDBVectorStore(VectorStore):
                 preference for hybrid search. Forcing this setting to ON for a
                 non-hybrid-enabled collection would result in a server error when
                 running searches.
+            hybrid_limit_factor: Partial-limit specification for hybrid searches.
+                This is a float positive factor applied at search-time to the query
+                `k` (number of requested items) to obtain the two limits for the lexical
+                and ANN parts of the hybrid query. Defaults to one.
 
         Note:
             For concurrency in synchronous :meth:`~add_texts`:, as a rule of thumb,
@@ -764,6 +792,11 @@ class AstraDBVectorStore(VectorStore):
         ):
             msg = "Embedding API Key cannot be provided for non-vectorize collections."
             raise ValueError(msg)
+
+        self.hybrid_limit_factor_map = _normalize_hybrid_limit_factor(
+            hybrid_limit_factor,
+            has_vectorize=self.document_codec.server_side_embeddings,
+        )
 
         self.astra_env = _AstraDBCollectionEnvironment(
             collection_name=collection_name,
@@ -2237,7 +2270,7 @@ class AstraDBVectorStore(VectorStore):
             embedding_vector = self._get_safe_embedding().embed_query(query)
             sort = self.document_codec.encode_vector_sort(embedding_vector)
 
-        return self._similarity_search_with_score_id_by_sort(
+        return self._similarity_find_with_score_id_by_sort(
             sort=sort,
             k=k,
             filter=filter,
@@ -2319,13 +2352,13 @@ class AstraDBVectorStore(VectorStore):
             )
             raise ValueError(msg)
         sort = self.document_codec.encode_vector_sort(embedding)
-        return self._similarity_search_with_score_id_by_sort(
+        return self._similarity_find_with_score_id_by_sort(
             sort=sort,
             k=k,
             filter=filter,
         )
 
-    def _similarity_search_with_score_id_by_sort(
+    def _similarity_find_with_score_id_by_sort(
         self,
         sort: dict[str, Any],
         k: int,
@@ -2354,11 +2387,16 @@ class AstraDBVectorStore(VectorStore):
         """Run a hybrid search with a provided sort clause."""
         self.astra_env.ensure_db_setup()
         encoded_filter = self.document_codec.encode_query(filter_dict=filter)
+        hybrid_limits = {
+            hlk: max(int(hlf * k), 1)
+            for hlk, hlf in self.hybrid_limit_factor_map.items()
+        }
         hybrid_hits = self.astra_env.collection.find_and_rerank(
             filter=encoded_filter,
             sort=sort,
             projection=self.document_codec.base_projection,
             limit=k,
+            hybrid_limits=hybrid_limits,
             hybrid_projection="scores",
             rerank_field=rerank_field,
         )
@@ -2482,7 +2520,7 @@ class AstraDBVectorStore(VectorStore):
             embedding_vector = await self._get_safe_embedding().aembed_query(query)
             sort = self.document_codec.encode_vector_sort(embedding_vector)
 
-        return await self._asimilarity_search_with_score_id_by_sort(
+        return await self._asimilarity_find_with_score_id_by_sort(
             sort=sort,
             k=k,
             filter=filter,
@@ -2564,13 +2602,13 @@ class AstraDBVectorStore(VectorStore):
             )
             raise ValueError(msg)
         sort = self.document_codec.encode_vector_sort(embedding)
-        return await self._asimilarity_search_with_score_id_by_sort(
+        return await self._asimilarity_find_with_score_id_by_sort(
             sort=sort,
             k=k,
             filter=filter,
         )
 
-    async def _asimilarity_search_with_score_id_by_sort(
+    async def _asimilarity_find_with_score_id_by_sort(
         self,
         sort: dict[str, Any],
         k: int,
@@ -2599,11 +2637,16 @@ class AstraDBVectorStore(VectorStore):
         """Run a hybrid search with a provided sort clause."""
         await self.astra_env.aensure_db_setup()
         encoded_filter = self.document_codec.encode_query(filter_dict=filter)
+        hybrid_limits = {
+            hlk: max(int(hlf * k), 1)
+            for hlk, hlf in self.hybrid_limit_factor_map.items()
+        }
         hybrid_hits = self.astra_env.async_collection.find_and_rerank(
             filter=encoded_filter,
             sort=sort,
             projection=self.document_codec.base_projection,
             limit=k,
+            hybrid_limits=hybrid_limits,
             hybrid_projection="scores",
             rerank_field=rerank_field,
         )
@@ -2644,7 +2687,7 @@ class AstraDBVectorStore(VectorStore):
             the most similar to the query vector.).
         """
         sort = self.document_codec.encode_vector_sort(vector=embedding)
-        _, doc_emb_list = self._similarity_search_with_embedding_by_sort(
+        _, doc_emb_list = self._similarity_find_with_embedding_by_sort(
             sort=sort, k=k, filter=filter
         )
         return doc_emb_list
@@ -2667,7 +2710,7 @@ class AstraDBVectorStore(VectorStore):
             the most similar to the query vector.).
         """
         sort = self.document_codec.encode_vector_sort(vector=embedding)
-        _, doc_emb_list = await self._asimilarity_search_with_embedding_by_sort(
+        _, doc_emb_list = await self._asimilarity_find_with_embedding_by_sort(
             sort=sort, k=k, filter=filter
         )
         return doc_emb_list
@@ -2712,7 +2755,7 @@ class AstraDBVectorStore(VectorStore):
                 return (query_embedding, [])
             sort = self.document_codec.encode_vector_sort(vector=query_embedding)
 
-        return self._similarity_search_with_embedding_by_sort(
+        return self._similarity_find_with_embedding_by_sort(
             sort=sort, k=k, filter=filter
         )
 
@@ -2756,11 +2799,11 @@ class AstraDBVectorStore(VectorStore):
                 return (query_embedding, [])
             sort = self.document_codec.encode_vector_sort(vector=query_embedding)
 
-        return await self._asimilarity_search_with_embedding_by_sort(
+        return await self._asimilarity_find_with_embedding_by_sort(
             sort=sort, k=k, filter=filter
         )
 
-    async def _asimilarity_search_with_embedding_by_sort(
+    async def _asimilarity_find_with_embedding_by_sort(
         self,
         sort: dict[str, Any],
         k: int = 4,
@@ -2790,7 +2833,7 @@ class AstraDBVectorStore(VectorStore):
             ],
         )
 
-    def _similarity_search_with_embedding_by_sort(
+    def _similarity_find_with_embedding_by_sort(
         self,
         sort: dict[str, Any],
         k: int = 4,
@@ -2820,7 +2863,7 @@ class AstraDBVectorStore(VectorStore):
             ],
         )
 
-    def _run_mmr_query_by_sort(
+    def _run_mmr_find_by_sort(
         self,
         sort: dict[str, Any],
         k: int,
@@ -2850,7 +2893,7 @@ class AstraDBVectorStore(VectorStore):
             prefetch_hit_pairs=prefetch_hit_pairs,
         )
 
-    async def _arun_mmr_query_by_sort(
+    async def _arun_mmr_find_by_sort(
         self,
         sort: dict[str, Any],
         k: int,
@@ -2927,7 +2970,7 @@ class AstraDBVectorStore(VectorStore):
         Returns:
             The list of Documents selected by maximal marginal relevance.
         """
-        return self._run_mmr_query_by_sort(
+        return self._run_mmr_find_by_sort(
             sort=self.document_codec.encode_vector_sort(embedding),
             k=k,
             fetch_k=fetch_k,
@@ -2963,7 +3006,7 @@ class AstraDBVectorStore(VectorStore):
         Returns:
             The list of Documents selected by maximal marginal relevance.
         """
-        return await self._arun_mmr_query_by_sort(
+        return await self._arun_mmr_find_by_sort(
             sort=self.document_codec.encode_vector_sort(embedding),
             k=k,
             fetch_k=fetch_k,
@@ -3015,7 +3058,7 @@ class AstraDBVectorStore(VectorStore):
             # this case goes directly to the "_by_sort" method
             # (and does its own filter normalization, as it cannot
             #  use the path for the with-embedding mmr querying)
-            return self._run_mmr_query_by_sort(
+            return self._run_mmr_find_by_sort(
                 sort=self.document_codec.encode_vectorize_sort(query),
                 k=k,
                 fetch_k=fetch_k,
@@ -3077,7 +3120,7 @@ class AstraDBVectorStore(VectorStore):
             # this case goes directly to the "_by_sort" method
             # (and does its own filter normalization, as it cannot
             #  use the path for the with-embedding mmr querying)
-            return await self._arun_mmr_query_by_sort(
+            return await self._arun_mmr_find_by_sort(
                 sort=self.document_codec.encode_vectorize_sort(query),
                 k=k,
                 fetch_k=fetch_k,
