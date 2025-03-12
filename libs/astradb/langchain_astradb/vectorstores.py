@@ -27,7 +27,7 @@ from typing import (
 
 import numpy as np
 from astrapy.constants import Environment
-from astrapy.exceptions import CollectionInsertManyException
+from astrapy.exceptions import CollectionInsertManyException, DataAPIResponseException
 from astrapy.info import VectorServiceOptions
 from langchain_community.vectorstores.utils import maximal_marginal_relevance
 from langchain_core.documents import Document
@@ -217,19 +217,26 @@ def _insertmany_error_message(err: CollectionInsertManyException) -> str:
     vectorstore multiple insertion.
 
     This operation must filter out duplicate-id specific errors
-    (which the vector store could actually handle, if they were the only ondes).
+    (which the vector store could actually handle, if they were the only ones).
     """
     err_msg = "Cannot insert documents. The Data API returned the following error(s): "
 
+    def _describe_error(_errd: Exception) -> list[str]:
+        if isinstance(_errd, DataAPIResponseException):
+            return [
+                edesc.message or ""
+                for edesc in _errd.error_descriptors
+                if edesc.error_code != DOCUMENT_ALREADY_EXISTS_API_ERROR_CODE
+            ]
+        return [str(_errd)]
+
     filtered_error_descs = [
         edesc
-        for edesc in err.error_descriptors
-        if edesc.error_code != DOCUMENT_ALREADY_EXISTS_API_ERROR_CODE
-        if edesc.message
+        for insmany_err in err.exceptions
+        for edesc in _describe_error(insmany_err)
     ]
     err_msg += "; ".join(
-        edesc.message or ""
-        for edesc in filtered_error_descs[:MAX_SHOWN_INSERTION_ERRORS]
+        edesc or "" for edesc in filtered_error_descs[:MAX_SHOWN_INSERTION_ERRORS]
     )
 
     if (num_residual := len(filtered_error_descs) - MAX_SHOWN_INSERTION_ERRORS) > 0:
@@ -1249,10 +1256,20 @@ class AstraDBVectorStore(VectorStore):
             inserted_ids = insert_many_result.inserted_ids
         except CollectionInsertManyException as err:
             # check that the error is solely due to already-existing documents
-            error_codes = {err_desc.error_code for err_desc in err.error_descriptors}
+            if any(
+                not isinstance(in_err, DataAPIResponseException)
+                for in_err in err.exceptions
+            ):
+                full_err_message = _insertmany_error_message(err)
+                raise AstraDBVectorStoreError(full_err_message) from err
+            # here, assume all in err.exceptions is a DataAPIResponseException:
+            error_codes = {
+                err_desc.error_code
+                for in_err in cast(list[DataAPIResponseException], err.exceptions)
+                for err_desc in in_err.error_descriptors
+            }
             if error_codes == {DOCUMENT_ALREADY_EXISTS_API_ERROR_CODE}:
-                inserted_ids = err.partial_result.inserted_ids
-                inserted_ids_set = set(inserted_ids)
+                inserted_ids_set = set(err.inserted_ids)
                 ids_to_replace = [
                     doc_id
                     for document in documents_to_insert
@@ -1381,10 +1398,20 @@ class AstraDBVectorStore(VectorStore):
             inserted_ids = insert_many_result.inserted_ids
         except CollectionInsertManyException as err:
             # check that the error is solely due to already-existing documents
-            error_codes = {err_desc.error_code for err_desc in err.error_descriptors}
+            if any(
+                not isinstance(in_err, DataAPIResponseException)
+                for in_err in err.exceptions
+            ):
+                full_err_message = _insertmany_error_message(err)
+                raise AstraDBVectorStoreError(full_err_message) from err
+            # here, assume all in err.exceptions is a DataAPIResponseException:
+            error_codes = {
+                err_desc.error_code
+                for in_err in cast(list[DataAPIResponseException], err.exceptions)
+                for err_desc in in_err.error_descriptors
+            }
             if error_codes == {DOCUMENT_ALREADY_EXISTS_API_ERROR_CODE}:
-                inserted_ids = err.partial_result.inserted_ids
-                inserted_ids_set = set(inserted_ids)
+                inserted_ids_set = set(err.inserted_ids)
                 ids_to_replace = [
                     doc_id
                     for document in documents_to_insert

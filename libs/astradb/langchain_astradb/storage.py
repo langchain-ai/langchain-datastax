@@ -104,7 +104,7 @@ class AstraDBBaseStore(BaseStore[str, V], Generic[V]):
             )
             ids_to_replace = []
         except CollectionInsertManyException as err:
-            inserted_ids_set = set(err.partial_result.inserted_ids)
+            inserted_ids_set = set(err.inserted_ids)
             ids_to_replace = [
                 document["_id"]
                 for document in documents_to_insert
@@ -162,7 +162,7 @@ class AstraDBBaseStore(BaseStore[str, V], Generic[V]):
             )
             ids_to_replace = []
         except CollectionInsertManyException as err:
-            inserted_ids_set = set(err.partial_result.inserted_ids)
+            inserted_ids_set = set(err.inserted_ids)
             ids_to_replace = [
                 document["_id"]
                 for document in documents_to_insert
