@@ -28,7 +28,11 @@ from typing import (
 import numpy as np
 from astrapy.constants import Environment
 from astrapy.exceptions import CollectionInsertManyException, DataAPIResponseException
-from astrapy.info import VectorServiceOptions
+from astrapy.info import (
+    CollectionLexicalOptions,
+    CollectionRerankingOptions,
+    VectorServiceOptions,
+)
 from langchain_community.vectorstores.utils import maximal_marginal_relevance
 from langchain_core.documents import Document
 from langchain_core.runnables.utils import gather_with_concurrency
@@ -61,6 +65,7 @@ from langchain_astradb.utils.vector_store_codecs import (
 if TYPE_CHECKING:
     from astrapy.authentication import EmbeddingHeadersProvider, TokenProvider
     from astrapy.cursors import RerankedResult
+    from astrapy.info import RerankingServiceOptions
     from astrapy.results import CollectionUpdateResult
     from langchain_core.embeddings import Embeddings
 
@@ -87,8 +92,6 @@ DOCUMENT_ALREADY_EXISTS_API_ERROR_CODE = "DOCUMENT_ALREADY_EXISTS"
 # max number of errors shown in full insertion error messages
 MAX_SHOWN_INSERTION_ERRORS = 8
 # default setting for creating hybrid-enabled collections
-# TODO: FARR: flip default to TRUE
-DEFAULT_HYBRID_COLLECTION = False
 DEFAULT_HYBRID_LIMIT_FACTOR = 1.0
 
 logger = logging.getLogger(__name__)
@@ -138,7 +141,8 @@ def _validate_autodetect_init_params(
     metadata_indexing_exclude: Iterable[str] | None,
     collection_indexing_policy: dict[str, Any] | None,
     collection_vector_service_options: VectorServiceOptions | None,
-    hybrid_collection: bool | None,
+    collection_reranking: CollectionRerankingOptions | RerankingServiceOptions | None,
+    collection_lexical: str | dict[str, Any] | CollectionLexicalOptions | None,
 ) -> None:
     """Check that the passed parameters do not violate the autodetect constraints."""
     forbidden_parameters = [
@@ -149,7 +153,8 @@ def _validate_autodetect_init_params(
             ("metadata_indexing_exclude", metadata_indexing_exclude),
             ("collection_indexing_policy", collection_indexing_policy),
             ("collection_vector_service_options", collection_vector_service_options),
-            ("hybrid_collection", hybrid_collection),
+            ("collection_reranking", collection_reranking),
+            ("collection_lexical", collection_lexical),
         )
         if p_value is not None
     ]
@@ -174,19 +179,19 @@ def _validate_autodetect_init_params(
 def _decide_hybrid_search_setting(
     *,
     required_hybrid_search: HybridSearchMode | None,
-    hybrid_collection: bool,
+    has_hybrid: bool,
 ) -> bool:
     """Determine whether searches must be hybrid.
 
     Args:
         required_hybrid_search: the hybrid_search parameter required in the constructor.
-        hybrid_collection: whether the collection actually is hybrid-capable.
+        has_hybrid: whether the collection actually is hybrid-capable.
     """
     if required_hybrid_search == HybridSearchMode.OFF:
         return False
     if required_hybrid_search == HybridSearchMode.ON:
         return True
-    return hybrid_collection
+    return has_hybrid
 
 
 def _normalize_hybrid_limit_factor(
@@ -497,7 +502,13 @@ class AstraDBVectorStore(VectorStore):
         autodetect_collection: bool = False,
         ext_callers: list[tuple[str | None, str | None] | str | None] | None = None,
         component_name: str = COMPONENT_NAME_VECTORSTORE,
-        hybrid_collection: bool | None = None,
+        collection_reranking: CollectionRerankingOptions
+        | RerankingServiceOptions
+        | None = None,
+        collection_lexical: str
+        | dict[str, Any]
+        | CollectionLexicalOptions
+        | None = None,
         hybrid_search: HybridSearchMode | None = None,
         hybrid_limit_factor: float | None = None,
     ) -> None:
@@ -606,10 +617,15 @@ class AstraDBVectorStore(VectorStore):
                 Defaults to "langchain_vectorstore", but can be overridden if this
                 component actually serves as the building block for another component
                 (such as a Graph Vector Store).
-            hybrid_collection: in case a collection is created as part of the store
-                setup, this controls whether Hybrid search should be enabled on it.
-                Hybrid search must be set at collection-creation time and cannot
-                be changed later. Defaults to True.
+            collection_reranking: providing reranking settings is necessary to run
+                hybrid searches for similarity. This parameter can be an instance
+                of the astrapy classes `CollectionRerankingOptions` or
+                `RerankingServiceOptions`.
+            collection_lexical: configuring a lexical analyzer is necessary to run
+                lexical and hybrid searches. This parameter can be a string or dict,
+                which is then passed as-is for the "analyzer" field of a
+                createCollection's "$lexical.analyzer" value, or a ready-made
+                astrapy `CollectionLexicalOptions` object.
             hybrid_search: whether similarity searches should be run as Hybrid searches
                 or not. Values are DEFAULT, ON or OFF. In case of DEFAULT, searches
                 are performed as permitted by the collection configuration, with a
@@ -668,9 +684,9 @@ class AstraDBVectorStore(VectorStore):
 
         _setup_mode: SetupMode
         _embedding_dimension: int | Awaitable[int] | None
-
-        _hybrid_collection: bool  # dictating collection creation setting for the env.
-        self.hybrid_search: bool  # as in 'actual behaviour when running searches'
+        self.has_lexical: bool
+        self.has_hybrid: bool
+        self.hybrid_search: bool  # affecting the actual behaviour when running searches
 
         if not self.autodetect_collection:
             logger.info(
@@ -686,26 +702,32 @@ class AstraDBVectorStore(VectorStore):
                 has_vectorize=has_vectorize,
             )
 
-            _hybrid_collection = (
-                DEFAULT_HYBRID_COLLECTION
-                if hybrid_collection is None
-                else hybrid_collection
-            )
+            if isinstance(collection_lexical, CollectionLexicalOptions):
+                self.has_lexical = collection_lexical.enabled
+            else:
+                self.has_lexical = collection_lexical is not None
+            _has_reranking: bool
+            if isinstance(collection_reranking, CollectionRerankingOptions):
+                _has_reranking = collection_reranking.enabled
+            else:
+                _has_reranking = collection_reranking is not None
+            self.has_hybrid = self.has_lexical and _has_reranking
+
             self.hybrid_search = _decide_hybrid_search_setting(
                 required_hybrid_search=hybrid_search,
-                hybrid_collection=_hybrid_collection,
+                has_hybrid=self.has_hybrid,
             )
 
             if self.collection_vector_service_options is not None:
                 self.document_codec = _DefaultVectorizeVSDocumentCodec(
                     ignore_invalid_documents=ignore_invalid_documents,
-                    has_lexical=self.hybrid_search,
+                    has_lexical=self.has_lexical,
                 )
             else:
                 self.document_codec = _DefaultVSDocumentCodec(
                     content_field=_content_field,
                     ignore_invalid_documents=ignore_invalid_documents,
-                    has_lexical=self.hybrid_search,
+                    has_lexical=self.has_lexical,
                 )
             # indexing policy setting
             self.indexing_policy = self._normalize_metadata_indexing_policy(
@@ -727,7 +749,8 @@ class AstraDBVectorStore(VectorStore):
                 metadata_indexing_exclude=metadata_indexing_exclude,
                 collection_indexing_policy=collection_indexing_policy,
                 collection_vector_service_options=self.collection_vector_service_options,
-                hybrid_collection=hybrid_collection,
+                collection_lexical=collection_lexical,
+                collection_reranking=collection_reranking,
             )
             _setup_mode = SetupMode.OFF
 
@@ -771,15 +794,19 @@ class AstraDBVectorStore(VectorStore):
                 document_codec=self.document_codec,
             )
 
-            _hybrid_collection = (
+            self.has_lexical = (
                 c_descriptor.definition.lexical is not None
-                and c_descriptor.definition.reranking is not None
                 and c_descriptor.definition.lexical.enabled
+            )
+            _has_reranking = (
+                c_descriptor.definition.reranking is not None
                 and c_descriptor.definition.reranking.enabled
             )
+            self.has_hybrid = self.has_lexical and _has_reranking
+
             self.hybrid_search = _decide_hybrid_search_setting(
                 required_hybrid_search=hybrid_search,
-                hybrid_collection=_hybrid_collection,
+                has_hybrid=self.has_hybrid,
             )
 
         # validate embedding/vectorize compatibility and such.
@@ -824,7 +851,8 @@ class AstraDBVectorStore(VectorStore):
             collection_embedding_api_key=self.collection_embedding_api_key,
             ext_callers=ext_callers,
             component_name=component_name,
-            hybrid_collection=_hybrid_collection,
+            collection_reranking=collection_reranking,
+            collection_lexical=collection_lexical,
         )
 
     def _get_safe_embedding(self) -> Embeddings:
@@ -939,7 +967,8 @@ class AstraDBVectorStore(VectorStore):
         )
         copy.collection_vector_service_options = self.collection_vector_service_options
         copy.document_codec = self.document_codec
-        copy.hybrid_search = self.hybrid_search
+        copy.has_lexical = self.has_lexical
+        copy.has_hybrid = self.hybrid_search
         copy.batch_size = self.batch_size
         copy.bulk_insert_batch_concurrency = self.bulk_insert_batch_concurrency
         copy.bulk_insert_overwrite_concurrency = self.bulk_insert_overwrite_concurrency

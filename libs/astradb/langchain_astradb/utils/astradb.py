@@ -29,7 +29,7 @@ from astrapy.info import (
     CollectionDefinition,
     CollectionLexicalOptions,
     CollectionRerankingOptions,
-    # RerankingServiceOptions,  # TODO: FARR restore this
+    RerankingServiceOptions,
 )
 
 if TYPE_CHECKING:
@@ -103,26 +103,6 @@ def unpack_indexing_policy(
             raise ValueError(msg)
         return next(iter(indexing_dict.items()))
     return None, None
-
-
-def _prepare_hybrid_search_settings(
-    *,
-    hybrid_collection: bool,
-) -> tuple[CollectionLexicalOptions | None, CollectionRerankingOptions | None]:
-    if not hybrid_collection:
-        return None, None
-
-    # TODO: FARR: restore these (and fill with actual values)
-    lex_opt = None
-    rrk_opt = None
-    # lex_opt = CollectionLexicalOptions(analyzer="DEFAULT")
-    # rrk_opt = CollectionRerankingOptions(
-    #     service=RerankingServiceOptions(
-    #         provider="reranking_provider",
-    #         model_name="reranking_model",
-    #     )
-    # )
-    return lex_opt, rrk_opt
 
 
 def _survey_collection(
@@ -304,7 +284,14 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
         default_indexing_policy: dict[str, Any] | None = None,
         collection_vector_service_options: VectorServiceOptions | None = None,
         collection_embedding_api_key: str | EmbeddingHeadersProvider | None = None,
-        hybrid_collection: bool = False,
+        collection_reranking: str
+        | CollectionRerankingOptions
+        | RerankingServiceOptions
+        | None = None,
+        collection_lexical: str
+        | dict[str, Any]
+        | CollectionLexicalOptions
+        | None = None,
     ) -> None:
         super().__init__(
             token=token,
@@ -326,7 +313,15 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
             embedding_api_key=self.collection_embedding_api_key,
         )
         self.async_collection = self.collection.to_async()
-        self.hybrid_collection = hybrid_collection
+
+        self.collection_reranking = collection_reranking
+        self.collection_lexical = collection_lexical
+
+        self.embedding_dimension = embedding_dimension
+        self.metric = metric
+        self.requested_indexing_policy = requested_indexing_policy
+        self.default_indexing_policy = default_indexing_policy
+        self.collection_vector_service_options = collection_vector_service_options
 
         self.async_setup_db_task: Task | None = None
         if setup_mode == SetupMode.ASYNC:
@@ -338,7 +333,6 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
                     default_indexing_policy=default_indexing_policy,
                     requested_indexing_policy=requested_indexing_policy,
                     collection_vector_service_options=collection_vector_service_options,
-                    hybrid_collection=self.hybrid_collection,
                 )
             )
         elif setup_mode == SetupMode.SYNC:
@@ -354,11 +348,7 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
                 _idx_mode, _idx_target = unpack_indexing_policy(
                     requested_indexing_policy,
                 )
-                hybrid_search_lexical, hybrid_search_reranking = (
-                    _prepare_hybrid_search_settings(
-                        hybrid_collection=self.hybrid_collection
-                    )
-                )
+
                 collection_definition = (
                     CollectionDefinition.builder()
                     .set_vector_dimension(embedding_dimension)  # type: ignore[arg-type]
@@ -368,8 +358,8 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
                         indexing_target=_idx_target,
                     )
                     .set_vector_service(collection_vector_service_options)
-                    .set_lexical(hybrid_search_lexical)
-                    .set_reranking(hybrid_search_reranking)
+                    .set_lexical(self.collection_lexical)
+                    .set_reranking(self.collection_reranking)
                     .build()
                 )
                 self.database.create_collection(
@@ -440,7 +430,13 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
             collection_embedding_api_key=self.collection_embedding_api_key
             if collection_embedding_api_key
             else collection_embedding_api_key,
-            hybrid_collection=self.hybrid_collection,
+            collection_reranking=self.collection_reranking,
+            collection_lexical=self.collection_lexical,
+            embedding_dimension=self.embedding_dimension,
+            metric=self.metric,
+            requested_indexing_policy=self.requested_indexing_policy,
+            default_indexing_policy=self.default_indexing_policy,
+            collection_vector_service_options=self.collection_vector_service_options,
         )
 
     async def _asetup_db(
@@ -452,7 +448,6 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
         requested_indexing_policy: dict[str, Any] | None,
         default_indexing_policy: dict[str, Any] | None,
         collection_vector_service_options: VectorServiceOptions | None,
-        hybrid_collection: bool,
     ) -> None:
         if pre_delete_collection:
             await self.async_database.drop_collection(self.collection_name)
@@ -463,9 +458,6 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
 
         try:
             _idx_mode, _idx_target = unpack_indexing_policy(requested_indexing_policy)
-            hybrid_search_lexical, hybrid_search_reranking = (
-                _prepare_hybrid_search_settings(hybrid_collection=hybrid_collection)
-            )
             await self.async_database.create_collection(
                 name=self.collection_name,
                 definition=(
@@ -477,8 +469,8 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
                         indexing_target=_idx_target,
                     )
                     .set_vector_service(collection_vector_service_options)
-                    .set_lexical(hybrid_search_lexical)
-                    .set_reranking(hybrid_search_reranking)
+                    .set_lexical(self.collection_lexical)
+                    .set_reranking(self.collection_reranking)
                     .build()
                 ),
             )
