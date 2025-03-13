@@ -1269,7 +1269,8 @@ class AstraDBVectorStore(VectorStore):
                 for err_desc in in_err.error_descriptors
             }
             if error_codes == {DOCUMENT_ALREADY_EXISTS_API_ERROR_CODE}:
-                inserted_ids_set = set(err.inserted_ids)
+                inserted_ids = err.inserted_ids
+                inserted_ids_set = set(inserted_ids)
                 ids_to_replace = [
                     doc_id
                     for document in documents_to_insert
@@ -1411,7 +1412,8 @@ class AstraDBVectorStore(VectorStore):
                 for err_desc in in_err.error_descriptors
             }
             if error_codes == {DOCUMENT_ALREADY_EXISTS_API_ERROR_CODE}:
-                inserted_ids_set = set(err.inserted_ids)
+                inserted_ids = err.inserted_ids
+                inserted_ids_set = set(inserted_ids)
                 ids_to_replace = [
                     doc_id
                     for document in documents_to_insert
