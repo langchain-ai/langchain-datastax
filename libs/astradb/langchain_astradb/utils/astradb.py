@@ -28,8 +28,8 @@ from astrapy.exceptions import DataAPIException
 from astrapy.info import (
     CollectionDefinition,
     CollectionLexicalOptions,
-    CollectionRerankingOptions,
-    RerankingServiceOptions,
+    CollectionRerankOptions,
+    RerankServiceOptions,
 )
 
 if TYPE_CHECKING:
@@ -284,9 +284,9 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
         default_indexing_policy: dict[str, Any] | None = None,
         collection_vector_service_options: VectorServiceOptions | None = None,
         collection_embedding_api_key: str | EmbeddingHeadersProvider | None = None,
-        collection_reranking: str
-        | CollectionRerankingOptions
-        | RerankingServiceOptions
+        collection_rerank: str
+        | CollectionRerankOptions
+        | RerankServiceOptions
         | None = None,
         collection_lexical: str
         | dict[str, Any]
@@ -314,7 +314,7 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
         )
         self.async_collection = self.collection.to_async()
 
-        self.collection_reranking = collection_reranking
+        self.collection_rerank = collection_rerank
         self.collection_lexical = collection_lexical
 
         self.embedding_dimension = embedding_dimension
@@ -359,7 +359,7 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
                     )
                     .set_vector_service(collection_vector_service_options)
                     .set_lexical(self.collection_lexical)
-                    .set_reranking(self.collection_reranking)
+                    .set_rerank(self.collection_rerank)
                     .build()
                 )
                 self.database.create_collection(
@@ -430,7 +430,7 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
             collection_embedding_api_key=self.collection_embedding_api_key
             if collection_embedding_api_key
             else collection_embedding_api_key,
-            collection_reranking=self.collection_reranking,
+            collection_rerank=self.collection_rerank,
             collection_lexical=self.collection_lexical,
             embedding_dimension=self.embedding_dimension,
             metric=self.metric,
@@ -470,7 +470,7 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
                     )
                     .set_vector_service(collection_vector_service_options)
                     .set_lexical(self.collection_lexical)
-                    .set_reranking(self.collection_reranking)
+                    .set_rerank(self.collection_rerank)
                     .build()
                 ),
             )

@@ -30,7 +30,7 @@ from astrapy.constants import Environment
 from astrapy.exceptions import CollectionInsertManyException, DataAPIResponseException
 from astrapy.info import (
     CollectionLexicalOptions,
-    CollectionRerankingOptions,
+    CollectionRerankOptions,
     VectorServiceOptions,
 )
 from langchain_community.vectorstores.utils import maximal_marginal_relevance
@@ -54,8 +54,8 @@ from langchain_astradb.utils.vector_store_autodetect import (
     _detect_document_codec,
 )
 from langchain_astradb.utils.vector_store_codecs import (
-    LEXICAL_FIELD_NAME,
-    VECTOR_FIELD_NAME,
+    # LEXICAL_FIELD_NAME,
+    # VECTOR_FIELD_NAME,
     VECTORIZE_FIELD_NAME,
     _AstraDBVectorStoreDocumentCodec,
     _DefaultVectorizeVSDocumentCodec,
@@ -65,7 +65,7 @@ from langchain_astradb.utils.vector_store_codecs import (
 if TYPE_CHECKING:
     from astrapy.authentication import EmbeddingHeadersProvider, TokenProvider
     from astrapy.cursors import RerankedResult
-    from astrapy.info import RerankingServiceOptions
+    from astrapy.info import RerankServiceOptions
     from astrapy.results import CollectionUpdateResult
     from langchain_core.embeddings import Embeddings
 
@@ -91,8 +91,6 @@ class AstraDBQueryResult(NamedTuple):
 DOCUMENT_ALREADY_EXISTS_API_ERROR_CODE = "DOCUMENT_ALREADY_EXISTS"
 # max number of errors shown in full insertion error messages
 MAX_SHOWN_INSERTION_ERRORS = 8
-# default setting for creating hybrid-enabled collections
-DEFAULT_HYBRID_LIMIT_FACTOR = 1.0
 
 logger = logging.getLogger(__name__)
 
@@ -141,7 +139,7 @@ def _validate_autodetect_init_params(
     metadata_indexing_exclude: Iterable[str] | None,
     collection_indexing_policy: dict[str, Any] | None,
     collection_vector_service_options: VectorServiceOptions | None,
-    collection_reranking: CollectionRerankingOptions | RerankingServiceOptions | None,
+    collection_rerank: CollectionRerankOptions | RerankServiceOptions | None,
     collection_lexical: str | dict[str, Any] | CollectionLexicalOptions | None,
 ) -> None:
     """Check that the passed parameters do not violate the autodetect constraints."""
@@ -153,7 +151,7 @@ def _validate_autodetect_init_params(
             ("metadata_indexing_exclude", metadata_indexing_exclude),
             ("collection_indexing_policy", collection_indexing_policy),
             ("collection_vector_service_options", collection_vector_service_options),
-            ("collection_reranking", collection_reranking),
+            ("collection_rerank", collection_rerank),
             ("collection_lexical", collection_lexical),
         )
         if p_value is not None
@@ -194,24 +192,36 @@ def _decide_hybrid_search_setting(
     return has_hybrid
 
 
-def _normalize_hybrid_limit_factor(
-    hybrid_limit_factor: float | None,
-    *,
-    has_vectorize: bool,
-) -> dict[str, float]:
-    """Bring `hybrid_limit_factor` to normal dict form."""
-    _ann_field_name = VECTORIZE_FIELD_NAME if has_vectorize else VECTOR_FIELD_NAME
-    if hybrid_limit_factor is None:
-        return {
-            _ann_field_name: DEFAULT_HYBRID_LIMIT_FACTOR,
-            LEXICAL_FIELD_NAME: DEFAULT_HYBRID_LIMIT_FACTOR,
-        }
+def _make_hybrid_limits(
+    hlf: None | float | dict[str, float],
+    k: int,
+) -> None | int | dict[str, int]:
+    if hlf is None:
+        return None
+    if isinstance(hlf, float):
+        return max(int(hlf * k), 1)
+    # hlf is a map:
+    return {hlk: max(int(hlf * k), 1) for hlk, hlf in hlf.items()}
 
-    # a number is passed:
-    return {
-        _ann_field_name: float(hybrid_limit_factor),
-        LEXICAL_FIELD_NAME: float(hybrid_limit_factor),
-    }
+
+# def _normalize_hybrid_limit_factor(
+#     hybrid_limit_factor: float | None,
+#     *,
+#     has_vectorize: bool,
+# ) -> dict[str, float]:
+#     """Bring `hybrid_limit_factor` to normal dict form."""
+#     _ann_field_name = VECTORIZE_FIELD_NAME if has_vectorize else VECTOR_FIELD_NAME
+#     if hybrid_limit_factor is None:
+#         return {
+#             _ann_field_name: DEFAULT_HYBRID_LIMIT_FACTOR,
+#             LEXICAL_FIELD_NAME: DEFAULT_HYBRID_LIMIT_FACTOR,
+#         }
+
+#     # a number is passed:
+#     return {
+#         _ann_field_name: float(hybrid_limit_factor),
+#         LEXICAL_FIELD_NAME: float(hybrid_limit_factor),
+#     }
 
 
 def _insertmany_error_message(err: CollectionInsertManyException) -> str:
@@ -502,9 +512,7 @@ class AstraDBVectorStore(VectorStore):
         autodetect_collection: bool = False,
         ext_callers: list[tuple[str | None, str | None] | str | None] | None = None,
         component_name: str = COMPONENT_NAME_VECTORSTORE,
-        collection_reranking: CollectionRerankingOptions
-        | RerankingServiceOptions
-        | None = None,
+        collection_rerank: CollectionRerankOptions | RerankServiceOptions | None = None,
         collection_lexical: str
         | dict[str, Any]
         | CollectionLexicalOptions
@@ -617,10 +625,10 @@ class AstraDBVectorStore(VectorStore):
                 Defaults to "langchain_vectorstore", but can be overridden if this
                 component actually serves as the building block for another component
                 (such as a Graph Vector Store).
-            collection_reranking: providing reranking settings is necessary to run
+            collection_rerank: providing reranking settings is necessary to run
                 hybrid searches for similarity. This parameter can be an instance
-                of the astrapy classes `CollectionRerankingOptions` or
-                `RerankingServiceOptions`.
+                of the astrapy classes `CollectionRerankOptions` or
+                `RerankServiceOptions`.
             collection_lexical: configuring a lexical analyzer is necessary to run
                 lexical and hybrid searches. This parameter can be a string or dict,
                 which is then passed as-is for the "analyzer" field of a
@@ -632,10 +640,14 @@ class AstraDBVectorStore(VectorStore):
                 preference for hybrid search. Forcing this setting to ON for a
                 non-hybrid-enabled collection would result in a server error when
                 running searches.
-            hybrid_limit_factor: Partial-limit specification for hybrid searches.
-                This is a float positive factor applied at search-time to the query
-                `k` (number of requested items) to obtain the two limits for the lexical
-                and ANN parts of the hybrid query. Defaults to one.
+            hybrid_limit_factor: subsearch "limit" specification for hybrid searches.
+                If omitted, hybrid searches do not specify it and leave the Data API
+                to use its defaults.
+                If a floating-point positive number is provided: each subsearch
+                participating in the hybrid search (i.e. both the vector-based ANN
+                and the lexical-based) will be requested to fecth up to
+                `int(k*hybrid_limit_factor)` items, where `k` is the desired result
+                count from the whole search.
 
         Note:
             For concurrency in synchronous :meth:`~add_texts`:, as a rule of thumb,
@@ -687,6 +699,7 @@ class AstraDBVectorStore(VectorStore):
         self.has_lexical: bool
         self.has_hybrid: bool
         self.hybrid_search: bool  # affecting the actual behaviour when running searches
+        self.hybrid_limit_factor: None | float | dict[str, float]
 
         if not self.autodetect_collection:
             logger.info(
@@ -707,10 +720,10 @@ class AstraDBVectorStore(VectorStore):
             else:
                 self.has_lexical = collection_lexical is not None
             _has_reranking: bool
-            if isinstance(collection_reranking, CollectionRerankingOptions):
-                _has_reranking = collection_reranking.enabled
+            if isinstance(collection_rerank, CollectionRerankOptions):
+                _has_reranking = collection_rerank.enabled
             else:
-                _has_reranking = collection_reranking is not None
+                _has_reranking = collection_rerank is not None
             self.has_hybrid = self.has_lexical and _has_reranking
 
             self.hybrid_search = _decide_hybrid_search_setting(
@@ -750,7 +763,7 @@ class AstraDBVectorStore(VectorStore):
                 collection_indexing_policy=collection_indexing_policy,
                 collection_vector_service_options=self.collection_vector_service_options,
                 collection_lexical=collection_lexical,
-                collection_reranking=collection_reranking,
+                collection_rerank=collection_rerank,
             )
             _setup_mode = SetupMode.OFF
 
@@ -799,8 +812,8 @@ class AstraDBVectorStore(VectorStore):
                 and c_descriptor.definition.lexical.enabled
             )
             _has_reranking = (
-                c_descriptor.definition.reranking is not None
-                and c_descriptor.definition.reranking.enabled
+                c_descriptor.definition.rerank is not None
+                and c_descriptor.definition.rerank.enabled
             )
             self.has_hybrid = self.has_lexical and _has_reranking
 
@@ -821,17 +834,7 @@ class AstraDBVectorStore(VectorStore):
             msg = "Embedding cannot be provided for vectorize collections."
             raise ValueError(msg)
 
-        if (
-            not self.document_codec.server_side_embeddings
-            and self.collection_embedding_api_key is not None
-        ):
-            msg = "Embedding API Key cannot be provided for non-vectorize collections."
-            raise ValueError(msg)
-
-        self.hybrid_limit_factor_map = _normalize_hybrid_limit_factor(
-            hybrid_limit_factor,
-            has_vectorize=self.document_codec.server_side_embeddings,
-        )
+        self.hybrid_limit_factor = hybrid_limit_factor
 
         self.astra_env = _AstraDBCollectionEnvironment(
             collection_name=collection_name,
@@ -851,7 +854,7 @@ class AstraDBVectorStore(VectorStore):
             collection_embedding_api_key=self.collection_embedding_api_key,
             ext_callers=ext_callers,
             component_name=component_name,
-            collection_reranking=collection_reranking,
+            collection_rerank=collection_rerank,
             collection_lexical=collection_lexical,
         )
 
@@ -2475,17 +2478,14 @@ class AstraDBVectorStore(VectorStore):
         """Run a hybrid search with a provided sort clause."""
         self.astra_env.ensure_db_setup()
         encoded_filter = self.document_codec.encode_query(filter_dict=filter)
-        hybrid_limits = {
-            hlk: max(int(hlf * k), 1)
-            for hlk, hlf in self.hybrid_limit_factor_map.items()
-        }
+        hybrid_limits = _make_hybrid_limits(self.hybrid_limit_factor, k)
         hybrid_reranked_results = self.astra_env.collection.find_and_rerank(
             filter=encoded_filter,
             sort=sort,
             projection=self.document_codec.base_projection,
             limit=k,
             hybrid_limits=hybrid_limits,
-            hybrid_projection="scores",
+            include_scores=True,
             rerank_on=rerank_on,
         )
         return [
@@ -2724,17 +2724,14 @@ class AstraDBVectorStore(VectorStore):
         """Run a hybrid search with a provided sort clause."""
         await self.astra_env.aensure_db_setup()
         encoded_filter = self.document_codec.encode_query(filter_dict=filter)
-        hybrid_limits = {
-            hlk: max(int(hlf * k), 1)
-            for hlk, hlf in self.hybrid_limit_factor_map.items()
-        }
+        hybrid_limits = _make_hybrid_limits(self.hybrid_limit_factor, k)
         hybrid_reranked_results = self.astra_env.async_collection.find_and_rerank(
             filter=encoded_filter,
             sort=sort,
             projection=self.document_codec.base_projection,
             limit=k,
             hybrid_limits=hybrid_limits,
-            hybrid_projection="scores",
+            include_scores=True,
             rerank_on=rerank_on,
         )
         return [
