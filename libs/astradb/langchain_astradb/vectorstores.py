@@ -63,7 +63,11 @@ from langchain_astradb.utils.vector_store_codecs import (
 )
 
 if TYPE_CHECKING:
-    from astrapy.authentication import EmbeddingHeadersProvider, TokenProvider
+    from astrapy.authentication import (
+        EmbeddingHeadersProvider,
+        RerankingHeadersProvider,
+        TokenProvider,
+    )
     from astrapy.cursors import RerankedResult
     from astrapy.info import RerankServiceOptions
     from astrapy.results import CollectionUpdateResult
@@ -513,6 +517,7 @@ class AstraDBVectorStore(VectorStore):
         ext_callers: list[tuple[str | None, str | None] | str | None] | None = None,
         component_name: str = COMPONENT_NAME_VECTORSTORE,
         collection_rerank: CollectionRerankOptions | RerankServiceOptions | None = None,
+        collection_reranking_api_key: str | RerankingHeadersProvider | None = None,
         collection_lexical: str
         | dict[str, Any]
         | CollectionLexicalOptions
@@ -528,9 +533,8 @@ class AstraDBVectorStore(VectorStore):
         Args:
             embedding: the embeddings function or service to use.
                 This enables client-side embedding functions or calls to external
-                embedding providers. If ``embedding`` is provided, arguments
-                ``collection_vector_service_options`` and
-                ``collection_embedding_api_key`` cannot be provided.
+                embedding providers. If ``embedding`` is passed, then
+                ``collection_vector_service_options`` can not be provided.
             collection_name: name of the Astra DB collection to create/use.
             token: API token for Astra DB usage, either in the form of a string
                 or a subclass of ``astrapy.authentication.TokenProvider``.
@@ -629,6 +633,14 @@ class AstraDBVectorStore(VectorStore):
                 hybrid searches for similarity. This parameter can be an instance
                 of the astrapy classes `CollectionRerankOptions` or
                 `RerankServiceOptions`.
+            collection_reranking_api_key: for usage of server-side reranking services
+                within Astra DB. With this parameter one can supply an API Key
+                that will be passed to Astra DB with each data request.
+                This parameter can be either a string or a subclass of
+                ``astrapy.authentication.RerankingHeadersProvider``.
+                This is useful when the service is configured for the collection,
+                but no corresponding secret is stored within
+                Astra's key management system.
             collection_lexical: configuring a lexical analyzer is necessary to run
                 lexical and hybrid searches. This parameter can be a string or dict,
                 which is then passed as-is for the "analyzer" field of a
@@ -700,6 +712,7 @@ class AstraDBVectorStore(VectorStore):
         self.has_hybrid: bool
         self.hybrid_search: bool  # affecting the actual behaviour when running searches
         self.hybrid_limit_factor: None | float | dict[str, float]
+        self.collection_reranking_api_key = collection_reranking_api_key
 
         if not self.autodetect_collection:
             logger.info(
@@ -855,6 +868,7 @@ class AstraDBVectorStore(VectorStore):
             ext_callers=ext_callers,
             component_name=component_name,
             collection_rerank=collection_rerank,
+            collection_reranking_api_key=self.collection_reranking_api_key,
             collection_lexical=collection_lexical,
         )
 
@@ -914,6 +928,7 @@ class AstraDBVectorStore(VectorStore):
         ext_callers: list[tuple[str | None, str | None] | str | None] | None = None,
         component_name: str | None = None,
         collection_embedding_api_key: str | EmbeddingHeadersProvider | None = None,
+        collection_reranking_api_key: str | RerankingHeadersProvider | None = None,
     ) -> AstraDBVectorStore:
         """Create a copy, possibly with changed attributes.
 
@@ -941,6 +956,14 @@ class AstraDBVectorStore(VectorStore):
                 feature and no secret is stored with the database.
                 In order to suppress the API Key in the copy, explicitly pass
                 ``astrapy.authentication.EmbeddingAPIKeyHeaderProvider(None)``.
+            collection_reranking_api_key: for usage of server-side reranking services
+                within Astra DB. With this parameter one can supply an API Key
+                that will be passed to Astra DB with each data request.
+                This parameter can be either a string or a subclass of
+                ``astrapy.authentication.RerankingHeadersProvider``.
+                This is useful when the service is configured for the collection,
+                but no corresponding secret is stored within
+                Astra's key management system.
         """
         copy = AstraDBVectorStore(
             collection_name="moot",
@@ -968,6 +991,11 @@ class AstraDBVectorStore(VectorStore):
             if collection_embedding_api_key is None
             else collection_embedding_api_key
         )
+        copy.collection_reranking_api_key = (
+            self.collection_reranking_api_key
+            if collection_reranking_api_key is None
+            else collection_reranking_api_key
+        )
         copy.collection_vector_service_options = self.collection_vector_service_options
         copy.document_codec = self.document_codec
         copy.has_lexical = self.has_lexical
@@ -982,6 +1010,7 @@ class AstraDBVectorStore(VectorStore):
             ext_callers=ext_callers,
             component_name=component_name,
             collection_embedding_api_key=collection_embedding_api_key,
+            collection_reranking_api_key=collection_reranking_api_key,
         )
 
         return copy

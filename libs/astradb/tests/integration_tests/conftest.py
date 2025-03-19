@@ -14,7 +14,7 @@ Required to run this test:
     - an openai key name on KMS for SHARED_SECRET vectorize mode, associated to the DB:
         export SHARED_SECRET_NAME_OPENAI="the_api_key_name_in_Astra_KMS"
     - an OpenAI key for the vectorize test (in HEADER mode):
-        export OPENAI_API_KEY="..."
+        export HEADER_EMBEDDING_API_KEY_OPENAI="..."
 
 Please refer to testing.env.sample.
 """
@@ -137,7 +137,7 @@ class AstraDBCredentials(TypedDict):
 
 @pytest.fixture(scope="session")
 def openai_api_key() -> str:
-    return os.environ["OPENAI_API_KEY"]
+    return os.environ["HEADER_EMBEDDING_API_KEY_OPENAI"]
 
 
 @pytest.fixture(scope="session")

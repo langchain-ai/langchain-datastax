@@ -20,6 +20,8 @@ from astrapy.api_options import APIOptions, SerdesOptions
 from astrapy.authentication import (
     EmbeddingAPIKeyHeaderProvider,
     EmbeddingHeadersProvider,
+    RerankingAPIKeyHeaderProvider,
+    RerankingHeadersProvider,
     StaticTokenProvider,
     TokenProvider,
 )
@@ -288,6 +290,7 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
         | CollectionRerankOptions
         | RerankServiceOptions
         | None = None,
+        collection_reranking_api_key: str | RerankingHeadersProvider | None = None,
         collection_lexical: str
         | dict[str, Any]
         | CollectionLexicalOptions
@@ -308,9 +311,16 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
             self.collection_embedding_api_key = EmbeddingAPIKeyHeaderProvider(
                 collection_embedding_api_key,
             )
+        if isinstance(collection_reranking_api_key, RerankingHeadersProvider):
+            self.collection_reranking_api_key = collection_reranking_api_key
+        else:
+            self.collection_reranking_api_key = RerankingAPIKeyHeaderProvider(
+                collection_reranking_api_key,
+            )
         self.collection = self.database.get_collection(
             name=self.collection_name,
             embedding_api_key=self.collection_embedding_api_key,
+            reranking_api_key=self.collection_reranking_api_key,
         )
         self.async_collection = self.collection.to_async()
 
@@ -388,6 +398,7 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
         ext_callers: list[tuple[str | None, str | None] | str | None] | None = None,
         component_name: str | None = None,
         collection_embedding_api_key: str | EmbeddingHeadersProvider | None = None,
+        collection_reranking_api_key: str | RerankingHeadersProvider | None = None,
     ) -> _AstraDBCollectionEnvironment:
         """Create a copy, possibly with changed attributes.
 
@@ -412,9 +423,14 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
                 identifying the originator of the Data API requests.
             collection_embedding_api_key: the API Key to supply in each Data API
                 request if necessary. This is necessary if using the Vectorize
-                feature and no secret is stored with the database.
+                feature and a required secret is not stored with the database.
                 In order to suppress the API Key in the copy, explicitly pass
                 ``astrapy.authentication.EmbeddingAPIKeyHeaderProvider(None)``.
+            collection_reranking_api_key: the API Key to supply in each Data API
+                request if necessary. This is necessary if using the Rerank
+                feature and a required secret is not stored with the database.
+                In order to suppress the API Key in the copy, explicitly pass
+                ``astrapy.authentication.RerankingAPIKeyHeaderProvider(None)``.
         """
         return _AstraDBCollectionEnvironment(
             collection_name=self.collection_name,
@@ -431,6 +447,9 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
             if collection_embedding_api_key
             else collection_embedding_api_key,
             collection_rerank=self.collection_rerank,
+            collection_reranking_api_key=self.collection_reranking_api_key
+            if collection_reranking_api_key
+            else collection_reranking_api_key,
             collection_lexical=self.collection_lexical,
             embedding_dimension=self.embedding_dimension,
             metric=self.metric,

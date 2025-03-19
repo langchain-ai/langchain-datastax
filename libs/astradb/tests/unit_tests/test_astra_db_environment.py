@@ -2,6 +2,7 @@ import os
 
 import pytest
 from astrapy.constants import Environment
+from astrapy.exceptions import InvalidEnvironmentException
 
 from langchain_astradb.utils.astradb import (
     API_ENDPOINT_ENV_VAR,
@@ -147,7 +148,7 @@ class TestAstraDBEnvironment:
         assert a_env_other.environment == Environment.OTHER
 
         # a funny case
-        with pytest.raises(ValueError, match="mismatch"):
+        with pytest.raises(InvalidEnvironmentException, match="mismatch"):
             _AstraDBEnvironment(
                 token=FAKE_TOKEN,
                 api_endpoint=a_e_string_prod,
