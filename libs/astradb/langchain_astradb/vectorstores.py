@@ -77,6 +77,15 @@ T = TypeVar("T")
 U = TypeVar("U")
 DocDict = Dict[str, Any]  # dicts expressing entries to insert
 
+# error code to check for during bulk insertions
+DOCUMENT_ALREADY_EXISTS_API_ERROR_CODE = "DOCUMENT_ALREADY_EXISTS"
+# max number of errors shown in full insertion error messages
+MAX_SHOWN_INSERTION_ERRORS = 8
+# key for the 'rerank' score within the find_and_rerank scores
+RERANK_SCORE_KEY = "$rerank"
+
+logger = logging.getLogger(__name__)
+
 
 class AstraDBQueryResult(NamedTuple):
     """The complete information contained in a vector store entry.
@@ -89,14 +98,6 @@ class AstraDBQueryResult(NamedTuple):
     id: str
     embedding: list[float] | None
     similarity: float | None
-
-
-# error code to check for during bulk insertions
-DOCUMENT_ALREADY_EXISTS_API_ERROR_CODE = "DOCUMENT_ALREADY_EXISTS"
-# max number of errors shown in full insertion error messages
-MAX_SHOWN_INSERTION_ERRORS = 8
-
-logger = logging.getLogger(__name__)
 
 
 def _unique_list(lst: list[T], key: Callable[[T], U]) -> list[T]:
@@ -1704,7 +1705,7 @@ class AstraDBVectorStore(VectorStore):
         if decoded is not None:
             doc_id = self.document_codec.get_id(astra_db_document)
             doc_embedding = self.document_codec.decode_vector(astra_db_document)
-            doc_similarity = astra_db_scores.get("$rerank")
+            doc_similarity = astra_db_scores.get(RERANK_SCORE_KEY)
             return AstraDBQueryResult(
                 document=decoded,
                 id=doc_id,

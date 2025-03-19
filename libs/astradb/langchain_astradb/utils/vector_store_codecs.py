@@ -291,18 +291,6 @@ class _AstraDBVectorStoreDocumentCodec(ABC):
         """
         return astra_document.get(SIMILARITY_FIELD_NAME)
 
-    def get_rerank_score(self, astra_document: dict[str, Any]) -> float | None:
-        """Return the rerank score of an encoded document (= a raw JSON read from DB).
-
-        This method gives no guarantees as to whether said score applies/is found.
-        """
-        return (
-            (astra_document.get(RERANK_SCORE_FIELD_NAME_0) or {}).get(
-                RERANK_SCORE_FIELD_NAME_1
-            )
-            or {}
-        ).get(RERANK_SCORE_FIELD_NAME_2)
-
     def encode_query(
         self,
         *,
@@ -598,9 +586,10 @@ class _FlatVSDocumentCodec(_AstraDBVectorStoreDocumentCodec):
         self.has_lexical = has_lexical
         self._non_md_fields = {
             "_id",
+            self.content_field,
+            LEXICAL_FIELD_NAME,
             VECTOR_FIELD_NAME,
             VECTORIZE_FIELD_NAME,
-            self.content_field,
             SIMILARITY_FIELD_NAME,
         }
 
@@ -706,6 +695,7 @@ class _FlatVectorizeVSDocumentCodec(_AstraDBVectorStoreDocumentCodec):
         self.has_lexical = has_lexical
         self._non_md_fields = {
             "_id",
+            LEXICAL_FIELD_NAME,
             VECTOR_FIELD_NAME,
             VECTORIZE_FIELD_NAME,
             SIMILARITY_FIELD_NAME,
