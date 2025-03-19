@@ -1,4 +1,4 @@
-"""Test of Astra DB vector store class `AstraDBVectorStore`
+"""Test of Astra DB vector store class `AstraDBVectorStore`, autodetect features.
 
 Refer to `test_vectorstores.py` for the requirements to run.
 """
