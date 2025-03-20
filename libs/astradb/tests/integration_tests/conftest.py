@@ -28,7 +28,13 @@ from typing import TYPE_CHECKING, Iterable, TypedDict
 import pytest
 from astrapy import DataAPIClient
 from astrapy.authentication import StaticTokenProvider
-from astrapy.info import CollectionDefinition, VectorServiceOptions
+from astrapy.info import (
+    CollectionDefinition,
+    CollectionLexicalOptions,
+    CollectionRerankOptions,
+    RerankServiceOptions,
+    VectorServiceOptions,
+)
 
 from langchain_astradb.utils.astradb import SetupMode, unpack_indexing_policy
 from langchain_astradb.utils.vector_store_codecs import (
@@ -114,6 +120,14 @@ OPENAI_VECTORIZE_OPTIONS_HEADER = VectorServiceOptions(
     model_name="text-embedding-3-small",
 )
 
+NVIDIA_RERANKING_OPTIONS_HEADER = CollectionRerankOptions(
+    service=RerankServiceOptions(
+        provider="nvidia",
+        model_name="nvidia/llama-3.2-nv-rerankqa-1b-v2",
+    ),
+)
+LEXICAL_OPTIONS = CollectionLexicalOptions(analyzer="standard")
+
 OPENAI_SHARED_SECRET_KEY_NAME = os.environ.get("SHARED_SECRET_NAME_OPENAI")
 OPENAI_VECTORIZE_OPTIONS_KMS: VectorServiceOptions | None
 if OPENAI_SHARED_SECRET_KEY_NAME:
@@ -138,6 +152,11 @@ class AstraDBCredentials(TypedDict):
 @pytest.fixture(scope="session")
 def openai_api_key() -> str:
     return os.environ["HEADER_EMBEDDING_API_KEY_OPENAI"]
+
+
+@pytest.fixture(scope="session")
+def nvidia_reranking_api_key() -> str:
+    return os.environ["HEADER_RERANKING_API_KEY_NVIDIA"]
 
 
 @pytest.fixture(scope="session")

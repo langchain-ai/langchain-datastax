@@ -54,6 +54,7 @@ from langchain_astradb.utils.vector_store_autodetect import (
     _detect_document_codec,
 )
 from langchain_astradb.utils.vector_store_codecs import (
+    # TODO: check this commented part
     # LEXICAL_FIELD_NAME,
     # VECTOR_FIELD_NAME,
     VECTORIZE_FIELD_NAME,
@@ -209,6 +210,7 @@ def _make_hybrid_limits(
     return {hlk: max(int(hlf * k), 1) for hlk, hlf in hlf.items()}
 
 
+# TODO: check this commented part
 # def _normalize_hybrid_limit_factor(
 #     hybrid_limit_factor: float | None,
 #     *,

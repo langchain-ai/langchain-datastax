@@ -477,21 +477,22 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
 
         try:
             _idx_mode, _idx_target = unpack_indexing_policy(requested_indexing_policy)
+            collection_definition = (
+                CollectionDefinition.builder()
+                .set_vector_dimension(dimension)
+                .set_vector_metric(metric)
+                .set_indexing(
+                    indexing_mode=_idx_mode,
+                    indexing_target=_idx_target,
+                )
+                .set_vector_service(collection_vector_service_options)
+                .set_lexical(self.collection_lexical)
+                .set_rerank(self.collection_rerank)
+                .build()
+            )
             await self.async_database.create_collection(
                 name=self.collection_name,
-                definition=(
-                    CollectionDefinition.builder()
-                    .set_vector_dimension(dimension)
-                    .set_vector_metric(metric)
-                    .set_indexing(
-                        indexing_mode=_idx_mode,
-                        indexing_target=_idx_target,
-                    )
-                    .set_vector_service(collection_vector_service_options)
-                    .set_lexical(self.collection_lexical)
-                    .set_rerank(self.collection_rerank)
-                    .build()
-                ),
+                definition=collection_definition,
             )
         except DataAPIException as data_api_exception:
             # possibly the collection is preexisting and may have legacy,
