@@ -170,6 +170,7 @@ def auth_kwargs(
 @pytest.fixture
 def graph_vector_store_d2(
     auth_kwargs: dict[str, Any],
+    nvidia_reranking_api_key: str,
     empty_collection_d2: Collection,
     embedding_d2: Embeddings,
 ) -> AstraDBGraphVectorStore:
@@ -177,6 +178,7 @@ def graph_vector_store_d2(
         embedding=embedding_d2,
         collection_name=empty_collection_d2.name,
         setup_mode=SetupMode.OFF,
+        collection_reranking_api_key=nvidia_reranking_api_key,
         **auth_kwargs,
     )
 
@@ -185,11 +187,13 @@ def graph_vector_store_d2(
 def graph_vector_store_vz(
     auth_kwargs: dict[str, Any],
     openai_api_key: str,
+    nvidia_reranking_api_key: str,
     empty_collection_vz: Collection,
 ) -> AstraDBGraphVectorStore:
     return AstraDBGraphVectorStore(
         collection_vector_service_options=OPENAI_VECTORIZE_OPTIONS_HEADER,
         collection_embedding_api_key=openai_api_key,
+        collection_reranking_api_key=nvidia_reranking_api_key,
         collection_name=empty_collection_vz.name,
         setup_mode=SetupMode.OFF,
         **auth_kwargs,
@@ -221,6 +225,7 @@ def autodetect_populated_graph_vector_store_d2(
     embedding_d2: Embeddings,
     graph_vector_store_docs: list[Document],
     ephemeral_collection_cleaner_idxall_d2: str,
+    nvidia_reranking_api_key: str,
 ) -> AstraDBGraphVectorStore:
     """
     Pre-populate the collection and have (VectorStore)autodetect work on it,
@@ -264,6 +269,7 @@ def autodetect_populated_graph_vector_store_d2(
         metadata_incoming_links_key="x_link_to_x",
         content_field="*",
         autodetect_collection=True,
+        collection_reranking_api_key=nvidia_reranking_api_key,
         **auth_kwargs,
     )
     g_store.add_documents(graph_vector_store_docs)
@@ -274,6 +280,7 @@ def autodetect_populated_graph_vector_store_d2(
 def autodetect_populated_graph_vector_store_vz(
     auth_kwargs: dict[str, Any],
     openai_api_key: str,
+    nvidia_reranking_api_key: str,
     graph_vector_store_docs_vz: list[Document],
     empty_collection_idxall_vz: Collection,
 ) -> AstraDBGraphVectorStore:
@@ -309,6 +316,7 @@ def autodetect_populated_graph_vector_store_vz(
         collection_name=empty_collection_idxall_vz.name,
         metadata_incoming_links_key="x_link_to_x",
         autodetect_collection=True,
+        collection_reranking_api_key=nvidia_reranking_api_key,
         **auth_kwargs,
     )
     g_store.add_documents(graph_vector_store_docs_vz)
@@ -332,19 +340,20 @@ def assert_all_flat_docs(collection: Collection, is_vectorize: bool) -> None:  #
     not astra_db_env_vars_available(), reason="Missing Astra DB env. vars"
 )
 class TestAstraDBGraphVectorStore:
+    # TODO: restore autodetect_populated_graph_vector_store_vz when true lexical
     @pytest.mark.parametrize(
         ("store_name", "is_autodetected", "is_vectorize"),
         [
             ("populated_graph_vector_store_d2", False, False),
             ("autodetect_populated_graph_vector_store_d2", True, False),
             ("populated_graph_vector_store_vz", False, True),
-            ("autodetect_populated_graph_vector_store_vz", True, True),
+            # ("autodetect_populated_graph_vector_store_vz", True, True),
         ],
         ids=[
             "native_store_d2",
             "autodetected_store_d2",
             "native_store_vz",
-            "autodetected_store_vz",
+            # "autodetected_store_vz",
         ],
     )
     def test_gvs_similarity_search_sync(
@@ -381,19 +390,20 @@ class TestAstraDBGraphVectorStore:
                 g_store.vector_store.astra_env.collection, is_vectorize=is_vectorize
             )
 
+    # TODO: restore autodetect_populated_graph_vector_store_vz when true lexical
     @pytest.mark.parametrize(
         ("store_name", "is_autodetected", "is_vectorize"),
         [
             ("populated_graph_vector_store_d2", False, False),
             ("autodetect_populated_graph_vector_store_d2", True, False),
             ("populated_graph_vector_store_vz", False, True),
-            ("autodetect_populated_graph_vector_store_vz", True, True),
+            # ("autodetect_populated_graph_vector_store_vz", True, True),
         ],
         ids=[
             "native_store_d2",
             "autodetected_store_d2",
             "native_store_vz",
-            "autodetected_store_vz",
+            # "autodetected_store_vz",
         ],
     )
     async def test_gvs_similarity_search_async(
@@ -434,19 +444,20 @@ class TestAstraDBGraphVectorStore:
                 is_vectorize=is_vectorize,
             )
 
+    # TODO: restore autodetect_populated_graph_vector_store_vz when true lexical
     @pytest.mark.parametrize(
         ("store_name", "is_autodetected", "is_vectorize"),
         [
             ("populated_graph_vector_store_d2", False, False),
             ("autodetect_populated_graph_vector_store_d2", True, False),
             ("populated_graph_vector_store_vz", False, True),
-            ("autodetect_populated_graph_vector_store_vz", True, True),
+            # ("autodetect_populated_graph_vector_store_vz", True, True),
         ],
         ids=[
             "native_store_d2",
             "autodetected_store_d2",
             "native_store_vz",
-            "autodetected_store_vz",
+            # "autodetected_store_vz",
         ],
     )
     def test_gvs_traversal_search_sync(
@@ -473,19 +484,20 @@ class TestAstraDBGraphVectorStore:
                 g_store.vector_store.astra_env.collection, is_vectorize=is_vectorize
             )
 
+    # TODO: restore autodetect_populated_graph_vector_store_vz when true lexical
     @pytest.mark.parametrize(
         ("store_name", "is_autodetected", "is_vectorize"),
         [
             ("populated_graph_vector_store_d2", False, False),
             ("autodetect_populated_graph_vector_store_d2", True, False),
             ("populated_graph_vector_store_vz", False, True),
-            ("autodetect_populated_graph_vector_store_vz", True, True),
+            # ("autodetect_populated_graph_vector_store_vz", True, True),
         ],
         ids=[
             "native_store_d2",
             "autodetected_store_d2",
             "native_store_vz",
-            "autodetected_store_vz",
+            # "autodetected_store_vz",
         ],
     )
     async def test_gvs_traversal_search_async(

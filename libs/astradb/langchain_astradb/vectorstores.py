@@ -203,7 +203,8 @@ def _make_hybrid_limits(
     k: int,
 ) -> None | int | dict[str, int]:
     if hlf is None:
-        return None
+        # TODO: restore `return None` here once the API can live without this parameter
+        return k
     if isinstance(hlf, float):
         return max(int(hlf * k), 1)
     # hlf is a map:

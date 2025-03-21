@@ -14,7 +14,7 @@ license = "MIT"
 python = ">=3.9,<4.0"
 langchain-community = ">=0.3.1"
 numpy = "^1.26.0"
-astrapy = {path = "../../../../other_github/astrapy"}
+astrapy = "2.0.0.rc2"
 
 [tool.poetry.group.test]
 optional = true
