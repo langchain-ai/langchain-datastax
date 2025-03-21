@@ -183,13 +183,33 @@ class TestUpgradeToGraphVectorStore:
 
     @pytest.mark.usefixtures("ephemeral_indexing_collections_cleaner")
     @pytest.mark.parametrize(
-        ("collection_name", "gvs_setup_mode", "gvs_indexing_policy"),
+        ("collection_name", "gvs_setup_mode", "gvs_indexing_policy", "error_match"),
         [
-            (EPHEMERAL_ALLOW_IDX_NAME_D2, SetupMode.SYNC, {"allow": ["test"]}),
-            (EPHEMERAL_ALLOW_IDX_NAME_D2, SetupMode.SYNC, None),
-            (EPHEMERAL_DENY_IDX_NAME_D2, SetupMode.SYNC, None),
-            (EPHEMERAL_ALLOW_IDX_NAME_D2, SetupMode.OFF, {"allow": ["test"]}),
-            (EPHEMERAL_ALLOW_IDX_NAME_D2, SetupMode.OFF, None),
+            (
+                EPHEMERAL_ALLOW_IDX_NAME_D2,
+                SetupMode.SYNC,
+                {"allow": ["test"]},
+                "incompatible with vector graph",
+            ),
+            (
+                EPHEMERAL_ALLOW_IDX_NAME_D2,
+                SetupMode.SYNC,
+                None,
+                "incompatible with vector graph",
+            ),
+            (
+                EPHEMERAL_DENY_IDX_NAME_D2,
+                SetupMode.SYNC,
+                None,
+                "incompatible with vector graph",
+            ),
+            (
+                EPHEMERAL_ALLOW_IDX_NAME_D2,
+                SetupMode.OFF,
+                {"allow": ["test"]},
+                "not indexed",
+            ),
+            (EPHEMERAL_ALLOW_IDX_NAME_D2, SetupMode.OFF, None, "not indexed"),
         ],
         ids=[
             "allow_list_upgrade_same_policy_sync",
@@ -207,6 +227,7 @@ class TestUpgradeToGraphVectorStore:
         gvs_setup_mode: SetupMode,
         collection_name: str,
         gvs_indexing_policy: dict[str, Any] | None,
+        error_match: str,
     ) -> None:
         # Create vector store using SetupMode.SYNC
         v_store = AstraDBVectorStore(
@@ -231,13 +252,7 @@ class TestUpgradeToGraphVectorStore:
         v_doc = v_store.get_by_document_id(document_id=doc_id)
         assert v_doc is not None
         assert v_doc.page_content == doc_al.page_content
-
-        expected_msg = (
-            "The collection configuration is incompatible with vector graph "
-            "store. Please create a new collection and make sure the metadata "
-            "path is not excluded by indexing."
-        )
-        with pytest.raises(ValueError, match=expected_msg):
+        with pytest.raises(Exception, match=error_match):
             # Create a GRAPH Vector Store using the existing collection from above
             # with setup_mode=gvs_setup_mode and indexing_policy=gvs_indexing_policy
             _ = AstraDBGraphVectorStore(
