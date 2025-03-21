@@ -10,7 +10,7 @@ from langchain_astradb.utils.vector_store_autodetect import (
     _detect_document_flatness,
     _detect_documents_content_field,
     _detect_documents_flatness,
-    _detect_documents_has_lexical,
+    _detect_documents_have_lexical,
 )
 
 FLAT_DOCUMENT = {"$vector": [0], "metadata": "m", "_id": "a", "x": "x"}
@@ -215,10 +215,10 @@ class TestVSAutodetectInferences:
         ("documents", "expected_has_lexical"),
         DOCS_LEXICAL_TEST_PARAMS,
     )
-    def test_detect_documents_has_lexical(
+    def test_detect_documents_have_lexical(
         self,
         documents: list[dict[str, Any]],
         *,
         expected_has_lexical: bool,
     ) -> None:
-        assert _detect_documents_has_lexical(documents) is expected_has_lexical
+        assert _detect_documents_have_lexical(documents) is expected_has_lexical

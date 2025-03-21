@@ -811,9 +811,16 @@ class AstraDBVectorStore(VectorStore):
                 is_autodetect=True,
                 has_vectorize=has_vectorize,
             )
+
+            self.has_lexical = (
+                c_descriptor.definition.lexical is not None
+                and c_descriptor.definition.lexical.enabled
+            )
+
             self.document_codec = _detect_document_codec(
                 c_documents,
                 has_vectorize=has_vectorize,
+                has_lexical=self.has_lexical,
                 ignore_invalid_documents=ignore_invalid_documents,
                 norm_content_field=norm_content_field,
             )
@@ -824,10 +831,6 @@ class AstraDBVectorStore(VectorStore):
                 document_codec=self.document_codec,
             )
 
-            self.has_lexical = (
-                c_descriptor.definition.lexical is not None
-                and c_descriptor.definition.lexical.enabled
-            )
             _has_reranking = (
                 c_descriptor.definition.rerank is not None
                 and c_descriptor.definition.rerank.enabled

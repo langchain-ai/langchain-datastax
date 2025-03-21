@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import warnings
 from collections import Counter
 from operator import itemgetter
 from typing import (
@@ -90,7 +91,7 @@ def _detect_documents_content_field(
     return requested_content_field
 
 
-def _detect_documents_has_lexical(documents: list[dict[str, Any]]) -> bool:
+def _detect_documents_have_lexical(documents: list[dict[str, Any]]) -> bool:
     return any(LEXICAL_FIELD_NAME in document for document in documents)
 
 
@@ -98,6 +99,7 @@ def _detect_document_codec(
     documents: list[dict[str, Any]],
     *,
     has_vectorize: bool,
+    has_lexical: bool,
     ignore_invalid_documents: bool,
     norm_content_field: str,
 ) -> _AstraDBVectorStoreDocumentCodec:
@@ -114,8 +116,27 @@ def _detect_document_codec(
         "vector store autodetect: final_content_field = %s", final_content_field
     )
 
-    has_lexical = _detect_documents_has_lexical(documents)
-    logger.info("vector store autodetect: has_lexical = %s", has_lexical)
+    lexical_in_docs = _detect_documents_have_lexical(documents)
+    logger.info(
+        "vector store autodetect: lexical_in_docs = %s (has_lexical = %s)",
+        lexical_in_docs,
+        has_lexical,
+    )
+    if has_lexical and not lexical_in_docs:
+        warnings.warn(
+            "Collection supports lexical; however, autodetect encountered documents "
+            "without a $lexical. The $lexical field will be set for new documents, "
+            "but the pre-existing documents might not be reached by lexical search "
+            "when running hybrid search mode.",
+            stacklevel=2,
+        )
+    if not has_lexical and lexical_in_docs:
+        warnings.warn(
+            "Documents with $lexical encountered on a non-hybrid-capable "
+            "collection. This inconsistency will be ignored moving forward "
+            "(and new documents will not be written with any $lexical).",
+            stacklevel=2,
+        )
 
     if has_vectorize:
         if is_flat:
