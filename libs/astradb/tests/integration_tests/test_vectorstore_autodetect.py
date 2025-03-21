@@ -5,24 +5,103 @@ Refer to `test_vectorstores.py` for the requirements to run.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+import os
+from typing import TYPE_CHECKING, Any, Iterable
 
 import pytest
 from astrapy.authentication import StaticTokenProvider
+from astrapy.info import (
+    CollectionDefinition,
+    CollectionLexicalOptions,
+    CollectionRerankOptions,
+)
 from langchain_core.documents import Document
 
+from langchain_astradb.utils.vector_store_codecs import (
+    _DefaultVectorizeVSDocumentCodec,
+    _FlatVectorizeVSDocumentCodec,
+)
 from langchain_astradb.vectorstores import AstraDBVectorStore
 
 from .conftest import (
     CUSTOM_CONTENT_KEY,
+    LEXICAL_OPTIONS,
+    NVIDIA_RERANKING_OPTIONS_HEADER,
+    OPENAI_VECTORIZE_OPTIONS_HEADER,
     astra_db_env_vars_available,
 )
 
 if TYPE_CHECKING:
-    from astrapy import Collection
+    from astrapy import Collection, Database
     from langchain_core.embeddings import Embeddings
 
     from .conftest import AstraDBCredentials
+
+
+COLLECTION_NAME_FORCEHYBRID_VECTORIZE = "lc_test_coll_hyb_vze"
+COLLECTION_NAME_FORCENOHYBRID_VECTORIZE = "lc_test_coll_nohyb_vze"
+
+
+@pytest.fixture(scope="module")
+def collection_forcehybrid_vectorize(
+    openai_api_key: str,
+    nvidia_reranking_api_key: str,
+    database: Database,
+) -> Iterable[Collection]:
+    """A general-purpose D=2(Euclidean) collection for per-test reuse."""
+    collection = database.create_collection(
+        COLLECTION_NAME_FORCEHYBRID_VECTORIZE,
+        definition=(
+            CollectionDefinition.builder()
+            .set_vector_service(OPENAI_VECTORIZE_OPTIONS_HEADER)
+            .set_lexical(LEXICAL_OPTIONS)
+            .set_rerank(NVIDIA_RERANKING_OPTIONS_HEADER)
+            .build()
+        ),
+        embedding_api_key=openai_api_key,
+        reranking_api_key=nvidia_reranking_api_key,
+    )
+    yield collection
+
+    collection.drop()
+
+
+@pytest.fixture
+def empty_collection_forcehybrid_vectorize(
+    collection_forcehybrid_vectorize: Collection,
+) -> Collection:
+    collection_forcehybrid_vectorize.delete_many({})
+    return collection_forcehybrid_vectorize
+
+
+@pytest.fixture(scope="module")
+def collection_forcenohybrid_vectorize(
+    openai_api_key: str,
+    database: Database,
+) -> Iterable[Collection]:
+    """A general-purpose D=2(Euclidean) collection for per-test reuse."""
+    collection = database.create_collection(
+        COLLECTION_NAME_FORCENOHYBRID_VECTORIZE,
+        definition=(
+            CollectionDefinition.builder()
+            .set_vector_service(OPENAI_VECTORIZE_OPTIONS_HEADER)
+            .set_lexical(CollectionLexicalOptions(enabled=False))
+            .set_rerank(CollectionRerankOptions(enabled=False))
+            .build()
+        ),
+        embedding_api_key=openai_api_key,
+    )
+    yield collection
+
+    collection.drop()
+
+
+@pytest.fixture
+def empty_collection_forcenohybrid_vectorize(
+    collection_forcenohybrid_vectorize: Collection,
+) -> Collection:
+    collection_forcenohybrid_vectorize.delete_many({})
+    return collection_forcenohybrid_vectorize
 
 
 @pytest.mark.skipif(
@@ -429,3 +508,162 @@ class TestAstraDBVectorStoreAutodetect:
             ]
             assert len(f_rec_warnings) == 1
         assert len(results_w_post) == 1
+
+    @pytest.mark.skipif(
+        "LANGCHAIN_TEST_HYBRID" not in os.environ,
+        reason="Hybrid tests not manually requested",
+    )
+    def test_vectorstore_autodetect_hybrid_prepopulated_vectorize(
+        self,
+        astra_db_credentials: AstraDBCredentials,
+        openai_api_key: str,
+        nvidia_reranking_api_key: str,
+        empty_collection_forcehybrid_vectorize: Collection,
+    ) -> None:
+        # populate (with/out $lexical, flat/nested) to then check autodetection result
+        for lexical_in_docs in [True, False]:
+            for flat_md in [True, False]:
+                empty_collection_forcehybrid_vectorize.delete_many({})
+                # populate a collection
+                _md_part: dict[str, Any] = (
+                    {"k0": "v0"} if flat_md else {"metadata": {"k0": "v0"}}
+                )
+                empty_collection_forcehybrid_vectorize.insert_one(
+                    {
+                        "_id": "doc0",
+                        "$vectorize": "the content",
+                        **_md_part,
+                        **({"$lexical": "the lex content"} if lexical_in_docs else {}),
+                    }
+                )
+                # instantiate store with autodetect
+                store_ad = AstraDBVectorStore(
+                    collection_name=empty_collection_forcehybrid_vectorize.name,
+                    token=StaticTokenProvider(astra_db_credentials["token"]),
+                    api_endpoint=astra_db_credentials["api_endpoint"],
+                    namespace=astra_db_credentials["namespace"],
+                    environment=astra_db_credentials["environment"],
+                    autodetect_collection=True,
+                    collection_embedding_api_key=openai_api_key,
+                    collection_reranking_api_key=nvidia_reranking_api_key,
+                )
+                # inspect store relevant attributes
+                assert store_ad.has_lexical  # regardless of documents found
+                # inspect codec
+                assert store_ad.document_codec.server_side_embeddings
+                assert store_ad.document_codec.has_lexical
+                assert store_ad.document_codec.content_field == "$vectorize"
+                if flat_md:
+                    assert isinstance(
+                        store_ad.document_codec,
+                        _FlatVectorizeVSDocumentCodec,
+                    )
+                else:
+                    assert isinstance(
+                        store_ad.document_codec,
+                        _DefaultVectorizeVSDocumentCodec,
+                    )
+                # insert one more doc and check it
+                store_ad.add_documents(
+                    [
+                        Document(
+                            id="doc1",
+                            page_content="inserted",
+                            metadata={"k1": "v1"},
+                        ),
+                    ]
+                )
+                doc1 = empty_collection_forcehybrid_vectorize.find_one(
+                    {"_id": "doc1"},
+                    projection={"*": True},
+                )
+                assert doc1 is not None
+                assert "$lexical" in doc1
+                assert "$vectorize" in doc1
+                assert doc1["$lexical"] == "inserted"
+                assert doc1["$vectorize"] == "inserted"
+                if flat_md:
+                    assert doc1["k1"] == "v1"
+                else:
+                    assert doc1["metadata"] == {"k1": "v1"}
+                # run perfunctory search + inspect results
+                hits = store_ad.similarity_search("query", k=2)
+                assert len(hits) == 2
+                assert {doc.id for doc in hits} == {"doc0", "doc1"}
+
+    @pytest.mark.skipif(
+        "LANGCHAIN_TEST_HYBRID" not in os.environ,
+        reason="Hybrid tests not manually requested",
+    )
+    def test_vectorstore_autodetect_nohybrid_prepopulated_vectorize(
+        self,
+        astra_db_credentials: AstraDBCredentials,
+        openai_api_key: str,
+        empty_collection_forcenohybrid_vectorize: Collection,
+    ) -> None:
+        # populate (flat/nested) to then check autodetection result
+        for flat_md in [True, False]:
+            empty_collection_forcenohybrid_vectorize.delete_many({})
+            # populate a collection
+            _md_part: dict[str, Any] = (
+                {"k0": "v0"} if flat_md else {"metadata": {"k0": "v0"}}
+            )
+            empty_collection_forcenohybrid_vectorize.insert_one(
+                {
+                    "_id": "doc0",
+                    "$vectorize": "the content",
+                    **_md_part,
+                }
+            )
+            # instantiate store with autodetect
+            store_ad = AstraDBVectorStore(
+                collection_name=empty_collection_forcenohybrid_vectorize.name,
+                token=StaticTokenProvider(astra_db_credentials["token"]),
+                api_endpoint=astra_db_credentials["api_endpoint"],
+                namespace=astra_db_credentials["namespace"],
+                environment=astra_db_credentials["environment"],
+                autodetect_collection=True,
+                collection_embedding_api_key=openai_api_key,
+            )
+            # inspect store relevant attributes
+            assert not store_ad.has_lexical
+            # inspect codec
+            assert store_ad.document_codec.server_side_embeddings
+            assert not store_ad.document_codec.has_lexical
+            assert store_ad.document_codec.content_field == "$vectorize"
+            if flat_md:
+                assert isinstance(
+                    store_ad.document_codec,
+                    _FlatVectorizeVSDocumentCodec,
+                )
+            else:
+                assert isinstance(
+                    store_ad.document_codec,
+                    _DefaultVectorizeVSDocumentCodec,
+                )
+            # insert one more doc and check it
+            store_ad.add_documents(
+                [
+                    Document(
+                        id="doc1",
+                        page_content="inserted",
+                        metadata={"k1": "v1"},
+                    ),
+                ]
+            )
+            doc1 = empty_collection_forcenohybrid_vectorize.find_one(
+                {"_id": "doc1"},
+                projection={"*": True},
+            )
+            assert doc1 is not None
+            assert "$lexical" not in doc1
+            assert "$vectorize" in doc1
+            assert doc1["$vectorize"] == "inserted"
+            if flat_md:
+                assert doc1["k1"] == "v1"
+            else:
+                assert doc1["metadata"] == {"k1": "v1"}
+            # run perfunctory search + inspect results
+            hits = store_ad.similarity_search("query", k=2)
+            assert len(hits) == 2
+            assert {doc.id for doc in hits} == {"doc0", "doc1"}
