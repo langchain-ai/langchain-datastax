@@ -5,6 +5,9 @@ This package contains the LangChain integrations for using DataStax Astra DB.
 > DataStax [Astra DB](https://docs.datastax.com/en/astra/home/astra.html) is a serverless vector-capable database built on Apache Cassandra® and made conveniently available
 > through an easy-to-use JSON API.
 
+> [!IMPORTANT]
+> This package replaces the _deprecated_ Astra DB classes found under `langchain_community.*`. Migrating away from the community plugins is strongly advised to get the latest features, fixes, and compatibility with modern versions of the AstraPy Data API client.
+
 ## Installation and Setup
 
 Installation of this partner package:
@@ -15,7 +18,7 @@ pip install langchain-astradb
 
 ## Integrations overview
 
-See the [LangChain docs page](https://python.langchain.com/docs/integrations/providers/astradb) and the [API reference](https://api.python.langchain.com/en/latest/astradb_api_reference.html) for more details.
+See the [LangChain docs page](https://python.langchain.com/docs/integrations/providers/astradb) and the [API reference](https://python.langchain.com/api_reference/astradb/index.html) for more details.
 
 ### Vector Store
 
@@ -124,3 +127,7 @@ You have several options:
 - you can ignore the warning because you know your application will never need to store very long textual contents;
 - you can ignore the warning and explicitly instruct the plugin _not to_ create the collection, assuming it exists already (which suppresses the warning): `store = AstraDBVectorStore(..., setup_mode=langchain_astradb.utils.astradb.SetupMode.OFF)`. In this case the collection will be used as-is, no (indexing) questions asked;
 - if you can afford populating the collection anew, you can drop it and re-run the LangChain application: the collection will be created with the optimized indexing settings. **This is the recommended option, when possible**.
+
+## Collection defaults mismatch
+
+TODO

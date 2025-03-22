@@ -93,6 +93,14 @@ class AstraDBQueryResult(NamedTuple):
 
     This class represents all that can be returned from the collection when running
     a query, which goes beyond just the corresponding Document.
+
+    Atributes:
+        document: a ``langchain.schema.Document`` object representing the query result.
+        id: the ID of the returned document.
+        embedding: the embedding vector associated to the document. This may be None,
+            depending on whether the embeddings were requested in the query or not.
+        similarity: the numeric similarity score of the document in the query. In case
+            this quantity was not requested by the query, it will be set to None.
     """
 
     document: Document
@@ -281,7 +289,7 @@ class AstraDBVectorStoreError(Exception):
 
 
 class AstraDBVectorStore(VectorStore):
-    """AstraDB vector store integration.
+    """A vector store which uses DataStax Astra DB as backend.
 
     Setup:
         Install the ``langchain-astradb`` package and head to the
@@ -300,7 +308,7 @@ class AstraDBVectorStore(VectorStore):
 
     Key init args — client params:
         api_endpoint: str
-            AstraDB API endpoint.
+            Astra DB API endpoint.
         token: str
             API token for Astra DB usage.
         namespace: Optional[str]
@@ -309,9 +317,12 @@ class AstraDBVectorStore(VectorStore):
     Instantiate:
         Get your API endpoint and application token from the dashboard of your database.
 
+        Create a vector store and provide a LangChain embedding object for working with it:
+
         .. code-block:: python
 
             import getpass
+
             from langchain_astradb import AstraDBVectorStore
             from langchain_openai import OpenAIEmbeddings
 
@@ -325,22 +336,85 @@ class AstraDBVectorStore(VectorStore):
                 token=ASTRA_DB_APPLICATION_TOKEN,
             )
 
-        Have the vector store figure out its configuration (documents scheme on DB)
-        from an existing collection, in the case of `server-side-embeddings <https://docs.datastax.com/en/astra-db-serverless/databases/embedding-generation.html>`_:
+        Create a vector store where the embedding vector computation happens entirely
+        on the server-side, using the `vectorize <https://docs.datastax.com/en/astra-db-serverless/databases/embedding-generation.html>`_ feature:
 
         .. code-block:: python
 
             import getpass
+            from astrapy.info import VectorServiceOptions
+
             from langchain_astradb import AstraDBVectorStore
 
             ASTRA_DB_API_ENDPOINT = getpass.getpass("ASTRA_DB_API_ENDPOINT = ")
             ASTRA_DB_APPLICATION_TOKEN = getpass.getpass("ASTRA_DB_APPLICATION_TOKEN = ")
 
             vector_store = AstraDBVectorStore(
-                collection_name="astra_vector_langchain",
+                collection_name="astra_vectorize_langchain",
+                api_endpoint=ASTRA_DB_API_ENDPOINT,
+                token=ASTRA_DB_APPLICATION_TOKEN,
+                collection_vector_service_options=VectorServiceOptions(
+                    provider="nvidia",
+                    model_name="NV-Embed-QA",
+                    # authentication=...,  # needed by some providers/models
+                ),
+            )
+
+        "Autodetect": let the vector store figure out the configuration (including vectorize
+        and document encoding scheme on DB), by inspection of an existing collection:
+
+        .. code-block:: python
+
+            import getpass
+
+            from langchain_astradb import AstraDBVectorStore
+
+            ASTRA_DB_API_ENDPOINT = getpass.getpass("ASTRA_DB_API_ENDPOINT = ")
+            ASTRA_DB_APPLICATION_TOKEN = getpass.getpass("ASTRA_DB_APPLICATION_TOKEN = ")
+
+            vector_store = AstraDBVectorStore(
+                collection_name="astra_existing_collection",
+                # embedding=...,  # needed unless using 'vectorize'
                 api_endpoint=ASTRA_DB_API_ENDPOINT,
                 token=ASTRA_DB_APPLICATION_TOKEN,
                 autodetect_collection=True,
+            )
+
+        The underlying Astra DB typically supports hybrid search
+        (i.e. lexical + vector ANN) to boost the results' accuracy.
+        This is generally used automatically when available (look for
+        the ``collection_rerank`` and ``collection_lexical`` constructor
+        parameters for manual control).
+
+        Hybrid-related server upgrades may introduce a mismatch between the store
+        defaults and a pre-existing collection: in case one such mismatch is
+        reported (as a Data API "EXISTING_COLLECTION_DIFFERENT_SETTINGS" error),
+        the options to resolve are:
+        (1) use autodetect mode, (2) switch to ``setup_mode`` "OFF", or
+        (3) explicitly specify lexical and/or rerank settings in the vector
+        store constructor, to match the existing collection configuration.
+        See `here <https://github.com/langchain-ai/langchain-datastax/blob/main/libs/astradb/README.md#collection-defaults-mismatch>`_ for more details.
+
+        This class can also target a non-Astra DB database, such as HCD, through
+        the Data API:
+
+        .. code-block:: python
+
+            import getpass
+
+            from astrapy.authentication import UsernamePasswordTokenProvider
+
+            from langchain_astradb import AstraDBVectorStore
+
+            vector_store = AstraDBVectorStore(
+                collection_name="astra_existing_collection",
+                # embedding=...,  # needed unless using 'vectorize'
+                api_endpoint="http://localhost:8181",
+                token=UsernamePasswordTokenProvider(
+                    username="user",
+                    password="pwd",
+                ),
+                collection_vector_service_options=...,  # if 'vectorize'
             )
 
     Add Documents:
@@ -529,9 +603,9 @@ class AstraDBVectorStore(VectorStore):
         hybrid_search: HybridSearchMode | None = None,
         hybrid_limit_factor: float | None = None,
     ) -> None:
-        """Wrapper around DataStax Astra DB for vector-store workloads.
+        """A vector store wich uses DataStax Astra DB as backend.
 
-        For quickstart and details, visit
+        For more on Astra DB, visit
         https://docs.datastax.com/en/astra-db-serverless/index.html
 
         Args:
@@ -1283,11 +1357,11 @@ class AstraDBVectorStore(VectorStore):
             **kwargs: Additional arguments are ignored.
 
         Note:
-            There are constraints on the allowed field names
-            in the metadata dictionaries, coming from the underlying Astra DB API.
-            For instance, the ``$`` (dollar sign) cannot be used in the dict keys.
-            See this document for details:
-            https://docs.datastax.com/en/astra-db-serverless/api-reference/overview.html#limits
+            The allowed field names for the metadata document attributes must
+            obey certain rules (such as: keys cannot start with a dollar sign
+            and cannot be empty).
+            See `Naming Conventions <https://docs.datastax.com/en/astra-db-serverless/api-reference/dataapiclient.html#naming-conventions>`_
+            for details.
 
         Returns:
             The list of ids of the added texts.
@@ -1424,11 +1498,11 @@ class AstraDBVectorStore(VectorStore):
             **kwargs: Additional arguments are ignored.
 
         Note:
-            There are constraints on the allowed field names
-            in the metadata dictionaries, coming from the underlying Astra DB API.
-            For instance, the ``$`` (dollar sign) cannot be used in the dict keys.
-            See this document for details:
-            https://docs.datastax.com/en/astra-db-serverless/api-reference/overview.html#limits
+            The allowed field names for the metadata document attributes must
+            obey certain rules (such as: keys cannot start with a dollar sign
+            and cannot be empty).
+            See `Naming Conventions <https://docs.datastax.com/en/astra-db-serverless/api-reference/dataapiclient.html#naming-conventions>`_
+            for details.
 
         Returns:
             The list of ids of the added texts.

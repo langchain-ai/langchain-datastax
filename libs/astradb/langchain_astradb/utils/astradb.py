@@ -250,7 +250,7 @@ class _AstraDBEnvironment:
             LC_CORE_CALLER,
             (self.component_name, LC_ASTRADB_VERSION),
         ]
-        # create the callers
+        # create the client (set to return plain lists for vectors)
         self.data_api_client = DataAPIClient(
             environment=self.environment,
             api_options=APIOptions(
@@ -387,6 +387,21 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
                         requested_indexing_policy=requested_indexing_policy,
                         default_indexing_policy=default_indexing_policy,
                     ):
+                        # other reasons for the exception
+                        warnings.warn(
+                            (
+                                f"Astra DB collection '{self.collection_name}' was "
+                                "found to be configured differently than requested "
+                                "by the vector store creation. This is resulting in "
+                                "a hard exception from the Data API. Please see "
+                                "https://github.com/langchain-ai/langchain-datastax"
+                                "/blob/main/libs/astradb/README.md#collection-defaults"
+                                "-mismatch for more context about this issue and "
+                                "possible mitigations."
+                            ),
+                            UserWarning,
+                            stacklevel=2,
+                        )
                         raise data_api_exception  # noqa: TRY201
                 except ValueError as validation_error:
                     raise validation_error from data_api_exception
@@ -508,6 +523,20 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
                     default_indexing_policy=default_indexing_policy,
                 ):
                     # other reasons for the exception
+                    warnings.warn(
+                        (
+                            f"Astra DB collection '{self.collection_name}' was "
+                            "found to be configured differently than requested "
+                            "by the vector store creation. This is resulting in "
+                            "a hard exception from the Data API. Please see "
+                            "https://github.com/langchain-ai/langchain-datastax"
+                            "/blob/main/libs/astradb/README.md#collection-defaults"
+                            "-mismatch for more context about this issue and "
+                            "possible mitigations."
+                        ),
+                        UserWarning,
+                        stacklevel=2,
+                    )
                     raise data_api_exception  # noqa: TRY201
             except ValueError as validation_error:
                 raise validation_error from data_api_exception
