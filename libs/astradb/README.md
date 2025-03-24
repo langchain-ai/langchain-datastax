@@ -8,6 +8,10 @@ This package contains the LangChain integrations for using DataStax Astra DB.
 > [!IMPORTANT]
 > This package replaces the _deprecated_ Astra DB classes found under `langchain_community.*`. Migrating away from the community plugins is strongly advised to get the latest features, fixes, and compatibility with modern versions of the AstraPy Data API client.
 
+## Architecture sketch
+
+![Architecture sketch](./langchain-astradb-architecture-sketch.png)
+
 ## Installation and Setup
 
 Installation of this partner package:
