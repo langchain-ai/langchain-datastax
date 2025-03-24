@@ -336,7 +336,7 @@ class AstraDBVectorStore(VectorStore):
                 token=ASTRA_DB_APPLICATION_TOKEN,
             )
 
-        Create a vector store where the embedding vector computation happens entirely
+        (Vectorize) Create a vector store where the embedding vector computation happens entirely
         on the server-side, using the `vectorize <https://docs.datastax.com/en/astra-db-serverless/databases/embedding-generation.html>`_ feature:
 
         .. code-block:: python
@@ -360,7 +360,52 @@ class AstraDBVectorStore(VectorStore):
                 ),
             )
 
-        "Autodetect": let the vector store figure out the configuration (including vectorize
+        (Hybrid) The underlying Astra DB typically supports hybrid search
+        (i.e. lexical + vector ANN) to boost the results' accuracy.
+        This is provisioned and used automatically when available. For manual control,
+        use the ``collection_rerank`` and ``collection_lexical`` constructor parameters:
+
+        .. code-block:: python
+
+            import getpass
+            from astrapy.info import (
+                CollectionLexicalOptions,
+                CollectionRerankOptions,
+                RerankServiceOptions,
+                VectorServiceOptions,
+            )
+
+            from langchain_astradb import AstraDBVectorStore
+
+            ASTRA_DB_API_ENDPOINT = getpass.getpass("ASTRA_DB_API_ENDPOINT = ")
+            ASTRA_DB_APPLICATION_TOKEN = getpass.getpass("ASTRA_DB_APPLICATION_TOKEN = ")
+
+            vector_store = AstraDBVectorStore(
+                collection_name="astra_vectorize_langchain",
+                # embedding=...,  # needed unless using 'vectorize'
+                api_endpoint=ASTRA_DB_API_ENDPOINT,
+                token=ASTRA_DB_APPLICATION_TOKEN,
+                collection_vector_service_options=VectorServiceOptions(...),  # see above
+                collection_lexical=CollectionLexicalOptions(analyzer="standard"),
+                collection_rerank=CollectionRerankOptions(
+                    service=RerankServiceOptions(
+                        provider="nvidia",
+                        model_name="nvidia/llama-3.2-nv-rerankqa-1b-v2",
+                    ),
+                ),
+                collection_reranking_api_key=...,  # if needed by the model/setup
+            )
+
+        Hybrid-related server upgrades may introduce a mismatch between the store
+        defaults and a pre-existing collection: in case one such mismatch is
+        reported (as a Data API "EXISTING_COLLECTION_DIFFERENT_SETTINGS" error),
+        the options to resolve are:
+        (1) use autodetect mode, (2) switch to ``setup_mode`` "OFF", or
+        (3) explicitly specify lexical and/or rerank settings in the vector
+        store constructor, to match the existing collection configuration.
+        See `here <https://github.com/langchain-ai/langchain-datastax/blob/main/libs/astradb/README.md#collection-defaults-mismatch>`_ for more details.
+
+        (Autodetect) Let the vector store figure out the configuration (including vectorize
         and document encoding scheme on DB), by inspection of an existing collection:
 
         .. code-block:: python
@@ -380,23 +425,8 @@ class AstraDBVectorStore(VectorStore):
                 autodetect_collection=True,
             )
 
-        The underlying Astra DB typically supports hybrid search
-        (i.e. lexical + vector ANN) to boost the results' accuracy.
-        This is generally used automatically when available (look for
-        the ``collection_rerank`` and ``collection_lexical`` constructor
-        parameters for manual control).
-
-        Hybrid-related server upgrades may introduce a mismatch between the store
-        defaults and a pre-existing collection: in case one such mismatch is
-        reported (as a Data API "EXISTING_COLLECTION_DIFFERENT_SETTINGS" error),
-        the options to resolve are:
-        (1) use autodetect mode, (2) switch to ``setup_mode`` "OFF", or
-        (3) explicitly specify lexical and/or rerank settings in the vector
-        store constructor, to match the existing collection configuration.
-        See `here <https://github.com/langchain-ai/langchain-datastax/blob/main/libs/astradb/README.md#collection-defaults-mismatch>`_ for more details.
-
-        This class can also target a non-Astra DB database, such as HCD, through
-        the Data API:
+        (Non-Astra DB) This class can also target a non-Astra DB database, such as a
+        self-deployed HCD, through the Data API:
 
         .. code-block:: python
 
