@@ -37,6 +37,8 @@ my_store = AstraDBVectorStore(
 )
 ```
 
+Class `AstraDBVectorStore` supports server-side embeddings ("vectorize"), hybrid search (vector ANN + BM25 + reranker), autodetect on arbitrary collections, non-Astra DB deployments of Data API, and more. [Example notebook](https://python.langchain.com/docs/integrations/vectorstores/astradb/).
+
 ### Chat message history
 
 ```python
