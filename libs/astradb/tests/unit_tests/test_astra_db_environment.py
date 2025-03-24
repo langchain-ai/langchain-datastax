@@ -9,7 +9,7 @@ from langchain_astradb.utils.astradb import (
     KEYSPACE_ENV_VAR,
     TOKEN_ENV_VAR,
     _AstraDBEnvironment,
-    unpack_indexing_policy,
+    _unpack_indexing_policy,
 )
 
 FAKE_TOKEN = "t"  # noqa: S105
@@ -156,9 +156,9 @@ class TestAstraDBEnvironment:
                 environment=Environment.DEV,
             )
 
-    def test_unpack_indexing_policy(self) -> None:
-        assert unpack_indexing_policy({}) == (None, None)
-        assert unpack_indexing_policy(None) == (None, None)
-        assert unpack_indexing_policy({"k": ["v"]}) == ("k", ["v"])
+    def test__unpack_indexing_policy(self) -> None:
+        assert _unpack_indexing_policy({}) == (None, None)
+        assert _unpack_indexing_policy(None) == (None, None)
+        assert _unpack_indexing_policy({"k": ["v"]}) == ("k", ["v"])
         with pytest.raises(ValueError, match="indexing policy"):
-            unpack_indexing_policy({"k1": ["v1"], "k2": ["v2"]})
+            _unpack_indexing_policy({"k1": ["v1"], "k2": ["v2"]})

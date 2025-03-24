@@ -26,7 +26,7 @@ from astrapy.authentication import (
     TokenProvider,
 )
 from astrapy.constants import Environment
-from astrapy.exceptions import DataAPIException
+from astrapy.exceptions import DataAPIException, DataAPIResponseException
 from astrapy.info import (
     CollectionDefinition,
     CollectionLexicalOptions,
@@ -76,6 +76,9 @@ MAX_CONCURRENT_DOCUMENT_DELETIONS = 20
 # Amount of (max) number of documents for surveying a collection
 SURVEY_NUMBER_OF_DOCUMENTS = 15
 
+# Data API error code for 'collection exists and it's different'
+EXISTING_COLLECTION_ERROR_CODE = "EXISTING_COLLECTION_DIFFERENT_SETTINGS"
+
 logger = logging.getLogger()
 
 
@@ -95,7 +98,7 @@ class HybridSearchMode(Enum):
     OFF = 2
 
 
-def unpack_indexing_policy(
+def _unpack_indexing_policy(
     indexing_dict: dict[str, list[str]] | None,
 ) -> tuple[str | None, list[str] | None]:
     """{} or None => (None, None); {"a": "b"} => ("a", "b"); multikey => error."""
@@ -105,6 +108,12 @@ def unpack_indexing_policy(
             raise ValueError(msg)
         return next(iter(indexing_dict.items()))
     return None, None
+
+
+def _api_exception_error_codes(exc: DataAPIException) -> set[str | None]:
+    if isinstance(exc, DataAPIResponseException):
+        return {ed.error_code for ed in exc.error_descriptors}
+    return set()
 
 
 def _survey_collection(
@@ -268,7 +277,7 @@ class _AstraDBEnvironment:
 
 
 class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
-    def __init__(
+    def __init__(  # noqa: C901
         self,
         collection_name: str,
         *,
@@ -355,7 +364,7 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
                 )
                 raise ValueError(msg)
             try:
-                _idx_mode, _idx_target = unpack_indexing_policy(
+                _idx_mode, _idx_target = _unpack_indexing_policy(
                     requested_indexing_policy,
                 )
 
@@ -378,33 +387,38 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
                 )
             except DataAPIException as data_api_exception:
                 # possibly the collection is preexisting and may have legacy,
-                # or custom, indexing settings: verify
-                collection_descriptors = list(self.database.list_collections())
-                try:
-                    if not self._validate_indexing_policy(
-                        collection_descriptors=collection_descriptors,
-                        collection_name=self.collection_name,
-                        requested_indexing_policy=requested_indexing_policy,
-                        default_indexing_policy=default_indexing_policy,
-                    ):
-                        # other reasons for the exception
-                        warnings.warn(
-                            (
-                                f"Astra DB collection '{self.collection_name}' was "
-                                "found to be configured differently than requested "
-                                "by the vector store creation. This is resulting in "
-                                "a hard exception from the Data API. Please see "
-                                "https://github.com/langchain-ai/langchain-datastax"
-                                "/blob/main/libs/astradb/README.md#collection-defaults"
-                                "-mismatch for more context about this issue and "
-                                "possible mitigations."
-                            ),
-                            UserWarning,
-                            stacklevel=2,
-                        )
-                        raise data_api_exception  # noqa: TRY201
-                except ValueError as validation_error:
-                    raise validation_error from data_api_exception
+                # or custom, indexing settings: verify if it's that error,
+                # and if so check for index mismatches - to raise the right error.
+                data_api_error_codes = _api_exception_error_codes(data_api_exception)
+                if EXISTING_COLLECTION_ERROR_CODE in data_api_error_codes:
+                    collection_descriptors = list(self.database.list_collections())
+                    try:
+                        if not self._validate_indexing_policy(
+                            collection_descriptors=collection_descriptors,
+                            collection_name=self.collection_name,
+                            requested_indexing_policy=requested_indexing_policy,
+                            default_indexing_policy=default_indexing_policy,
+                        ):
+                            # mismatch is not due to indexing
+                            warnings.warn(
+                                (
+                                    f"Astra DB collection '{self.collection_name}' was "
+                                    "found to be configured differently than requested "
+                                    "by the vector store creation. This is resulting "
+                                    "in a hard exception from the Data API. Please see "
+                                    "https://github.com/langchain-ai/langchain-datastax"
+                                    "/blob/main/libs/astradb/README.md#collection-"
+                                    "defaults-mismatch for more context about this "
+                                    "issue and possible mitigations."
+                                ),
+                                UserWarning,
+                                stacklevel=2,
+                            )
+                            raise
+                    except ValueError as validation_error:
+                        raise validation_error from data_api_exception
+                else:
+                    raise
 
     def copy(
         self,
@@ -491,7 +505,7 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
             dimension = embedding_dimension
 
         try:
-            _idx_mode, _idx_target = unpack_indexing_policy(requested_indexing_policy)
+            _idx_mode, _idx_target = _unpack_indexing_policy(requested_indexing_policy)
             collection_definition = (
                 CollectionDefinition.builder()
                 .set_vector_dimension(dimension)
@@ -511,35 +525,40 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
             )
         except DataAPIException as data_api_exception:
             # possibly the collection is preexisting and may have legacy,
-            # or custom, indexing settings: verify
-            collection_descriptors = list(
-                await asyncio.to_thread(self.database.list_collections)
-            )
-            try:
-                if not self._validate_indexing_policy(
-                    collection_descriptors=collection_descriptors,
-                    collection_name=self.collection_name,
-                    requested_indexing_policy=requested_indexing_policy,
-                    default_indexing_policy=default_indexing_policy,
-                ):
-                    # other reasons for the exception
-                    warnings.warn(
-                        (
-                            f"Astra DB collection '{self.collection_name}' was "
-                            "found to be configured differently than requested "
-                            "by the vector store creation. This is resulting in "
-                            "a hard exception from the Data API. Please see "
-                            "https://github.com/langchain-ai/langchain-datastax"
-                            "/blob/main/libs/astradb/README.md#collection-defaults"
-                            "-mismatch for more context about this issue and "
-                            "possible mitigations."
-                        ),
-                        UserWarning,
-                        stacklevel=2,
-                    )
-                    raise data_api_exception  # noqa: TRY201
-            except ValueError as validation_error:
-                raise validation_error from data_api_exception
+            # or custom, indexing settings: verify if it's that error,
+            # and if so check for index mismatches - to raise the right error.
+            data_api_error_codes = _api_exception_error_codes(data_api_exception)
+            if EXISTING_COLLECTION_ERROR_CODE in data_api_error_codes:
+                collection_descriptors = list(
+                    await asyncio.to_thread(self.database.list_collections)
+                )
+                try:
+                    if not self._validate_indexing_policy(
+                        collection_descriptors=collection_descriptors,
+                        collection_name=self.collection_name,
+                        requested_indexing_policy=requested_indexing_policy,
+                        default_indexing_policy=default_indexing_policy,
+                    ):
+                        # mismatch is not due to indexing
+                        warnings.warn(
+                            (
+                                f"Astra DB collection '{self.collection_name}' was "
+                                "found to be configured differently than requested "
+                                "by the vector store creation. This is resulting "
+                                "in a hard exception from the Data API. Please see "
+                                "https://github.com/langchain-ai/langchain-datastax"
+                                "/blob/main/libs/astradb/README.md#collection-"
+                                "defaults-mismatch for more context about this "
+                                "issue and possible mitigations."
+                            ),
+                            UserWarning,
+                            stacklevel=2,
+                        )
+                        raise
+                except ValueError as validation_error:
+                    raise validation_error from data_api_exception
+            else:
+                raise
 
     @staticmethod
     def _validate_indexing_policy(

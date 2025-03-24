@@ -36,7 +36,7 @@ from astrapy.info import (
     VectorServiceOptions,
 )
 
-from langchain_astradb.utils.astradb import SetupMode, unpack_indexing_policy
+from langchain_astradb.utils.astradb import SetupMode, _unpack_indexing_policy
 from langchain_astradb.utils.vector_store_codecs import (
     STANDARD_INDEXING_OPTIONS_DEFAULT,
 )
@@ -220,7 +220,7 @@ def collection_d2(
             CollectionDefinition.builder()
             .set_vector_dimension(2)
             .set_vector_metric("euclidean")
-            .set_indexing(*unpack_indexing_policy(STANDARD_INDEXING_OPTIONS_DEFAULT))
+            .set_indexing(*_unpack_indexing_policy(STANDARD_INDEXING_OPTIONS_DEFAULT))
             .build()
         ),
     )
@@ -417,7 +417,7 @@ def collection_vz(
             CollectionDefinition.builder()
             .set_vector_dimension(1536)
             .set_vector_metric("euclidean")
-            .set_indexing(*unpack_indexing_policy(STANDARD_INDEXING_OPTIONS_DEFAULT))
+            .set_indexing(*_unpack_indexing_policy(STANDARD_INDEXING_OPTIONS_DEFAULT))
             .set_vector_service(OPENAI_VECTORIZE_OPTIONS_HEADER)
             .build()
         ),

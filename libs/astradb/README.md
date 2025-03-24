@@ -133,7 +133,7 @@ API command will effectively try to create a differently-configured object on DB
 
 Here are three suggested ways to remediate the problem:
 
-*Solution one* is to let the `AstraDBVectorStore` autodetect the configuration
+**Solution one** is to let the `AstraDBVectorStore` autodetect the configuration
 and behave accordingly in its data read/write operations. This assumes the collection
 already exists, and has the advantage that hybrid capabilities are picked up automatically:
 
@@ -147,7 +147,7 @@ vector_store = AstraDBVectorStore(
 )
 ```
 
-*Solution two* is to simply turn off the actual collection creation step with
+**Solution two** is to simply turn off the actual collection creation step with
 the `setup_mode` constructor parameter. The store
 behaviour is entirely dictated by the passed parameters, simply no attempt is made
 to create the collection on DB. This can work if you are sure that the collection
@@ -168,7 +168,7 @@ vector_store = AstraDBVectorStore(
 )
 ```
 
-*Solution three* is to specify your hybrid-related settings (reranker and lexical)
+**Solution three** is to specify your hybrid-related settings (reranker and lexical)
 for the store to exactly match what's on the database (including the case of turning these off):
 
 ```python
@@ -179,6 +179,7 @@ from astrapy.info import (
     VectorServiceOptions,
 )
 
+# hybrid-related capabilities explicitly ON
 vector_store = AstraDBVectorStore(
     collection_name="astra_existing_collection",
     api_endpoint=ASTRA_DB_API_ENDPOINT,
@@ -193,9 +194,8 @@ vector_store = AstraDBVectorStore(
     ),
     collection_reranking_api_key=...,  # if needed by the model/setup
 )
-```
 
-```python
+# hybrid-related capabilities explicitly OFF
 vector_store = AstraDBVectorStore(
     collection_name="astra_existing_collection",
     api_endpoint=ASTRA_DB_API_ENDPOINT,
