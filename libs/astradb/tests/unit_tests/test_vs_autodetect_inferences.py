@@ -102,6 +102,16 @@ DOC_CF_TEST_PARAMS = [
     pytest.param(DOCUMENT_WITH_UNKNOWN_CF, None, id="unknown-cf"),
     pytest.param({"x": "LL", "_id": "a"}, "x", id="only-x"),
     pytest.param({"x": 1234, "_id": "a"}, None, id="x-is-number"),
+    pytest.param(
+        {"$lexical": "thelexical", "bla": "abc", "_id": "a"},
+        "bla",
+        id="prefer-nonlexical",
+    ),
+    pytest.param(
+        {"$lexical": "lex", "size": 123, "_id": "a"},
+        "$lexical",
+        id="pick-lexical",
+    ),
     pytest.param({"_id": "a"}, None, id="no-fields"),
 ]
 

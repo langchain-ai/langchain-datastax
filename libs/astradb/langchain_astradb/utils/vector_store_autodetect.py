@@ -59,12 +59,19 @@ def _detect_documents_flatness(documents: list[dict[str, Any]]) -> bool:
 
 
 def _detect_document_content_field(document: dict[str, Any]) -> str | None:
-    """Try to guess the content field by inspecting the passed document."""
+    """Try to guess the content field by inspecting the passed document.
+
+    Prefer other fields than $lexical if available.
+    """
     strlen_map = {
         k: len(v) for k, v in document.items() if k != "_id" if isinstance(v, str)
     }
     if not strlen_map:
         return None
+
+    preferred_strlen_map = {k: v for k, v in strlen_map.items() if k != "$lexical"}
+    if preferred_strlen_map:
+        return max(preferred_strlen_map.items(), key=itemgetter(1))[0]
     return max(strlen_map.items(), key=itemgetter(1))[0]
 
 

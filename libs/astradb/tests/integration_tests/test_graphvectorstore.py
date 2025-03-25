@@ -340,7 +340,6 @@ def assert_all_flat_docs(collection: Collection, is_vectorize: bool) -> None:  #
     not astra_db_env_vars_available(), reason="Missing Astra DB env. vars"
 )
 class TestAstraDBGraphVectorStore:
-    # TODO: restore autodetect_populated_graph_vector_store_vz when true lexical
     @pytest.mark.parametrize(
         ("store_name", "is_autodetected", "is_vectorize"),
         [
@@ -371,7 +370,11 @@ class TestAstraDBGraphVectorStore:
 
         ss_response = g_store.similarity_search(query=query, k=2)
         ss_labels = [doc.metadata["label"] for doc in ss_response]
-        assert ss_labels == ["AR", "A0"]
+        if g_store.vector_store.hybrid_search:
+            # cannot expect exact vector-dictated sequence, there is reranking
+            assert set(ss_labels) == {"AR", "A0"}
+        else:
+            assert ss_labels == ["AR", "A0"]
 
         if is_vectorize:
             with pytest.raises(
@@ -390,7 +393,6 @@ class TestAstraDBGraphVectorStore:
                 g_store.vector_store.astra_env.collection, is_vectorize=is_vectorize
             )
 
-    # TODO: restore autodetect_populated_graph_vector_store_vz when true lexical
     @pytest.mark.parametrize(
         ("store_name", "is_autodetected", "is_vectorize"),
         [
@@ -423,7 +425,11 @@ class TestAstraDBGraphVectorStore:
 
         ss_response = await g_store.asimilarity_search(query=query, k=2)
         ss_labels = [doc.metadata["label"] for doc in ss_response]
-        assert ss_labels == ["AR", "A0"]
+        if g_store.vector_store.hybrid_search:
+            # cannot expect exact vector-dictated sequence, there is reranking
+            assert set(ss_labels) == {"AR", "A0"}
+        else:
+            assert ss_labels == ["AR", "A0"]
 
         if is_vectorize:
             with pytest.raises(
@@ -444,7 +450,6 @@ class TestAstraDBGraphVectorStore:
                 is_vectorize=is_vectorize,
             )
 
-    # TODO: restore autodetect_populated_graph_vector_store_vz when true lexical
     @pytest.mark.parametrize(
         ("store_name", "is_autodetected", "is_vectorize"),
         [
@@ -484,7 +489,6 @@ class TestAstraDBGraphVectorStore:
                 g_store.vector_store.astra_env.collection, is_vectorize=is_vectorize
             )
 
-    # TODO: restore autodetect_populated_graph_vector_store_vz when true lexical
     @pytest.mark.parametrize(
         ("store_name", "is_autodetected", "is_vectorize"),
         [

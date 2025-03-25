@@ -29,8 +29,6 @@ if TYPE_CHECKING:
 
 COLLECTION_NAME_VECTORIZE = "lc_vstore_hybrid_vectorize"
 QUERY_TEXT = "need a number?"
-# TODO: remove this value. Temporary as long as the API cannot tolerate omitted hybLim's
-SUPPLIED_HYBRIDLIMITFACTOR = 1.0
 
 
 @pytest.fixture
@@ -100,7 +98,6 @@ class TestAstraDBVectorStoreHybrid:
                 collection_rerank=NVIDIA_RERANKING_OPTIONS_HEADER,
                 collection_reranking_api_key=nvidia_reranking_api_key,
                 collection_lexical=LEXICAL_OPTIONS,
-                hybrid_limit_factor=SUPPLIED_HYBRIDLIMITFACTOR,
             )
             # verify it would run hybrid
             assert store0.hybrid_search
@@ -143,7 +140,6 @@ class TestAstraDBVectorStoreHybrid:
                 collection_rerank=NVIDIA_RERANKING_OPTIONS_HEADER,
                 collection_reranking_api_key=nvidia_reranking_api_key,
                 collection_lexical=LEXICAL_OPTIONS,
-                hybrid_limit_factor=SUPPLIED_HYBRIDLIMITFACTOR,
             )
             assert store1.hybrid_search
             hits_triples = store1.similarity_search_with_score_id(QUERY_TEXT, k=2)
@@ -165,7 +161,6 @@ class TestAstraDBVectorStoreHybrid:
                 collection_embedding_api_key=openai_api_key,
                 collection_reranking_api_key=nvidia_reranking_api_key,
                 autodetect_collection=True,
-                hybrid_limit_factor=SUPPLIED_HYBRIDLIMITFACTOR,
             )
             # check it runs hybrid search
             assert store2_ad.hybrid_search
@@ -233,7 +228,6 @@ class TestAstraDBVectorStoreHybrid:
                 collection_reranking_api_key=nvidia_reranking_api_key,
                 collection_lexical=LEXICAL_OPTIONS,
                 hybrid_search=HybridSearchMode.OFF,
-                hybrid_limit_factor=SUPPLIED_HYBRIDLIMITFACTOR,
             )
             # check it's not doing hybrid
             assert not store4.hybrid_search
@@ -278,7 +272,6 @@ class TestAstraDBVectorStoreHybrid:
                 collection_embedding_api_key=openai_api_key,
                 collection_rerank=NVIDIA_RERANKING_OPTIONS_HEADER,
                 collection_lexical=LEXICAL_OPTIONS,
-                hybrid_limit_factor=SUPPLIED_HYBRIDLIMITFACTOR,
             )
             with pytest.raises(DataAPIResponseException):
                 store5.similarity_search(QUERY_TEXT)
@@ -292,7 +285,6 @@ class TestAstraDBVectorStoreHybrid:
                 environment=astra_db_credentials["environment"],
                 collection_embedding_api_key=openai_api_key,
                 autodetect_collection=True,
-                hybrid_limit_factor=SUPPLIED_HYBRIDLIMITFACTOR,
             )
             with pytest.raises(DataAPIResponseException):
                 store6_ad.similarity_search(QUERY_TEXT)
@@ -325,7 +317,6 @@ class TestAstraDBVectorStoreHybrid:
                 collection_rerank=NVIDIA_RERANKING_OPTIONS_HEADER,
                 collection_reranking_api_key=nvidia_reranking_api_key,
                 collection_lexical=LEXICAL_OPTIONS,
-                hybrid_limit_factor=SUPPLIED_HYBRIDLIMITFACTOR,
             )
             # verify it would run hybrid
             assert store0.hybrid_search
@@ -373,7 +364,6 @@ class TestAstraDBVectorStoreHybrid:
                 collection_rerank=NVIDIA_RERANKING_OPTIONS_HEADER,
                 collection_reranking_api_key=nvidia_reranking_api_key,
                 collection_lexical=LEXICAL_OPTIONS,
-                hybrid_limit_factor=SUPPLIED_HYBRIDLIMITFACTOR,
             )
             assert store1.hybrid_search
             hits_triples = await store1.asimilarity_search_with_score_id(
@@ -401,7 +391,6 @@ class TestAstraDBVectorStoreHybrid:
                 collection_reranking_api_key=nvidia_reranking_api_key,
                 collection_lexical=LEXICAL_OPTIONS,
                 hybrid_search=HybridSearchMode.OFF,
-                hybrid_limit_factor=SUPPLIED_HYBRIDLIMITFACTOR,
             )
             # check it's not doing hybrid
             assert not store4.hybrid_search
@@ -451,7 +440,6 @@ class TestAstraDBVectorStoreHybrid:
                 collection_embedding_api_key=openai_api_key,
                 collection_rerank=NVIDIA_RERANKING_OPTIONS_HEADER,
                 collection_lexical=LEXICAL_OPTIONS,
-                hybrid_limit_factor=SUPPLIED_HYBRIDLIMITFACTOR,
             )
             with pytest.raises(DataAPIResponseException):
                 await store5.asimilarity_search(QUERY_TEXT)
