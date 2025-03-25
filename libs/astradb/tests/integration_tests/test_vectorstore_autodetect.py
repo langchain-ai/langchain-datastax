@@ -504,6 +504,11 @@ class TestAstraDBVectorStoreAutodetect:
             }
         )
 
+        # if doing hybrid, there's no easy way to generate a malformed document that
+        # could get picked up by the findAndRerank. Give up with the test in that case:
+        if ad_store_w.hybrid_search:
+            pytest.skip("Vector store runs hybrid search, cannot run this test.")
+
         with pytest.raises(KeyError):
             ad_store_e.similarity_search("[7,8]", k=3)
 
