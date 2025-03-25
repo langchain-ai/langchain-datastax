@@ -347,13 +347,13 @@ class TestAstraDBGraphVectorStore:
             ("populated_graph_vector_store_d2", False, False),
             ("autodetect_populated_graph_vector_store_d2", True, False),
             ("populated_graph_vector_store_vz", False, True),
-            # ("autodetect_populated_graph_vector_store_vz", True, True),
+            ("autodetect_populated_graph_vector_store_vz", True, True),
         ],
         ids=[
             "native_store_d2",
             "autodetected_store_d2",
             "native_store_vz",
-            # "autodetected_store_vz",
+            "autodetected_store_vz",
         ],
     )
     def test_gvs_similarity_search_sync(
@@ -397,13 +397,13 @@ class TestAstraDBGraphVectorStore:
             ("populated_graph_vector_store_d2", False, False),
             ("autodetect_populated_graph_vector_store_d2", True, False),
             ("populated_graph_vector_store_vz", False, True),
-            # ("autodetect_populated_graph_vector_store_vz", True, True),
+            ("autodetect_populated_graph_vector_store_vz", True, True),
         ],
         ids=[
             "native_store_d2",
             "autodetected_store_d2",
             "native_store_vz",
-            # "autodetected_store_vz",
+            "autodetected_store_vz",
         ],
     )
     async def test_gvs_similarity_search_async(
@@ -451,13 +451,13 @@ class TestAstraDBGraphVectorStore:
             ("populated_graph_vector_store_d2", False, False),
             ("autodetect_populated_graph_vector_store_d2", True, False),
             ("populated_graph_vector_store_vz", False, True),
-            # ("autodetect_populated_graph_vector_store_vz", True, True),
+            ("autodetect_populated_graph_vector_store_vz", True, True),
         ],
         ids=[
             "native_store_d2",
             "autodetected_store_d2",
             "native_store_vz",
-            # "autodetected_store_vz",
+            "autodetected_store_vz",
         ],
     )
     def test_gvs_traversal_search_sync(
@@ -491,13 +491,13 @@ class TestAstraDBGraphVectorStore:
             ("populated_graph_vector_store_d2", False, False),
             ("autodetect_populated_graph_vector_store_d2", True, False),
             ("populated_graph_vector_store_vz", False, True),
-            # ("autodetect_populated_graph_vector_store_vz", True, True),
+            ("autodetect_populated_graph_vector_store_vz", True, True),
         ],
         ids=[
             "native_store_d2",
             "autodetected_store_d2",
             "native_store_vz",
-            # "autodetected_store_vz",
+            "autodetected_store_vz",
         ],
     )
     async def test_gvs_traversal_search_async(

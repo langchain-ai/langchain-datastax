@@ -111,6 +111,7 @@ class TestAstraDBVectorStoreAutodetect:
     def test_autodetect_flat_novectorize_crud(
         self,
         astra_db_credentials: AstraDBCredentials,
+        nvidia_reranking_api_key: str,
         empty_collection_idxall_d2: Collection,
         embedding_d2: Embeddings,
     ) -> None:
@@ -148,6 +149,7 @@ class TestAstraDBVectorStoreAutodetect:
             namespace=astra_db_credentials["namespace"],
             environment=astra_db_credentials["environment"],
             autodetect_collection=True,
+            collection_reranking_api_key=nvidia_reranking_api_key,
         )
 
         # ANN and the metadata
@@ -198,6 +200,7 @@ class TestAstraDBVectorStoreAutodetect:
         self,
         astra_db_credentials: AstraDBCredentials,
         embedding_d2: Embeddings,
+        nvidia_reranking_api_key: str,
         vector_store_idxall_d2: AstraDBVectorStore,
     ) -> None:
         """Test autodetect on a VS-made collection, checking all codecs."""
@@ -227,6 +230,7 @@ class TestAstraDBVectorStoreAutodetect:
             namespace=astra_db_credentials["namespace"],
             environment=astra_db_credentials["environment"],
             autodetect_collection=True,
+            collection_reranking_api_key=nvidia_reranking_api_key,
         )
 
         # ANN and the metadata
@@ -446,6 +450,7 @@ class TestAstraDBVectorStoreAutodetect:
     def test_failed_docs_autodetect_flat_novectorize_crud(
         self,
         astra_db_credentials: AstraDBCredentials,
+        nvidia_reranking_api_key: str,
         empty_collection_idxall_d2: Collection,
         embedding_d2: Embeddings,
     ) -> None:
@@ -470,6 +475,7 @@ class TestAstraDBVectorStoreAutodetect:
             environment=astra_db_credentials["environment"],
             autodetect_collection=True,
             ignore_invalid_documents=False,
+            collection_reranking_api_key=nvidia_reranking_api_key,
         )
         ad_store_w = AstraDBVectorStore(
             collection_name=empty_collection_idxall_d2.name,
@@ -480,6 +486,7 @@ class TestAstraDBVectorStoreAutodetect:
             environment=astra_db_credentials["environment"],
             autodetect_collection=True,
             ignore_invalid_documents=True,
+            collection_reranking_api_key=nvidia_reranking_api_key,
         )
 
         results_e = ad_store_e.similarity_search("[-1,-1]", k=3)

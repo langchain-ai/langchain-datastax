@@ -2474,12 +2474,14 @@ class AstraDBVectorStore(VectorStore):
 
         if self.hybrid_search:
             rerank_on = self.document_codec.rerank_on
+            rerank_query: str | None
             if self.document_codec.server_side_embeddings:
                 sort = self.document_codec.encode_hybrid_sort(
                     vector=None,
                     vectorize=query,
                     lexical=query,
                 )
+                rerank_query = None
             else:
                 embedding_vector = self._get_safe_embedding().embed_query(query)
                 sort = self.document_codec.encode_hybrid_sort(
@@ -2487,12 +2489,14 @@ class AstraDBVectorStore(VectorStore):
                     vectorize=None,
                     lexical=query,
                 )
+                rerank_query = query
 
             return self._hybrid_search_with_score_id_by_sort(
                 sort=sort,
                 k=k,
                 filter=filter,
                 rerank_on=rerank_on,
+                rerank_query=rerank_query,
             )
 
         if self.document_codec.server_side_embeddings:
@@ -2614,6 +2618,7 @@ class AstraDBVectorStore(VectorStore):
         k: int,
         filter: dict[str, Any] | None,  # noqa: A002
         rerank_on: str | None,
+        rerank_query: str | None,
     ) -> list[tuple[Document, float, str]]:
         """Run a hybrid search with a provided sort clause."""
         self.astra_env.ensure_db_setup()
@@ -2627,6 +2632,7 @@ class AstraDBVectorStore(VectorStore):
             hybrid_limits=hybrid_limits,
             include_scores=True,
             rerank_on=rerank_on,
+            rerank_query=rerank_query,
         )
         return [
             cast(
@@ -2720,12 +2726,14 @@ class AstraDBVectorStore(VectorStore):
 
         if self.hybrid_search:
             rerank_on = self.document_codec.rerank_on
+            rerank_query: str | None
             if self.document_codec.server_side_embeddings:
                 sort = self.document_codec.encode_hybrid_sort(
                     vector=None,
                     vectorize=query,
                     lexical=query,
                 )
+                rerank_query = None
             else:
                 embedding_vector = await self._get_safe_embedding().aembed_query(query)
                 sort = self.document_codec.encode_hybrid_sort(
@@ -2733,12 +2741,14 @@ class AstraDBVectorStore(VectorStore):
                     vectorize=None,
                     lexical=query,
                 )
+                rerank_query = query
 
             return await self._ahybrid_search_with_score_id_by_sort(
                 sort=sort,
                 k=k,
                 filter=filter,
                 rerank_on=rerank_on,
+                rerank_query=rerank_query,
             )
 
         if self.document_codec.server_side_embeddings:
@@ -2860,6 +2870,7 @@ class AstraDBVectorStore(VectorStore):
         k: int,
         filter: dict[str, Any] | None,  # noqa: A002
         rerank_on: str | None,
+        rerank_query: str | None,
     ) -> list[tuple[Document, float, str]]:
         """Run a hybrid search with a provided sort clause."""
         await self.astra_env.aensure_db_setup()
@@ -2873,6 +2884,7 @@ class AstraDBVectorStore(VectorStore):
             hybrid_limits=hybrid_limits,
             include_scores=True,
             rerank_on=rerank_on,
+            rerank_query=rerank_query,
         )
         return [
             cast(
