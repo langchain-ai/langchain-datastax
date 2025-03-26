@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 from astrapy.exceptions import DataAPIResponseException
+from astrapy.info import CollectionLexicalOptions, CollectionRerankOptions
 from langchain_core.documents import Document
 
 from langchain_astradb.utils.astradb import HybridSearchMode, SetupMode
@@ -32,6 +33,7 @@ if TYPE_CHECKING:
 
 COLLECTION_NAME_VECTORIZE = "lc_vstore_hybrid_vectorize"
 COLLECTION_NAME_NOVECTORIZE = "lc_vstore_hybrid_novectorize"
+COLLECTION_NAME_NOHYBRID_NOVECTORIZE = "lc_vstore_nohybrid_novectorize"
 QUERY_TEXT = "need a number?"
 QUERY_TEXT_NOVECTORIZE = "[1,0]"
 
@@ -862,3 +864,328 @@ class TestAstraDBVectorStoreHybrid:
                 await store5.asimilarity_search(QUERY_TEXT_NOVECTORIZE)
         finally:
             await database.to_async().drop_collection(COLLECTION_NAME_NOVECTORIZE)
+
+    def test_astradb_vectorstore_explicit_nohybrid_lifecycle_novectorize_sync(
+        self,
+        *,
+        astra_db_credentials: AstraDBCredentials,
+        database: Database,
+        embedding_d2: Embeddings,
+        documents_novectorize: list[Document],
+        documents2_novectorize: list[Document],
+    ) -> None:
+        # Hybrid search coll.config is explicit ==> run hyb search is automatic.
+        try:
+            # create vstore ( => actual collection creation)
+            store0 = AstraDBVectorStore(
+                collection_name=COLLECTION_NAME_NOHYBRID_NOVECTORIZE,
+                embedding=embedding_d2,
+                token=astra_db_credentials["token"],
+                api_endpoint=astra_db_credentials["api_endpoint"],
+                namespace=astra_db_credentials["namespace"],
+                environment=astra_db_credentials["environment"],
+                collection_rerank=CollectionRerankOptions(enabled=False),
+                collection_lexical=CollectionLexicalOptions(enabled=False),
+            )
+            # verify it would run hybrid
+            assert not store0.hybrid_search
+            # insert items, check they get $lexical on DB
+            store0.add_documents(documents_novectorize)
+            assert all(
+                "$lexical" not in doc
+                for doc in store0.astra_env.collection.find(
+                    limit=10, projection={"*": True}
+                )
+            )
+            # run a 'search' (trusting it to be hybrid), some checks on the results
+            hits_triples = store0.similarity_search_with_score_id(
+                QUERY_TEXT_NOVECTORIZE, k=2
+            )
+            assert len(hits_triples) == 2
+            rdoc, rscore, rid = hits_triples[0]
+            assert rdoc.page_content.startswith("[")
+            assert isinstance(rdoc.page_content, str)
+            assert rscore > -100
+            assert rscore < 100
+            assert isinstance(rid, str)
+
+            # another search with a metadata filter on top
+            hits_triples_b = store0.similarity_search_with_score_id(
+                QUERY_TEXT_NOVECTORIZE,
+                k=2,
+                filter={"tag": "01"},
+            )
+            assert len(hits_triples_b) == 1
+            assert hits_triples_b[0][0].page_content == "[1,1]"
+
+            # re-instantiate just like above, re-check
+            store1 = AstraDBVectorStore(
+                collection_name=COLLECTION_NAME_NOHYBRID_NOVECTORIZE,
+                embedding=embedding_d2,
+                token=astra_db_credentials["token"],
+                api_endpoint=astra_db_credentials["api_endpoint"],
+                namespace=astra_db_credentials["namespace"],
+                environment=astra_db_credentials["environment"],
+                collection_rerank=CollectionRerankOptions(enabled=False),
+                collection_lexical=CollectionLexicalOptions(enabled=False),
+            )
+            assert not store1.hybrid_search
+            hits_triples = store1.similarity_search_with_score_id(
+                QUERY_TEXT_NOVECTORIZE, k=2
+            )
+            assert len(hits_triples) == 2
+            rdoc, rscore, rid = hits_triples[0]
+            assert rdoc.page_content.startswith("[")
+            assert isinstance(rdoc.page_content, str)
+            assert rscore > -100
+            assert rscore < 100
+            assert isinstance(rid, str)
+
+            # autodetect instantiation (no other changes)
+            store2_ad = AstraDBVectorStore(
+                collection_name=COLLECTION_NAME_NOHYBRID_NOVECTORIZE,
+                embedding=embedding_d2,
+                token=astra_db_credentials["token"],
+                api_endpoint=astra_db_credentials["api_endpoint"],
+                namespace=astra_db_credentials["namespace"],
+                environment=astra_db_credentials["environment"],
+                autodetect_collection=True,
+            )
+            # check it runs hybrid search
+            assert not store2_ad.hybrid_search
+            # check the right codec is selected
+            assert isinstance(
+                store2_ad.document_codec,
+                _DefaultVSDocumentCodec,
+            )
+            assert not store2_ad.document_codec.ignore_invalid_documents
+            assert not store2_ad.document_codec.has_lexical
+            # run a 'search' (trusting it to be hybrid), some checks on the results
+            hits_triples = store2_ad.similarity_search_with_score_id(
+                QUERY_TEXT_NOVECTORIZE, k=2
+            )
+            assert len(hits_triples) == 2
+            rdoc, rscore, rid = hits_triples[0]
+            assert rdoc.page_content.startswith("[")
+            assert isinstance(rdoc.page_content, str)
+            assert rscore > -100
+            assert rscore < 100
+            assert isinstance(rid, str)
+            # run other search methods
+            store2_ad.similarity_search_by_vector([1, 2])
+            mmr_hits_docs = store2_ad.max_marginal_relevance_search(
+                query=QUERY_TEXT_NOVECTORIZE,
+                k=1,
+            )
+            assert len(mmr_hits_docs) == 1
+            mmr_doc = mmr_hits_docs[0]
+            assert mmr_doc.page_content.startswith("[")
+            assert isinstance(mmr_doc.page_content, str)
+            assert isinstance(mmr_doc.id, str)
+
+            # autodetect instantiation #2 (nondefault hybrid_limits)
+            store3_ad = AstraDBVectorStore(
+                collection_name=COLLECTION_NAME_NOHYBRID_NOVECTORIZE,
+                embedding=embedding_d2,
+                token=astra_db_credentials["token"],
+                api_endpoint=astra_db_credentials["api_endpoint"],
+                namespace=astra_db_credentials["namespace"],
+                environment=astra_db_credentials["environment"],
+                autodetect_collection=True,
+                hybrid_limit_factor=3.1415,
+            )
+            # run a 'search' (trusting it to be hybrid), some checks on the results
+            hits_triples = store3_ad.similarity_search_with_score_id(
+                QUERY_TEXT_NOVECTORIZE, k=2
+            )
+            assert len(hits_triples) == 2
+            rdoc, rscore, rid = hits_triples[0]
+            assert rdoc.page_content.startswith("[")
+            assert isinstance(rdoc.page_content, str)
+            assert rscore > -100
+            assert rscore < 100
+            assert isinstance(rid, str)
+
+            # instantiate explicitly, disabling hybrid in searching
+            store4 = AstraDBVectorStore(
+                collection_name=COLLECTION_NAME_NOHYBRID_NOVECTORIZE,
+                embedding=embedding_d2,
+                token=astra_db_credentials["token"],
+                api_endpoint=astra_db_credentials["api_endpoint"],
+                namespace=astra_db_credentials["namespace"],
+                environment=astra_db_credentials["environment"],
+                collection_rerank=CollectionRerankOptions(enabled=False),
+                collection_lexical=CollectionLexicalOptions(enabled=False),
+                hybrid_search=HybridSearchMode.OFF,
+            )
+            # check it's not doing hybrid
+            assert not store4.hybrid_search
+            # insert more documents, ensure writes respect $lexical nevertheless
+            store4.add_documents(documents2_novectorize)
+            assert all(
+                "$lexical" not in doc
+                for doc in store4.astra_env.collection.find(
+                    limit=10, projection={"*": True}
+                )
+            )
+            # run similarity search (expecting regular ANN to be done)
+            hits_triples = store4.similarity_search_with_score_id(
+                QUERY_TEXT_NOVECTORIZE, k=2
+            )
+            assert len(hits_triples) == 2
+            rdoc, rscore, rid = hits_triples[0]
+            assert rdoc.page_content.startswith("[")
+            assert isinstance(rdoc.page_content, str)
+            assert rscore > -100
+            assert rscore < 100
+            assert isinstance(rid, str)
+            # run other search methods
+            store4.similarity_search_by_vector([1, 2])
+            mmr_hits_docs = store4.max_marginal_relevance_search(
+                query=QUERY_TEXT_NOVECTORIZE,
+                k=1,
+            )
+            assert len(mmr_hits_docs) == 1
+            mmr_doc = mmr_hits_docs[0]
+            assert mmr_doc.page_content.startswith("[")
+            assert isinstance(mmr_doc.page_content, str)
+            assert isinstance(mmr_doc.id, str)
+
+        finally:
+            database.drop_collection(COLLECTION_NAME_NOHYBRID_NOVECTORIZE)
+
+    async def test_astradb_vectorstore_explicit_nohybrid_lifecycle_novectorize_async(
+        self,
+        *,
+        astra_db_credentials: AstraDBCredentials,
+        database: Database,
+        embedding_d2: Embeddings,
+        documents_novectorize: list[Document],
+        documents2_novectorize: list[Document],
+    ) -> None:
+        # Hybrid search coll.config is explicit ==> run hyb search is automatic.
+        try:
+            # create vstore ( => actual collection creation)
+            store0 = AstraDBVectorStore(
+                collection_name=COLLECTION_NAME_NOHYBRID_NOVECTORIZE,
+                embedding=embedding_d2,
+                token=astra_db_credentials["token"],
+                api_endpoint=astra_db_credentials["api_endpoint"],
+                namespace=astra_db_credentials["namespace"],
+                setup_mode=SetupMode.ASYNC,
+                environment=astra_db_credentials["environment"],
+                collection_rerank=CollectionRerankOptions(enabled=False),
+                collection_lexical=CollectionLexicalOptions(enabled=False),
+            )
+            # verify it would run hybrid
+            assert not store0.hybrid_search
+            # insert items, check they get $lexical on DB
+            await store0.aadd_documents(documents_novectorize)
+            assert all(
+                "$lexical" not in doc
+                for doc in (
+                    await store0.astra_env.async_collection.find(
+                        limit=10, projection={"*": True}
+                    ).to_list()
+                )
+            )
+            # run a 'search' (trusting it to be hybrid), some checks on the results
+            hits_triples = await store0.asimilarity_search_with_score_id(
+                QUERY_TEXT_NOVECTORIZE,
+                k=2,
+            )
+            assert len(hits_triples) == 2
+            rdoc, rscore, rid = hits_triples[0]
+            assert rdoc.page_content.startswith("[")
+            assert isinstance(rdoc.page_content, str)
+            assert rscore > -100
+            assert rscore < 100
+            assert isinstance(rid, str)
+
+            # another search with a metadata filter on top
+            hits_triples_b = await store0.asimilarity_search_with_score_id(
+                QUERY_TEXT_NOVECTORIZE,
+                k=2,
+                filter={"tag": "01"},
+            )
+            assert len(hits_triples_b) == 1
+            assert hits_triples_b[0][0].page_content == "[1,1]"
+
+            # re-instantiate just like above, re-check
+            store1 = AstraDBVectorStore(
+                collection_name=COLLECTION_NAME_NOHYBRID_NOVECTORIZE,
+                embedding=embedding_d2,
+                token=astra_db_credentials["token"],
+                api_endpoint=astra_db_credentials["api_endpoint"],
+                namespace=astra_db_credentials["namespace"],
+                setup_mode=SetupMode.ASYNC,
+                environment=astra_db_credentials["environment"],
+                collection_rerank=CollectionRerankOptions(enabled=False),
+                collection_lexical=CollectionLexicalOptions(enabled=False),
+            )
+            assert not store1.hybrid_search
+            hits_triples = await store1.asimilarity_search_with_score_id(
+                QUERY_TEXT_NOVECTORIZE,
+                k=2,
+            )
+            assert len(hits_triples) == 2
+            rdoc, rscore, rid = hits_triples[0]
+            assert rdoc.page_content.startswith("[")
+            assert isinstance(rdoc.page_content, str)
+            assert rscore > -100
+            assert rscore < 100
+            assert isinstance(rid, str)
+
+            # instantiate explicitly, disabling hybrid in searching
+            store4 = AstraDBVectorStore(
+                collection_name=COLLECTION_NAME_NOHYBRID_NOVECTORIZE,
+                embedding=embedding_d2,
+                token=astra_db_credentials["token"],
+                api_endpoint=astra_db_credentials["api_endpoint"],
+                namespace=astra_db_credentials["namespace"],
+                setup_mode=SetupMode.ASYNC,
+                environment=astra_db_credentials["environment"],
+                collection_rerank=CollectionRerankOptions(enabled=False),
+                collection_lexical=CollectionLexicalOptions(enabled=False),
+                hybrid_search=HybridSearchMode.OFF,
+            )
+            # check it's not doing hybrid
+            assert not store4.hybrid_search
+            # insert more documents, ensure writes respect $lexical nevertheless
+            await store4.aadd_documents(documents2_novectorize)
+            assert all(
+                "$lexical" not in doc
+                for doc in (
+                    await store4.astra_env.async_collection.find(
+                        limit=10, projection={"*": True}
+                    ).to_list()
+                )
+            )
+            # run similarity search (expecting regular ANN to be done)
+            hits_triples = await store4.asimilarity_search_with_score_id(
+                QUERY_TEXT_NOVECTORIZE,
+                k=2,
+            )
+            assert len(hits_triples) == 2
+            rdoc, rscore, rid = hits_triples[0]
+            assert rdoc.page_content.startswith("[")
+            assert isinstance(rdoc.page_content, str)
+            assert rscore > -100
+            assert rscore < 100
+            assert isinstance(rid, str)
+            # run other search methods
+            await store4.asimilarity_search_by_vector([1, 2])
+            mmr_hits_docs = await store4.amax_marginal_relevance_search(
+                query=QUERY_TEXT_NOVECTORIZE,
+                k=1,
+            )
+            assert len(mmr_hits_docs) == 1
+            mmr_doc = mmr_hits_docs[0]
+            assert mmr_doc.page_content.startswith("[")
+            assert isinstance(mmr_doc.page_content, str)
+            assert isinstance(mmr_doc.id, str)
+
+        finally:
+            await database.to_async().drop_collection(
+                COLLECTION_NAME_NOHYBRID_NOVECTORIZE
+            )

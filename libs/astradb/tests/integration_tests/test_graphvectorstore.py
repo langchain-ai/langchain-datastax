@@ -6,9 +6,9 @@ Refer to `test_vectorstores.py` for the requirements to run.
 from __future__ import annotations
 
 import asyncio
+import os
 from typing import TYPE_CHECKING, Any
 
-import os
 import pytest
 from astrapy.authentication import StaticTokenProvider
 from astrapy.info import CollectionDefinition
