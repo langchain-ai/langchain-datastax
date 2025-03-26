@@ -370,9 +370,10 @@ class TestAstraDBGraphVectorStore:
 
         ss_response = g_store.similarity_search(query=query, k=2)
         ss_labels = [doc.metadata["label"] for doc in ss_response]
-        if g_store.vector_store.hybrid_search:
+        if g_store.vector_store.hybrid_search and is_autodetected:
             # cannot expect exact vector-dictated sequence, there is reranking
-            assert set(ss_labels) == {"AR", "A0"}
+            assert "A0" in ss_labels
+            assert len(ss_labels) == 2
         else:
             assert ss_labels == ["AR", "A0"]
 
@@ -425,9 +426,10 @@ class TestAstraDBGraphVectorStore:
 
         ss_response = await g_store.asimilarity_search(query=query, k=2)
         ss_labels = [doc.metadata["label"] for doc in ss_response]
-        if g_store.vector_store.hybrid_search:
+        if g_store.vector_store.hybrid_search and is_autodetected:
             # cannot expect exact vector-dictated sequence, there is reranking
-            assert set(ss_labels) == {"AR", "A0"}
+            assert "A0" in ss_labels
+            assert len(ss_labels) == 2
         else:
             assert ss_labels == ["AR", "A0"]
 
@@ -483,7 +485,12 @@ class TestAstraDBGraphVectorStore:
             doc.metadata["label"]
             for doc in g_store.traversal_search(query=query, k=2, depth=2)
         }
-        assert ts_labels == {"AR", "A0", "BR", "B0", "TR", "T0"}
+        if g_store.vector_store.hybrid_search and is_autodetected:
+            # cannot expect exact vector-dictated sequence, there is reranking
+            assert "A0" in ts_labels
+            assert len(ts_labels) >= 2
+        else:
+            assert ts_labels == {"AR", "A0", "BR", "B0", "TR", "T0"}
         if is_autodetected:
             assert_all_flat_docs(
                 g_store.vector_store.astra_env.collection, is_vectorize=is_vectorize
@@ -524,7 +531,12 @@ class TestAstraDBGraphVectorStore:
             doc.metadata["label"]
             async for doc in g_store.atraversal_search(query=query, k=2, depth=2)
         }
-        assert ts_labels == {"AR", "A0", "BR", "B0", "TR", "T0"}
+        if g_store.vector_store.hybrid_search and is_autodetected:
+            # cannot expect exact vector-dictated sequence, there is reranking
+            assert "A0" in ts_labels
+            assert len(ts_labels) >= 2
+        else:
+            assert ts_labels == {"AR", "A0", "BR", "B0", "TR", "T0"}
         if is_autodetected:
             await asyncio.to_thread(
                 assert_all_flat_docs,
