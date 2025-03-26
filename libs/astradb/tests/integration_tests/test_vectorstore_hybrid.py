@@ -118,7 +118,7 @@ class TestAstraDBVectorStoreHybrid:
         astra_db_credentials: AstraDBCredentials,
         database: Database,
         openai_api_key: str,
-        nvidia_reranking_api_key: str,
+        nvidia_reranking_api_key: str | None,
         documents: list[Document],
         documents2: list[Document],
     ) -> None:
@@ -299,7 +299,7 @@ class TestAstraDBVectorStoreHybrid:
             assert isinstance(mmr_doc.page_content, str)
             assert isinstance(mmr_doc.id, str)
 
-            # regular instantiation, no rerank api key -> error on search
+            # regular instantiation, wrong rerank api key -> error on search
             store5 = AstraDBVectorStore(
                 collection_name=COLLECTION_NAME_VECTORIZE,
                 token=astra_db_credentials["token"],
@@ -309,12 +309,13 @@ class TestAstraDBVectorStoreHybrid:
                 collection_vector_service_options=OPENAI_VECTORIZE_OPTIONS_HEADER,
                 collection_embedding_api_key=openai_api_key,
                 collection_rerank=NVIDIA_RERANKING_OPTIONS_HEADER,
+                collection_reranking_api_key="bababa-wrong",
                 collection_lexical=LEXICAL_OPTIONS,
             )
             with pytest.raises(DataAPIResponseException):
                 store5.similarity_search(QUERY_TEXT)
 
-            # autodetect instantiation, no rerank api key -> error on search
+            # autodetect instantiation, wrong rerank api key -> error on search
             store6_ad = AstraDBVectorStore(
                 collection_name=COLLECTION_NAME_VECTORIZE,
                 token=astra_db_credentials["token"],
@@ -322,6 +323,7 @@ class TestAstraDBVectorStoreHybrid:
                 namespace=astra_db_credentials["namespace"],
                 environment=astra_db_credentials["environment"],
                 collection_embedding_api_key=openai_api_key,
+                collection_reranking_api_key="bababa-wrong",
                 autodetect_collection=True,
             )
             with pytest.raises(DataAPIResponseException):
@@ -335,7 +337,7 @@ class TestAstraDBVectorStoreHybrid:
         astra_db_credentials: AstraDBCredentials,
         database: Database,
         openai_api_key: str,
-        nvidia_reranking_api_key: str,
+        nvidia_reranking_api_key: str | None,
         documents: list[Document],
         documents2: list[Document],
     ) -> None:
@@ -465,7 +467,7 @@ class TestAstraDBVectorStoreHybrid:
             assert isinstance(mmr_doc.page_content, str)
             assert isinstance(mmr_doc.id, str)
 
-            # regular instantiation, no rerank api key -> error on search
+            # regular instantiation, wrong rerank api key -> error on search
             store5 = AstraDBVectorStore(
                 collection_name=COLLECTION_NAME_VECTORIZE,
                 token=astra_db_credentials["token"],
@@ -477,6 +479,7 @@ class TestAstraDBVectorStoreHybrid:
                 collection_embedding_api_key=openai_api_key,
                 collection_rerank=NVIDIA_RERANKING_OPTIONS_HEADER,
                 collection_lexical=LEXICAL_OPTIONS,
+                collection_reranking_api_key="bababa-wrong",
             )
             with pytest.raises(DataAPIResponseException):
                 await store5.asimilarity_search(QUERY_TEXT)
@@ -490,7 +493,7 @@ class TestAstraDBVectorStoreHybrid:
         astra_db_credentials: AstraDBCredentials,
         database: Database,
         embedding_d2: Embeddings,
-        nvidia_reranking_api_key: str,
+        nvidia_reranking_api_key: str | None,
         documents_novectorize: list[Document],
         documents2_novectorize: list[Document],
     ) -> None:
@@ -676,7 +679,7 @@ class TestAstraDBVectorStoreHybrid:
             assert isinstance(mmr_doc.page_content, str)
             assert isinstance(mmr_doc.id, str)
 
-            # regular instantiation, no rerank api key -> error on search
+            # regular instantiation, wrong rerank api key -> error on search
             store5 = AstraDBVectorStore(
                 collection_name=COLLECTION_NAME_NOVECTORIZE,
                 embedding=embedding_d2,
@@ -686,11 +689,12 @@ class TestAstraDBVectorStoreHybrid:
                 environment=astra_db_credentials["environment"],
                 collection_rerank=NVIDIA_RERANKING_OPTIONS_HEADER,
                 collection_lexical=LEXICAL_OPTIONS,
+                collection_reranking_api_key="bababa-wrong",
             )
             with pytest.raises(DataAPIResponseException):
                 store5.similarity_search(QUERY_TEXT_NOVECTORIZE)
 
-            # autodetect instantiation, no rerank api key -> error on search
+            # autodetect instantiation, wrong rerank api key -> error on search
             store6_ad = AstraDBVectorStore(
                 collection_name=COLLECTION_NAME_NOVECTORIZE,
                 embedding=embedding_d2,
@@ -699,6 +703,7 @@ class TestAstraDBVectorStoreHybrid:
                 namespace=astra_db_credentials["namespace"],
                 environment=astra_db_credentials["environment"],
                 autodetect_collection=True,
+                collection_reranking_api_key="bababa-wrong",
             )
             with pytest.raises(DataAPIResponseException):
                 store6_ad.similarity_search(QUERY_TEXT_NOVECTORIZE)
@@ -711,7 +716,7 @@ class TestAstraDBVectorStoreHybrid:
         astra_db_credentials: AstraDBCredentials,
         database: Database,
         embedding_d2: Embeddings,
-        nvidia_reranking_api_key: str,
+        nvidia_reranking_api_key: str | None,
         documents_novectorize: list[Document],
         documents2_novectorize: list[Document],
     ) -> None:
@@ -840,7 +845,7 @@ class TestAstraDBVectorStoreHybrid:
             assert isinstance(mmr_doc.page_content, str)
             assert isinstance(mmr_doc.id, str)
 
-            # regular instantiation, no rerank api key -> error on search
+            # regular instantiation, wrong rerank api key -> error on search
             store5 = AstraDBVectorStore(
                 collection_name=COLLECTION_NAME_NOVECTORIZE,
                 embedding=embedding_d2,
@@ -851,6 +856,7 @@ class TestAstraDBVectorStoreHybrid:
                 environment=astra_db_credentials["environment"],
                 collection_rerank=NVIDIA_RERANKING_OPTIONS_HEADER,
                 collection_lexical=LEXICAL_OPTIONS,
+                collection_reranking_api_key="bababa-wrong",
             )
             with pytest.raises(DataAPIResponseException):
                 await store5.asimilarity_search(QUERY_TEXT_NOVECTORIZE)

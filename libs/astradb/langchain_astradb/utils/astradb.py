@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING, Any, Awaitable
 import langchain_core
 from astrapy import AsyncDatabase, DataAPIClient, Database
 from astrapy.admin import parse_api_endpoint
-from astrapy.api_options import APIOptions, SerdesOptions
+from astrapy.api_options import APIOptions, SerdesOptions, TimeoutOptions
 from astrapy.authentication import (
     EmbeddingAPIKeyHeaderProvider,
     EmbeddingHeadersProvider,
@@ -72,6 +72,9 @@ MAX_CONCURRENT_DOCUMENT_INSERTIONS = 20
 MAX_CONCURRENT_DOCUMENT_REPLACEMENTS = 20
 # Thread/coroutine count for one-doc-at-a-time deletes:
 MAX_CONCURRENT_DOCUMENT_DELETIONS = 20
+
+# Hardcoded here for the time being
+ASTRA_DB_REQUEST_TIMEOUT_MS = 30000
 
 # Amount of (max) number of documents for surveying a collection
 SURVEY_NUMBER_OF_DOCUMENTS = 15
@@ -265,6 +268,9 @@ class _AstraDBEnvironment:
             api_options=APIOptions(
                 callers=self.full_callers,
                 serdes_options=SerdesOptions(custom_datatypes_in_reading=False),
+                timeout_options=TimeoutOptions(
+                    request_timeout_ms=ASTRA_DB_REQUEST_TIMEOUT_MS
+                ),
             ),
         )
 

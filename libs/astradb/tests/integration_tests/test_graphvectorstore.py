@@ -170,7 +170,7 @@ def auth_kwargs(
 @pytest.fixture
 def graph_vector_store_d2(
     auth_kwargs: dict[str, Any],
-    nvidia_reranking_api_key: str,
+    nvidia_reranking_api_key: str | None,
     empty_collection_d2: Collection,
     embedding_d2: Embeddings,
 ) -> AstraDBGraphVectorStore:
@@ -187,7 +187,7 @@ def graph_vector_store_d2(
 def graph_vector_store_vz(
     auth_kwargs: dict[str, Any],
     openai_api_key: str,
-    nvidia_reranking_api_key: str,
+    nvidia_reranking_api_key: str | None,
     empty_collection_vz: Collection,
 ) -> AstraDBGraphVectorStore:
     return AstraDBGraphVectorStore(
@@ -225,7 +225,7 @@ def autodetect_populated_graph_vector_store_d2(
     embedding_d2: Embeddings,
     graph_vector_store_docs: list[Document],
     ephemeral_collection_cleaner_idxall_d2: str,
-    nvidia_reranking_api_key: str,
+    nvidia_reranking_api_key: str | None,
 ) -> AstraDBGraphVectorStore:
     """
     Pre-populate the collection and have (VectorStore)autodetect work on it,
@@ -280,7 +280,7 @@ def autodetect_populated_graph_vector_store_d2(
 def autodetect_populated_graph_vector_store_vz(
     auth_kwargs: dict[str, Any],
     openai_api_key: str,
-    nvidia_reranking_api_key: str,
+    nvidia_reranking_api_key: str | None,
     graph_vector_store_docs_vz: list[Document],
     empty_collection_idxall_vz: Collection,
 ) -> AstraDBGraphVectorStore:

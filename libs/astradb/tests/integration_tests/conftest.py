@@ -155,8 +155,8 @@ def openai_api_key() -> str:
 
 
 @pytest.fixture(scope="session")
-def nvidia_reranking_api_key() -> str:
-    return os.environ["HEADER_RERANKING_API_KEY_NVIDIA"]
+def nvidia_reranking_api_key() -> str | None:
+    return os.environ.get("HEADER_RERANKING_API_KEY_NVIDIA")
 
 
 @pytest.fixture(scope="session")

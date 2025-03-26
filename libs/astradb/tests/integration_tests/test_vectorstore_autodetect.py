@@ -15,6 +15,7 @@ from astrapy.info import (
     CollectionLexicalOptions,
     CollectionRerankOptions,
 )
+from astrapy.utils.unset import _UNSET
 from langchain_core.documents import Document
 
 from langchain_astradb.utils.vector_store_codecs import (
@@ -49,7 +50,7 @@ COLLECTION_NAME_FORCENOHYBRID_NOVECTORIZE = "lc_test_coll_nohyb_d2"
 @pytest.fixture
 def collection_forcehybrid_vectorize(
     openai_api_key: str,
-    nvidia_reranking_api_key: str,
+    nvidia_reranking_api_key: str | None,
     database: Database,
 ) -> Iterable[Collection]:
     """A general-purpose D=2(Euclidean) collection for per-test reuse."""
@@ -63,7 +64,7 @@ def collection_forcehybrid_vectorize(
             .build()
         ),
         embedding_api_key=openai_api_key,
-        reranking_api_key=nvidia_reranking_api_key,
+        reranking_api_key=nvidia_reranking_api_key or _UNSET,
     )
     yield collection
 
@@ -110,7 +111,7 @@ def empty_collection_forcenohybrid_vectorize(
 
 @pytest.fixture
 def collection_forcehybrid_novectorize(
-    nvidia_reranking_api_key: str,
+    nvidia_reranking_api_key: str | None,
     database: Database,
 ) -> Iterable[Collection]:
     """A general-purpose D=2(Euclidean) collection for per-test reuse."""
@@ -123,7 +124,7 @@ def collection_forcehybrid_novectorize(
             .set_rerank(NVIDIA_RERANKING_OPTIONS_HEADER)
             .build()
         ),
-        reranking_api_key=nvidia_reranking_api_key,
+        reranking_api_key=nvidia_reranking_api_key or _UNSET,
     )
     yield collection
 
@@ -173,7 +174,7 @@ class TestAstraDBVectorStoreAutodetect:
     def test_autodetect_flat_novectorize_crud(
         self,
         astra_db_credentials: AstraDBCredentials,
-        nvidia_reranking_api_key: str,
+        nvidia_reranking_api_key: str | None,
         empty_collection_idxall_d2: Collection,
         embedding_d2: Embeddings,
     ) -> None:
@@ -262,7 +263,7 @@ class TestAstraDBVectorStoreAutodetect:
         self,
         astra_db_credentials: AstraDBCredentials,
         embedding_d2: Embeddings,
-        nvidia_reranking_api_key: str,
+        nvidia_reranking_api_key: str | None,
         vector_store_idxall_d2: AstraDBVectorStore,
     ) -> None:
         """Test autodetect on a VS-made collection, checking all codecs."""
@@ -343,7 +344,7 @@ class TestAstraDBVectorStoreAutodetect:
         self,
         astra_db_credentials: AstraDBCredentials,
         openai_api_key: str,
-        nvidia_reranking_api_key: str,
+        nvidia_reranking_api_key: str | None,
         empty_collection_idxall_vz: Collection,
     ) -> None:
         """Test autodetect on a populated flat collection, checking all codecs."""
@@ -429,7 +430,7 @@ class TestAstraDBVectorStoreAutodetect:
         *,
         astra_db_credentials: AstraDBCredentials,
         openai_api_key: str,
-        nvidia_reranking_api_key: str,
+        nvidia_reranking_api_key: str | None,
         empty_collection_idxall_vz: Collection,
         vector_store_idxall_vz: AstraDBVectorStore,
     ) -> None:
@@ -510,7 +511,7 @@ class TestAstraDBVectorStoreAutodetect:
     def test_failed_docs_autodetect_flat_novectorize_crud(
         self,
         astra_db_credentials: AstraDBCredentials,
-        nvidia_reranking_api_key: str,
+        nvidia_reranking_api_key: str | None,
         empty_collection_idxall_d2: Collection,
         embedding_d2: Embeddings,
     ) -> None:
@@ -589,7 +590,7 @@ class TestAstraDBVectorStoreAutodetect:
         self,
         astra_db_credentials: AstraDBCredentials,
         openai_api_key: str,
-        nvidia_reranking_api_key: str,
+        nvidia_reranking_api_key: str | None,
         empty_collection_forcehybrid_vectorize: Collection,
     ) -> None:
         # populate (with/out $lexical, flat/nested) to then check autodetection result
@@ -747,7 +748,7 @@ class TestAstraDBVectorStoreAutodetect:
     def test_vectorstore_autodetect_hybrid_prepopulated_novectorize(
         self,
         astra_db_credentials: AstraDBCredentials,
-        nvidia_reranking_api_key: str,
+        nvidia_reranking_api_key: str | None,
         empty_collection_forcehybrid_novectorize: Collection,
         embedding_d2: Embeddings,
     ) -> None:
