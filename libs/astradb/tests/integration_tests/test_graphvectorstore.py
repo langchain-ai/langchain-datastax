@@ -8,6 +8,7 @@ from __future__ import annotations
 import asyncio
 from typing import TYPE_CHECKING, Any
 
+import os
 import pytest
 from astrapy.authentication import StaticTokenProvider
 from astrapy.info import CollectionDefinition
@@ -338,6 +339,10 @@ def assert_all_flat_docs(collection: Collection, is_vectorize: bool) -> None:  #
 
 @pytest.mark.skipif(
     not astra_db_env_vars_available(), reason="Missing Astra DB env. vars"
+)
+@pytest.mark.skipif(
+    "LANGCHAIN_TEST_ASTRADBGRAPHVECTORSTORE" not in os.environ,
+    reason="AstraDBGraphVectorStore tests omitted by default",
 )
 class TestAstraDBGraphVectorStore:
     @pytest.mark.parametrize(

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+import os
 import pytest
 from astrapy.authentication import StaticTokenProvider
 from langchain_core.documents import Document
@@ -43,6 +44,10 @@ def _vs_indexing_policy(collection_name: str) -> dict[str, Any] | None:
 
 @pytest.mark.skipif(
     not astra_db_env_vars_available(), reason="Missing Astra DB env. vars"
+)
+@pytest.mark.skipif(
+    "LANGCHAIN_TEST_ASTRADBGRAPHVECTORSTORE" not in os.environ,
+    reason="AstraDBGraphVectorStore tests omitted by default",
 )
 class TestUpgradeToGraphVectorStore:
     @pytest.mark.usefixtures("ephemeral_indexing_collections_cleaner")
