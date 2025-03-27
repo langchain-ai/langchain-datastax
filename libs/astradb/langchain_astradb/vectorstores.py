@@ -3037,36 +3037,6 @@ class AstraDBVectorStore(VectorStore):
             sort=sort, k=k, filter=filter
         )
 
-    async def _asimilarity_find_with_embedding_by_sort(
-        self,
-        sort: dict[str, Any],
-        k: int = 4,
-        filter: dict[str, Any] | None = None,  # noqa: A002
-    ) -> tuple[list[float], list[tuple[Document, list[float]]]]:
-        """Run ANN search with a provided sort clause.
-
-        Returns:
-            (query_embedding, List of (Document, embedding) most similar to the query).
-        """
-        sort_vec, hits_ite = await self.arun_query(
-            n=k,
-            filter=filter,
-            sort=sort,
-            include_sort_vector=True,
-            include_embeddings=True,
-        )
-        if sort_vec is None:
-            msg = "Unable to retrieve the server-side embedding of the query."
-            raise AstraDBVectorStoreError(msg)
-        # doc is a Document and emb is a list[float]:
-        return (
-            sort_vec,
-            [
-                cast(tuple[Document, list[float]], (doc, emb))
-                async for doc, _, emb, _ in hits_ite
-            ],
-        )
-
     def _similarity_find_with_embedding_by_sort(
         self,
         sort: dict[str, Any],
@@ -3094,6 +3064,36 @@ class AstraDBVectorStore(VectorStore):
             [
                 cast(tuple[Document, list[float]], (doc, emb))
                 for doc, _, emb, _ in hits_ite
+            ],
+        )
+
+    async def _asimilarity_find_with_embedding_by_sort(
+        self,
+        sort: dict[str, Any],
+        k: int = 4,
+        filter: dict[str, Any] | None = None,  # noqa: A002
+    ) -> tuple[list[float], list[tuple[Document, list[float]]]]:
+        """Run ANN search with a provided sort clause.
+
+        Returns:
+            (query_embedding, List of (Document, embedding) most similar to the query).
+        """
+        sort_vec, hits_ite = await self.arun_query(
+            n=k,
+            filter=filter,
+            sort=sort,
+            include_sort_vector=True,
+            include_embeddings=True,
+        )
+        if sort_vec is None:
+            msg = "Unable to retrieve the server-side embedding of the query."
+            raise AstraDBVectorStoreError(msg)
+        # doc is a Document and emb is a list[float]:
+        return (
+            sort_vec,
+            [
+                cast(tuple[Document, list[float]], (doc, emb))
+                async for doc, _, emb, _ in hits_ite
             ],
         )
 
