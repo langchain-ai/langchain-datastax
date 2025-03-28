@@ -248,8 +248,6 @@ def _normalize_hybrid_limit_factor(
     | None
     | dict[str, float]
     | HybridLimitFactorPrescription,
-    *,
-    has_vectorize: bool,
 ) -> float | dict[str, float] | None:
     """Bring `hybrid_limit_factor` to a normal form."""
     if hybrid_limit_factor is None:
@@ -257,11 +255,9 @@ def _normalize_hybrid_limit_factor(
     if isinstance(hybrid_limit_factor, float):
         return hybrid_limit_factor
 
-    _ann_field_name = VECTORIZE_FIELD_NAME if has_vectorize else VECTOR_FIELD_NAME
-
     if isinstance(hybrid_limit_factor, HybridLimitFactorPrescription):
         return {
-            _ann_field_name: hybrid_limit_factor.vector,
+            VECTOR_FIELD_NAME: hybrid_limit_factor.vector,
             LEXICAL_FIELD_NAME: hybrid_limit_factor.lexical,
         }
 
@@ -994,10 +990,7 @@ class AstraDBVectorStore(VectorStore):
             msg = "Embedding cannot be provided for vectorize collections."
             raise ValueError(msg)
 
-        self.hybrid_limit_factor = _normalize_hybrid_limit_factor(
-            hybrid_limit_factor,
-            has_vectorize=self.document_codec.server_side_embeddings,
-        )
+        self.hybrid_limit_factor = _normalize_hybrid_limit_factor(hybrid_limit_factor)
 
         self.astra_env = _AstraDBCollectionEnvironment(
             collection_name=collection_name,

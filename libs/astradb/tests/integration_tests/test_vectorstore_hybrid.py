@@ -15,7 +15,10 @@ from langchain_astradb.utils.vector_store_codecs import (
     _DefaultVectorizeVSDocumentCodec,
     _DefaultVSDocumentCodec,
 )
-from langchain_astradb.vectorstores import AstraDBVectorStore
+from langchain_astradb.vectorstores import (
+    AstraDBVectorStore,
+    HybridLimitFactorPrescription,
+)
 
 from .conftest import (
     LEXICAL_OPTIONS,
@@ -270,6 +273,52 @@ class TestAstraDBVectorStoreHybrid:
             assert rscore < 100
             assert isinstance(rid, str)
 
+            # autodetect instantiation #4 (split hybrid_limits, struct)
+            store3b_ad = AstraDBVectorStore(
+                collection_name=COLLECTION_NAME_VECTORIZE,
+                token=astra_db_credentials["token"],
+                api_endpoint=astra_db_credentials["api_endpoint"],
+                namespace=astra_db_credentials["namespace"],
+                environment=astra_db_credentials["environment"],
+                collection_embedding_api_key=openai_api_key,
+                collection_reranking_api_key=nvidia_reranking_api_key,
+                autodetect_collection=True,
+                hybrid_limit_factor=HybridLimitFactorPrescription(
+                    vector=3.2, lexical=1.8
+                ),
+            )
+            # run a 'search' (trusting it to be hybrid), some checks on the results
+            hits_triples = store3b_ad.similarity_search_with_score_id(QUERY_TEXT, k=2)
+            assert len(hits_triples) == 2
+            rdoc, rscore, rid = hits_triples[0]
+            assert rdoc.page_content.startswith("number")
+            assert isinstance(rdoc.page_content, str)
+            assert rscore > -100
+            assert rscore < 100
+            assert isinstance(rid, str)
+
+            # autodetect instantiation #5 (split hybrid_limits, dict)
+            store3c_ad = AstraDBVectorStore(
+                collection_name=COLLECTION_NAME_VECTORIZE,
+                token=astra_db_credentials["token"],
+                api_endpoint=astra_db_credentials["api_endpoint"],
+                namespace=astra_db_credentials["namespace"],
+                environment=astra_db_credentials["environment"],
+                collection_embedding_api_key=openai_api_key,
+                collection_reranking_api_key=nvidia_reranking_api_key,
+                autodetect_collection=True,
+                hybrid_limit_factor={"$vector": 3.2, "$lexical": 1.8},
+            )
+            # run a 'search' (trusting it to be hybrid), some checks on the results
+            hits_triples = store3c_ad.similarity_search_with_score_id(QUERY_TEXT, k=2)
+            assert len(hits_triples) == 2
+            rdoc, rscore, rid = hits_triples[0]
+            assert rdoc.page_content.startswith("number")
+            assert isinstance(rdoc.page_content, str)
+            assert rscore > -100
+            assert rscore < 100
+            assert isinstance(rid, str)
+
             # instantiate explicitly, disabling hybrid in searching
             store4 = AstraDBVectorStore(
                 collection_name=COLLECTION_NAME_VECTORIZE,
@@ -437,6 +486,90 @@ class TestAstraDBVectorStoreHybrid:
             )
             assert store1.hybrid_search
             hits_triples = await store1.asimilarity_search_with_score_id(
+                QUERY_TEXT, k=2
+            )
+            assert len(hits_triples) == 2
+            rdoc, rscore, rid = hits_triples[0]
+            assert rdoc.page_content.startswith("number")
+            assert isinstance(rdoc.page_content, str)
+            assert rscore > -100
+            assert rscore < 100
+            assert isinstance(rid, str)
+
+            # re-instantiate again with nonstandard hybrid limits
+            store1b = AstraDBVectorStore(
+                collection_name=COLLECTION_NAME_VECTORIZE,
+                token=astra_db_credentials["token"],
+                api_endpoint=astra_db_credentials["api_endpoint"],
+                namespace=astra_db_credentials["namespace"],
+                setup_mode=SetupMode.ASYNC,
+                environment=astra_db_credentials["environment"],
+                collection_vector_service_options=OPENAI_VECTORIZE_OPTIONS_HEADER,
+                collection_embedding_api_key=openai_api_key,
+                collection_rerank=NVIDIA_RERANKING_OPTIONS_HEADER,
+                collection_reranking_api_key=nvidia_reranking_api_key,
+                collection_lexical=LEXICAL_OPTIONS,
+                hybrid_limit_factor=3.1415,
+            )
+            assert store1b.hybrid_search
+            hits_triples = await store1b.asimilarity_search_with_score_id(
+                QUERY_TEXT, k=2
+            )
+            assert len(hits_triples) == 2
+            rdoc, rscore, rid = hits_triples[0]
+            assert rdoc.page_content.startswith("number")
+            assert isinstance(rdoc.page_content, str)
+            assert rscore > -100
+            assert rscore < 100
+            assert isinstance(rid, str)
+
+            # re-instantiate again with split hybrid limits (struct)
+            store1c = AstraDBVectorStore(
+                collection_name=COLLECTION_NAME_VECTORIZE,
+                token=astra_db_credentials["token"],
+                api_endpoint=astra_db_credentials["api_endpoint"],
+                namespace=astra_db_credentials["namespace"],
+                setup_mode=SetupMode.ASYNC,
+                environment=astra_db_credentials["environment"],
+                collection_vector_service_options=OPENAI_VECTORIZE_OPTIONS_HEADER,
+                collection_embedding_api_key=openai_api_key,
+                collection_rerank=NVIDIA_RERANKING_OPTIONS_HEADER,
+                collection_reranking_api_key=nvidia_reranking_api_key,
+                collection_lexical=LEXICAL_OPTIONS,
+                hybrid_limit_factor=HybridLimitFactorPrescription(
+                    vector=3.2,
+                    lexical=1.8,
+                ),
+            )
+            assert store1c.hybrid_search
+            hits_triples = await store1c.asimilarity_search_with_score_id(
+                QUERY_TEXT, k=2
+            )
+            assert len(hits_triples) == 2
+            rdoc, rscore, rid = hits_triples[0]
+            assert rdoc.page_content.startswith("number")
+            assert isinstance(rdoc.page_content, str)
+            assert rscore > -100
+            assert rscore < 100
+            assert isinstance(rid, str)
+
+            # re-instantiate again with split hybrid limits (dict)
+            store1d = AstraDBVectorStore(
+                collection_name=COLLECTION_NAME_VECTORIZE,
+                token=astra_db_credentials["token"],
+                api_endpoint=astra_db_credentials["api_endpoint"],
+                namespace=astra_db_credentials["namespace"],
+                setup_mode=SetupMode.ASYNC,
+                environment=astra_db_credentials["environment"],
+                collection_vector_service_options=OPENAI_VECTORIZE_OPTIONS_HEADER,
+                collection_embedding_api_key=openai_api_key,
+                collection_rerank=NVIDIA_RERANKING_OPTIONS_HEADER,
+                collection_reranking_api_key=nvidia_reranking_api_key,
+                collection_lexical=LEXICAL_OPTIONS,
+                hybrid_limit_factor={"$vector": 3.2, "$lexical": 1.8},
+            )
+            assert store1d.hybrid_search
+            hits_triples = await store1d.asimilarity_search_with_score_id(
                 QUERY_TEXT, k=2
             )
             assert len(hits_triples) == 2
@@ -678,6 +811,56 @@ class TestAstraDBVectorStoreHybrid:
             assert rscore < 100
             assert isinstance(rid, str)
 
+            # autodetect instantiation #4 (split hybrid_limits, struct)
+            store3b_ad = AstraDBVectorStore(
+                collection_name=COLLECTION_NAME_NOVECTORIZE,
+                embedding=embedding_d2,
+                token=astra_db_credentials["token"],
+                api_endpoint=astra_db_credentials["api_endpoint"],
+                namespace=astra_db_credentials["namespace"],
+                environment=astra_db_credentials["environment"],
+                collection_reranking_api_key=nvidia_reranking_api_key,
+                autodetect_collection=True,
+                hybrid_limit_factor=HybridLimitFactorPrescription(
+                    vector=3.2, lexical=1.8
+                ),
+            )
+            # run a 'search' (trusting it to be hybrid), some checks on the results
+            hits_triples = store3b_ad.similarity_search_with_score_id(
+                QUERY_TEXT_NOVECTORIZE, k=2
+            )
+            assert len(hits_triples) == 2
+            rdoc, rscore, rid = hits_triples[0]
+            assert rdoc.page_content.startswith("[")
+            assert isinstance(rdoc.page_content, str)
+            assert rscore > -100
+            assert rscore < 100
+            assert isinstance(rid, str)
+
+            # autodetect instantiation #5 (split hybrid_limits, dict)
+            store3c_ad = AstraDBVectorStore(
+                collection_name=COLLECTION_NAME_NOVECTORIZE,
+                embedding=embedding_d2,
+                token=astra_db_credentials["token"],
+                api_endpoint=astra_db_credentials["api_endpoint"],
+                namespace=astra_db_credentials["namespace"],
+                environment=astra_db_credentials["environment"],
+                collection_reranking_api_key=nvidia_reranking_api_key,
+                autodetect_collection=True,
+                hybrid_limit_factor={"$vector": 3.2, "$lexical": 1.8},
+            )
+            # run a 'search' (trusting it to be hybrid), some checks on the results
+            hits_triples = store3c_ad.similarity_search_with_score_id(
+                QUERY_TEXT_NOVECTORIZE, k=2
+            )
+            assert len(hits_triples) == 2
+            rdoc, rscore, rid = hits_triples[0]
+            assert rdoc.page_content.startswith("[")
+            assert isinstance(rdoc.page_content, str)
+            assert rscore > -100
+            assert rscore < 100
+            assert isinstance(rid, str)
+
             # instantiate explicitly, disabling hybrid in searching
             store4 = AstraDBVectorStore(
                 collection_name=COLLECTION_NAME_NOVECTORIZE,
@@ -843,6 +1026,90 @@ class TestAstraDBVectorStoreHybrid:
             )
             assert store1.hybrid_search
             hits_triples = await store1.asimilarity_search_with_score_id(
+                QUERY_TEXT_NOVECTORIZE,
+                k=2,
+            )
+            assert len(hits_triples) == 2
+            rdoc, rscore, rid = hits_triples[0]
+            assert rdoc.page_content.startswith("[")
+            assert isinstance(rdoc.page_content, str)
+            assert rscore > -100
+            assert rscore < 100
+            assert isinstance(rid, str)
+
+            # re-instantiate again, nonstandard hybrid limits
+            store1b = AstraDBVectorStore(
+                collection_name=COLLECTION_NAME_NOVECTORIZE,
+                embedding=embedding_d2,
+                token=astra_db_credentials["token"],
+                api_endpoint=astra_db_credentials["api_endpoint"],
+                namespace=astra_db_credentials["namespace"],
+                setup_mode=SetupMode.ASYNC,
+                environment=astra_db_credentials["environment"],
+                collection_rerank=NVIDIA_RERANKING_OPTIONS_HEADER,
+                collection_reranking_api_key=nvidia_reranking_api_key,
+                collection_lexical=LEXICAL_OPTIONS,
+                hybrid_limit_factor=3.1415,
+            )
+            assert store1b.hybrid_search
+            hits_triples = await store1b.asimilarity_search_with_score_id(
+                QUERY_TEXT_NOVECTORIZE,
+                k=2,
+            )
+            assert len(hits_triples) == 2
+            rdoc, rscore, rid = hits_triples[0]
+            assert rdoc.page_content.startswith("[")
+            assert isinstance(rdoc.page_content, str)
+            assert rscore > -100
+            assert rscore < 100
+            assert isinstance(rid, str)
+
+            # re-instantiate again, split hybrid limits (struct)
+            store1c = AstraDBVectorStore(
+                collection_name=COLLECTION_NAME_NOVECTORIZE,
+                embedding=embedding_d2,
+                token=astra_db_credentials["token"],
+                api_endpoint=astra_db_credentials["api_endpoint"],
+                namespace=astra_db_credentials["namespace"],
+                setup_mode=SetupMode.ASYNC,
+                environment=astra_db_credentials["environment"],
+                collection_rerank=NVIDIA_RERANKING_OPTIONS_HEADER,
+                collection_reranking_api_key=nvidia_reranking_api_key,
+                collection_lexical=LEXICAL_OPTIONS,
+                hybrid_limit_factor=HybridLimitFactorPrescription(
+                    vector=3.2,
+                    lexical=1.8,
+                ),
+            )
+            assert store1c.hybrid_search
+            hits_triples = await store1c.asimilarity_search_with_score_id(
+                QUERY_TEXT_NOVECTORIZE,
+                k=2,
+            )
+            assert len(hits_triples) == 2
+            rdoc, rscore, rid = hits_triples[0]
+            assert rdoc.page_content.startswith("[")
+            assert isinstance(rdoc.page_content, str)
+            assert rscore > -100
+            assert rscore < 100
+            assert isinstance(rid, str)
+
+            # re-instantiate again, split hybrid limits (dict)
+            store1d = AstraDBVectorStore(
+                collection_name=COLLECTION_NAME_NOVECTORIZE,
+                embedding=embedding_d2,
+                token=astra_db_credentials["token"],
+                api_endpoint=astra_db_credentials["api_endpoint"],
+                namespace=astra_db_credentials["namespace"],
+                setup_mode=SetupMode.ASYNC,
+                environment=astra_db_credentials["environment"],
+                collection_rerank=NVIDIA_RERANKING_OPTIONS_HEADER,
+                collection_reranking_api_key=nvidia_reranking_api_key,
+                collection_lexical=LEXICAL_OPTIONS,
+                hybrid_limit_factor={"$vector": 3.2, "$lexical": 1.8},
+            )
+            assert store1d.hybrid_search
+            hits_triples = await store1d.asimilarity_search_with_score_id(
                 QUERY_TEXT_NOVECTORIZE,
                 k=2,
             )
