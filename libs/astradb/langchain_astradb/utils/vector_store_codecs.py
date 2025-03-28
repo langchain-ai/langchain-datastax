@@ -128,7 +128,6 @@ def _astra_vectorize_encode_hybrid_sort(
 ) -> dict[str, Any]:
     """Encoding of a sort clause for hybrid search in the vectorize case."""
     if vectorize == lexical:
-        # TODO: maybe remove this shortcut once the API can handle the object
         return {RERANK_SORT_TOP_FIELD_NAME: vectorize}
     return {
         RERANK_SORT_TOP_FIELD_NAME: {

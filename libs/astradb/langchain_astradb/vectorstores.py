@@ -54,9 +54,8 @@ from langchain_astradb.utils.vector_store_autodetect import (
     _detect_document_codec,
 )
 from langchain_astradb.utils.vector_store_codecs import (
-    # TODO: check this commented part
-    # LEXICAL_FIELD_NAME,
-    # VECTOR_FIELD_NAME,
+    LEXICAL_FIELD_NAME,
+    VECTOR_FIELD_NAME,
     VECTORIZE_FIELD_NAME,
     _AstraDBVectorStoreDocumentCodec,
     _DefaultVectorizeVSDocumentCodec,
@@ -111,6 +110,28 @@ class AstraDBQueryResult(NamedTuple):
     id: str
     embedding: list[float] | None
     similarity: float | None
+
+
+class HybridLimitFactorPrescription(NamedTuple):
+    """A per-subsearch setting for the hybrid-search 'limit' factors.
+
+    This structure is to be used to set different values for
+    the vector and the lexical portions of the hybrid search.
+
+    Each of the attributes is a floating-point number, representing the multiplicative
+    factor applied to a search final 'k' to calculate the "limit" value for
+    the associated sub-search. For instance, if vector=1.5 and lexical=3.0,
+    a hybrid search called by asking a final set of k=4 results will be executed
+    with limits of 6 for vector and 12 for lexical. (The results are approximated
+    to an integer.)
+
+    Attributes:
+        vector: the multiplicative factor for the "vector" part of the hybrid search.
+        lexical: the multiplicative factor for the "lexical" part of the hybrid search.
+    """
+
+    vector: float
+    lexical: float
 
 
 def _unique_list(lst: list[T], key: Callable[[T], U]) -> list[T]:
@@ -218,29 +239,34 @@ def _make_hybrid_limits(
         return None
     if isinstance(hlf, float):
         return max(int(hlf * k), 1)
-    # hlf is a map:
+    # hlf is a dict:
     return {hlk: max(int(hlf * k), 1) for hlk, hlf in hlf.items()}
 
 
-# TODO: check this commented part
-# def _normalize_hybrid_limit_factor(
-#     hybrid_limit_factor: float | None,
-#     *,
-#     has_vectorize: bool,
-# ) -> dict[str, float]:
-#     """Bring `hybrid_limit_factor` to normal dict form."""
-#     _ann_field_name = VECTORIZE_FIELD_NAME if has_vectorize else VECTOR_FIELD_NAME
-#     if hybrid_limit_factor is None:
-#         return {
-#             _ann_field_name: DEFAULT_HYBRID_LIMIT_FACTOR,
-#             LEXICAL_FIELD_NAME: DEFAULT_HYBRID_LIMIT_FACTOR,
-#         }
+def _normalize_hybrid_limit_factor(
+    hybrid_limit_factor: float
+    | None
+    | dict[str, float]
+    | HybridLimitFactorPrescription,
+    *,
+    has_vectorize: bool,
+) -> float | dict[str, float] | None:
+    """Bring `hybrid_limit_factor` to a normal form."""
+    if hybrid_limit_factor is None:
+        return None
+    if isinstance(hybrid_limit_factor, float):
+        return hybrid_limit_factor
 
-#     # a number is passed:
-#     return {
-#         _ann_field_name: float(hybrid_limit_factor),
-#         LEXICAL_FIELD_NAME: float(hybrid_limit_factor),
-#     }
+    _ann_field_name = VECTORIZE_FIELD_NAME if has_vectorize else VECTOR_FIELD_NAME
+
+    if isinstance(hybrid_limit_factor, HybridLimitFactorPrescription):
+        return {
+            _ann_field_name: hybrid_limit_factor.vector,
+            LEXICAL_FIELD_NAME: hybrid_limit_factor.lexical,
+        }
+
+    # already a dict:
+    return hybrid_limit_factor
 
 
 def _insertmany_error_message(err: CollectionInsertManyException) -> str:
@@ -634,7 +660,10 @@ class AstraDBVectorStore(VectorStore):
         | CollectionLexicalOptions
         | None = None,
         hybrid_search: HybridSearchMode | None = None,
-        hybrid_limit_factor: float | None = None,
+        hybrid_limit_factor: float
+        | None
+        | dict[str, float]
+        | HybridLimitFactorPrescription = None,
     ) -> None:
         """A vector store wich uses DataStax Astra DB as backend.
 
@@ -771,6 +800,10 @@ class AstraDBVectorStore(VectorStore):
                 and the lexical-based) will be requested to fecth up to
                 `int(k*hybrid_limit_factor)` items, where `k` is the desired result
                 count from the whole search.
+                If a `HybridLimitFactorPrescription` is provided (see the class
+                docstring for details), separate factors are applied to the vector
+                and the lexical subsearches. Alternatively, a simple dictionary
+                with keys "$lexical" and "$vector" achieves the same effect.
 
         Note:
             For concurrency in synchronous :meth:`~add_texts`:, as a rule of thumb,
@@ -961,7 +994,10 @@ class AstraDBVectorStore(VectorStore):
             msg = "Embedding cannot be provided for vectorize collections."
             raise ValueError(msg)
 
-        self.hybrid_limit_factor = hybrid_limit_factor
+        self.hybrid_limit_factor = _normalize_hybrid_limit_factor(
+            hybrid_limit_factor,
+            has_vectorize=self.document_codec.server_side_embeddings,
+        )
 
         self.astra_env = _AstraDBCollectionEnvironment(
             collection_name=collection_name,
