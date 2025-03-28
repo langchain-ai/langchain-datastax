@@ -84,6 +84,10 @@ DOCUMENT_ALREADY_EXISTS_API_ERROR_CODE = "DOCUMENT_ALREADY_EXISTS"
 MAX_SHOWN_INSERTION_ERRORS = 8
 # key for the 'rerank' score within the find_and_rerank scores
 RERANK_SCORE_KEY = "$rerank"
+# Error message for receiving a lexical_query for a non-hybrid search
+ERROR_LEXICAL_QUERY_ON_NONHYBRID_SEARCH = (
+    "Parameter 'lexical_query' cannot be passed for a non-hybrid search"
+)
 
 logger = logging.getLogger(__name__)
 
@@ -2405,6 +2409,7 @@ class AstraDBVectorStore(VectorStore):
         query: str,
         k: int = 4,
         filter: dict[str, Any] | None = None,
+        lexical_query: str | None = None,
         **kwargs: Any,
     ) -> list[Document]:
         """Return docs most similar to query.
@@ -2413,6 +2418,9 @@ class AstraDBVectorStore(VectorStore):
             query: Query to look up documents similar to.
             k: Number of Documents to return. Defaults to 4.
             filter: Filter on the metadata to apply.
+            lexical_query: for hybrid search, a specific query for the lexical
+                portion of the retrieval. If omitted or empty, defaults to the same
+                as 'query'. If passed on a non-hybrid search, an error is raised.
             **kwargs: Additional arguments are ignored.
 
         Returns:
@@ -2424,6 +2432,7 @@ class AstraDBVectorStore(VectorStore):
                 query=query,
                 k=k,
                 filter=filter,
+                lexical_query=lexical_query,
             )
         ]
 
@@ -2433,6 +2442,7 @@ class AstraDBVectorStore(VectorStore):
         query: str,
         k: int = 4,
         filter: dict[str, Any] | None = None,
+        lexical_query: str | None = None,
     ) -> list[tuple[Document, float]]:
         """Return docs most similar to query with score.
 
@@ -2440,6 +2450,9 @@ class AstraDBVectorStore(VectorStore):
             query: Query to look up documents similar to.
             k: Number of Documents to return. Defaults to 4.
             filter: Filter on the metadata to apply.
+            lexical_query: for hybrid search, a specific query for the lexical
+                portion of the retrieval. If omitted or empty, defaults to the same
+                as 'query'. If passed on a non-hybrid search, an error is raised.
 
         Returns:
             The list of (Document, score), the most similar to the query vector.
@@ -2450,6 +2463,7 @@ class AstraDBVectorStore(VectorStore):
                 query=query,
                 k=k,
                 filter=filter,
+                lexical_query=lexical_query,
             )
         ]
 
@@ -2458,6 +2472,7 @@ class AstraDBVectorStore(VectorStore):
         query: str,
         k: int = 4,
         filter: dict[str, Any] | None = None,  # noqa: A002
+        lexical_query: str | None = None,
     ) -> list[tuple[Document, float, str]]:
         """Return docs most similar to the query with score and id.
 
@@ -2465,6 +2480,9 @@ class AstraDBVectorStore(VectorStore):
             query: Query to look up documents similar to.
             k: Number of Documents to return. Defaults to 4.
             filter: Filter on the metadata to apply.
+            lexical_query: for hybrid search, a specific query for the lexical
+                portion of the retrieval. If omitted or empty, defaults to the same
+                as 'query'. If passed on a non-hybrid search, an error is raised.
 
         Returns:
             The list of (Document, score, id), the most similar to the query.
@@ -2478,7 +2496,7 @@ class AstraDBVectorStore(VectorStore):
                 sort = self.document_codec.encode_hybrid_sort(
                     vector=None,
                     vectorize=query,
-                    lexical=query,
+                    lexical=lexical_query or query,
                 )
                 rerank_query = None
             else:
@@ -2486,7 +2504,7 @@ class AstraDBVectorStore(VectorStore):
                 sort = self.document_codec.encode_hybrid_sort(
                     vector=embedding_vector,
                     vectorize=None,
-                    lexical=query,
+                    lexical=lexical_query or query,
                 )
                 rerank_query = query
 
@@ -2498,6 +2516,8 @@ class AstraDBVectorStore(VectorStore):
                 rerank_query=rerank_query,
             )
 
+        if lexical_query is not None:
+            raise ValueError(ERROR_LEXICAL_QUERY_ON_NONHYBRID_SEARCH)
         if self.document_codec.server_side_embeddings:
             sort = self.document_codec.encode_vectorize_sort(query)
         else:
@@ -2657,6 +2677,7 @@ class AstraDBVectorStore(VectorStore):
         query: str,
         k: int = 4,
         filter: dict[str, Any] | None = None,
+        lexical_query: str | None = None,
         **kwargs: Any,
     ) -> list[Document]:
         """Return docs most similar to query.
@@ -2665,6 +2686,9 @@ class AstraDBVectorStore(VectorStore):
             query: Query to look up documents similar to.
             k: Number of Documents to return. Defaults to 4.
             filter: Filter on the metadata to apply.
+            lexical_query: for hybrid search, a specific query for the lexical
+                portion of the retrieval. If omitted or empty, defaults to the same
+                as 'query'. If passed on a non-hybrid search, an error is raised.
             **kwargs: Additional arguments are ignored.
 
         Returns:
@@ -2676,6 +2700,7 @@ class AstraDBVectorStore(VectorStore):
                 query=query,
                 k=k,
                 filter=filter,
+                lexical_query=lexical_query,
             )
         ]
 
@@ -2685,6 +2710,7 @@ class AstraDBVectorStore(VectorStore):
         query: str,
         k: int = 4,
         filter: dict[str, Any] | None = None,
+        lexical_query: str | None = None,
     ) -> list[tuple[Document, float]]:
         """Return docs most similar to query with score.
 
@@ -2692,6 +2718,9 @@ class AstraDBVectorStore(VectorStore):
             query: Query to look up documents similar to.
             k: Number of Documents to return. Defaults to 4.
             filter: Filter on the metadata to apply.
+            lexical_query: for hybrid search, a specific query for the lexical
+                portion of the retrieval. If omitted or empty, defaults to the same
+                as 'query'. If passed on a non-hybrid search, an error is raised.
 
         Returns:
             The list of (Document, score), the most similar to the query vector.
@@ -2702,6 +2731,7 @@ class AstraDBVectorStore(VectorStore):
                 query=query,
                 k=k,
                 filter=filter,
+                lexical_query=lexical_query,
             )
         ]
 
@@ -2710,6 +2740,7 @@ class AstraDBVectorStore(VectorStore):
         query: str,
         k: int = 4,
         filter: dict[str, Any] | None = None,  # noqa: A002
+        lexical_query: str | None = None,
     ) -> list[tuple[Document, float, str]]:
         """Return docs most similar to the query with score and id.
 
@@ -2717,6 +2748,9 @@ class AstraDBVectorStore(VectorStore):
             query: Query to look up documents similar to.
             k: Number of Documents to return. Defaults to 4.
             filter: Filter on the metadata to apply.
+            lexical_query: for hybrid search, a specific query for the lexical
+                portion of the retrieval. If omitted or empty, defaults to the same
+                as 'query'. If passed on a non-hybrid search, an error is raised.
 
         Returns:
             The list of (Document, score, id), the most similar to the query.
@@ -2730,7 +2764,7 @@ class AstraDBVectorStore(VectorStore):
                 sort = self.document_codec.encode_hybrid_sort(
                     vector=None,
                     vectorize=query,
-                    lexical=query,
+                    lexical=lexical_query or query,
                 )
                 rerank_query = None
             else:
@@ -2738,7 +2772,7 @@ class AstraDBVectorStore(VectorStore):
                 sort = self.document_codec.encode_hybrid_sort(
                     vector=embedding_vector,
                     vectorize=None,
-                    lexical=query,
+                    lexical=lexical_query or query,
                 )
                 rerank_query = query
 
@@ -2750,6 +2784,8 @@ class AstraDBVectorStore(VectorStore):
                 rerank_query=rerank_query,
             )
 
+        if lexical_query is not None:
+            raise ValueError(ERROR_LEXICAL_QUERY_ON_NONHYBRID_SEARCH)
         if self.document_codec.server_side_embeddings:
             sort = self.document_codec.encode_vectorize_sort(query)
         else:

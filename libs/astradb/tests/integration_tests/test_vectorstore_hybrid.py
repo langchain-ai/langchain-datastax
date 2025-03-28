@@ -35,6 +35,7 @@ COLLECTION_NAME_VECTORIZE = "lc_vstore_hybrid_vectorize"
 COLLECTION_NAME_NOVECTORIZE = "lc_vstore_hybrid_novectorize"
 COLLECTION_NAME_NOHYBRID_NOVECTORIZE = "lc_vstore_nohybrid_novectorize"
 QUERY_TEXT = "need a number?"
+LEXICAL_QUERY_TEXT = "number counting units"
 QUERY_TEXT_NOVECTORIZE = "[1,0]"
 
 
@@ -167,6 +168,20 @@ class TestAstraDBVectorStoreHybrid:
             )
             assert len(hits_triples_b) == 1
             assert hits_triples_b[0][0].page_content == "number one"
+
+            # another search with a different lexical_query
+            hits_triples_lq = store0.similarity_search_with_score_id(
+                QUERY_TEXT,
+                k=2,
+                lexical_query=LEXICAL_QUERY_TEXT,
+            )
+            assert len(hits_triples_lq) == 2
+            rdoc_lq, rscore_lq, rid_lq = hits_triples_lq[0]
+            assert rdoc_lq.page_content.startswith("number")
+            assert isinstance(rdoc_lq.page_content, str)
+            assert rscore_lq > -100
+            assert rscore_lq < 100
+            assert isinstance(rid_lq, str)
 
             # re-instantiate just like above, re-check
             store1 = AstraDBVectorStore(
@@ -392,6 +407,20 @@ class TestAstraDBVectorStoreHybrid:
             assert len(hits_triples_b) == 1
             assert hits_triples_b[0][0].page_content == "number one"
 
+            # another search with a different lexical_query
+            hits_triples_lq = await store0.asimilarity_search_with_score_id(
+                QUERY_TEXT,
+                k=2,
+                lexical_query=LEXICAL_QUERY_TEXT,
+            )
+            assert len(hits_triples_lq) == 2
+            rdoc_lq, rscore_lq, rid_lq = hits_triples_lq[0]
+            assert rdoc_lq.page_content.startswith("number")
+            assert isinstance(rdoc_lq.page_content, str)
+            assert rscore_lq > -100
+            assert rscore_lq < 100
+            assert isinstance(rid_lq, str)
+
             # re-instantiate just like above, re-check
             store1 = AstraDBVectorStore(
                 collection_name=COLLECTION_NAME_VECTORIZE,
@@ -543,6 +572,20 @@ class TestAstraDBVectorStoreHybrid:
             )
             assert len(hits_triples_b) == 1
             assert hits_triples_b[0][0].page_content == "[1,1]"
+
+            # another search with a different lexical_query
+            hits_triples_lq = store0.similarity_search_with_score_id(
+                QUERY_TEXT_NOVECTORIZE,
+                k=2,
+                lexical_query=LEXICAL_QUERY_TEXT,
+            )
+            assert len(hits_triples_lq) == 2
+            rdoc_lq, rscore_lq, rid_lq = hits_triples_lq[0]
+            assert rdoc_lq.page_content.startswith("[")
+            assert isinstance(rdoc_lq.page_content, str)
+            assert rscore_lq > -100
+            assert rscore_lq < 100
+            assert isinstance(rid_lq, str)
 
             # re-instantiate just like above, re-check
             store1 = AstraDBVectorStore(
@@ -771,6 +814,20 @@ class TestAstraDBVectorStoreHybrid:
             assert len(hits_triples_b) == 1
             assert hits_triples_b[0][0].page_content == "[1,1]"
 
+            # another search with a different lexical_query
+            hits_triples_lq = await store0.asimilarity_search_with_score_id(
+                QUERY_TEXT_NOVECTORIZE,
+                k=2,
+                lexical_query=LEXICAL_QUERY_TEXT,
+            )
+            assert len(hits_triples_lq) == 2
+            rdoc_lq, rscore_lq, rid_lq = hits_triples_lq[0]
+            assert rdoc_lq.page_content.startswith("[")
+            assert isinstance(rdoc_lq.page_content, str)
+            assert rscore_lq > -100
+            assert rscore_lq < 100
+            assert isinstance(rid_lq, str)
+
             # re-instantiate just like above, re-check
             store1 = AstraDBVectorStore(
                 collection_name=COLLECTION_NAME_NOVECTORIZE,
@@ -917,6 +974,14 @@ class TestAstraDBVectorStoreHybrid:
             )
             assert len(hits_triples_b) == 1
             assert hits_triples_b[0][0].page_content == "[1,1]"
+
+            # searches with a different lexical_query should fail
+            with pytest.raises(ValueError, match="cannot be passed"):
+                store0.similarity_search_with_score_id(
+                    QUERY_TEXT,
+                    k=2,
+                    lexical_query=LEXICAL_QUERY_TEXT,
+                )
 
             # re-instantiate just like above, re-check
             store1 = AstraDBVectorStore(
@@ -1110,6 +1175,14 @@ class TestAstraDBVectorStoreHybrid:
             )
             assert len(hits_triples_b) == 1
             assert hits_triples_b[0][0].page_content == "[1,1]"
+
+            # searches with a different lexical_query should fail
+            with pytest.raises(ValueError, match="cannot be passed"):
+                await store0.asimilarity_search_with_score_id(
+                    QUERY_TEXT,
+                    k=2,
+                    lexical_query=LEXICAL_QUERY_TEXT,
+                )
 
             # re-instantiate just like above, re-check
             store1 = AstraDBVectorStore(
