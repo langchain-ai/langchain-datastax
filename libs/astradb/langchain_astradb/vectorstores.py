@@ -1143,6 +1143,7 @@ class AstraDBVectorStore(VectorStore):
         copy.document_codec = self.document_codec
         copy.has_lexical = self.has_lexical
         copy.has_hybrid = self.hybrid_search
+        copy.hybrid_limit_factor = self.hybrid_limit_factor
         copy.batch_size = self.batch_size
         copy.bulk_insert_batch_concurrency = self.bulk_insert_batch_concurrency
         copy.bulk_insert_overwrite_concurrency = self.bulk_insert_overwrite_concurrency
