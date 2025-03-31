@@ -240,30 +240,33 @@ class TestAstraDBVectorStoreAutodetect:
         del_by_md = ad_store.delete_by_metadata_filter(filter={"q2": "Q2"})
         assert del_by_md is not None
         assert del_by_md == 1
-        # TODO: restore the rest once the following hybrid-related fix gets rolled out:
-        # https://github.com/datastax/cassandra/pull/1653
-        # results2n = ad_store.similarity_search("[-1,-1]", k=3, filter={"q2": "Q2"})
-        # assert results2n == []
+        # TODO: Remove this flag once `github.com/datastax/cassandra/pull/1653`
+        # makes it to the testing HCD
+        if "LANGCHAIN_TEST_NO_CNDB13480" not in os.environ:
+            results2n = ad_store.similarity_search("[-1,-1]", k=3, filter={"q2": "Q2"})
+            assert results2n == []
 
-        # def doc_sorter(doc: Document) -> str:
-        #     return doc.id or ""
+            def doc_sorter(doc: Document) -> str:
+                return doc.id or ""
 
-        # # update metadata
-        # ad_store.update_metadata(
-        #     {
-        #         "1": {"m1": "A", "mZ": "Z"},
-        #         "2": {"m1": "B", "mZ": "Z"},
-        #     }
-        # )
-        # matches_z = ad_store.similarity_search("[-1,-1]", k=3, filter={"mZ": "Z"})
-        # assert len(matches_z) == 2
-        # s_matches_z = sorted(matches_z, key=doc_sorter)
-        # assert s_matches_z[0].metadata == {"m1": "A", "m2": "x", "mZ": "Z"}
-        # assert s_matches_z[1].metadata == {"m1": "B", "m2": "y", "mZ": "Z"}
+            # update metadata
+            ad_store.update_metadata(
+                {
+                    "1": {"m1": "A", "mZ": "Z"},
+                    "2": {"m1": "B", "mZ": "Z"},
+                }
+            )
+            matches_z = ad_store.similarity_search("[-1,-1]", k=3, filter={"mZ": "Z"})
+            assert len(matches_z) == 2
+            s_matches_z = sorted(matches_z, key=doc_sorter)
+            assert s_matches_z[0].metadata == {"m1": "A", "m2": "x", "mZ": "Z"}
+            assert s_matches_z[1].metadata == {"m1": "B", "m2": "y", "mZ": "Z"}
 
-        # ad_store.clear()
-        # results2z = ad_store.similarity_search("[-1,-1]", k=3, filter={"xyz": "XYZ"})
-        # assert results2z == []
+            ad_store.clear()
+            results2z = ad_store.similarity_search(
+                "[-1,-1]", k=3, filter={"xyz": "XYZ"}
+            )
+            assert results2z == []
 
     def test_autodetect_default_novectorize_crud(
         self,
@@ -327,30 +330,33 @@ class TestAstraDBVectorStoreAutodetect:
         del_by_md = ad_store.delete_by_metadata_filter(filter={"q2": "Q2"})
         assert del_by_md is not None
         assert del_by_md == 1
-        # TODO: restore the rest once the following hybrid-related fix gets rolled out:
-        # https://github.com/datastax/cassandra/pull/1653
-        # results2n = ad_store.similarity_search("[-1,-1]", k=3, filter={"q2": "Q2"})
-        # assert results2n == []
+        # TODO: Remove this flag once `github.com/datastax/cassandra/pull/1653`
+        # makes it to the testing HCD
+        if "LANGCHAIN_TEST_NO_CNDB13480" not in os.environ:
+            results2n = ad_store.similarity_search("[-1,-1]", k=3, filter={"q2": "Q2"})
+            assert results2n == []
 
-        # def doc_sorter(doc: Document) -> str:
-        #     return doc.id or ""
+            def doc_sorter(doc: Document) -> str:
+                return doc.id or ""
 
-        # # update metadata
-        # ad_store.update_metadata(
-        #     {
-        #         "1": {"m1": "A", "mZ": "Z"},
-        #         "2": {"m1": "B", "mZ": "Z"},
-        #     }
-        # )
-        # matches_z = ad_store.similarity_search("[-1,-1]", k=3, filter={"mZ": "Z"})
-        # assert len(matches_z) == 2
-        # s_matches_z = sorted(matches_z, key=doc_sorter)
-        # assert s_matches_z[0].metadata == {"m1": "A", "m2": "x", "mZ": "Z"}
-        # assert s_matches_z[1].metadata == {"m1": "B", "m2": "y", "mZ": "Z"}
+            # update metadata
+            ad_store.update_metadata(
+                {
+                    "1": {"m1": "A", "mZ": "Z"},
+                    "2": {"m1": "B", "mZ": "Z"},
+                }
+            )
+            matches_z = ad_store.similarity_search("[-1,-1]", k=3, filter={"mZ": "Z"})
+            assert len(matches_z) == 2
+            s_matches_z = sorted(matches_z, key=doc_sorter)
+            assert s_matches_z[0].metadata == {"m1": "A", "m2": "x", "mZ": "Z"}
+            assert s_matches_z[1].metadata == {"m1": "B", "m2": "y", "mZ": "Z"}
 
-        # ad_store.clear()
-        # results2z = ad_store.similarity_search("[-1,-1]", k=3, filter={"xyz": "XYZ"})
-        # assert results2z == []
+            ad_store.clear()
+            results2z = ad_store.similarity_search(
+                "[-1,-1]", k=3, filter={"xyz": "XYZ"}
+            )
+            assert results2z == []
 
     def test_autodetect_flat_vectorize_crud(
         self,
@@ -418,30 +424,33 @@ class TestAstraDBVectorStoreAutodetect:
         del_by_md = ad_store.delete_by_metadata_filter(filter={"q2": "Q2"})
         assert del_by_md is not None
         assert del_by_md == 1
-        # TODO: restore the rest once the following hybrid-related fix gets rolled out:
-        # https://github.com/datastax/cassandra/pull/1653
-        # results2n = ad_store.similarity_search("[-1,-1]", k=3, filter={"q2": "Q2"})
-        # assert results2n == []
+        # TODO: Remove this flag once `github.com/datastax/cassandra/pull/1653`
+        # makes it to the testing HCD
+        if "LANGCHAIN_TEST_NO_CNDB13480" not in os.environ:
+            results2n = ad_store.similarity_search("[-1,-1]", k=3, filter={"q2": "Q2"})
+            assert results2n == []
 
-        # def doc_sorter(doc: Document) -> str:
-        #     return doc.id or ""
+            def doc_sorter(doc: Document) -> str:
+                return doc.id or ""
 
-        # # update metadata
-        # ad_store.update_metadata(
-        #     {
-        #         "1": {"m1": "A", "mZ": "Z"},
-        #         "2": {"m1": "B", "mZ": "Z"},
-        #     }
-        # )
-        # matches_z = ad_store.similarity_search("[-1,-1]", k=3, filter={"mZ": "Z"})
-        # assert len(matches_z) == 2
-        # s_matches_z = sorted(matches_z, key=doc_sorter)
-        # assert s_matches_z[0].metadata == {"m1": "A", "m2": "x", "mZ": "Z"}
-        # assert s_matches_z[1].metadata == {"m1": "B", "m2": "y", "mZ": "Z"}
+            # update metadata
+            ad_store.update_metadata(
+                {
+                    "1": {"m1": "A", "mZ": "Z"},
+                    "2": {"m1": "B", "mZ": "Z"},
+                }
+            )
+            matches_z = ad_store.similarity_search("[-1,-1]", k=3, filter={"mZ": "Z"})
+            assert len(matches_z) == 2
+            s_matches_z = sorted(matches_z, key=doc_sorter)
+            assert s_matches_z[0].metadata == {"m1": "A", "m2": "x", "mZ": "Z"}
+            assert s_matches_z[1].metadata == {"m1": "B", "m2": "y", "mZ": "Z"}
 
-        # ad_store.clear()
-        # results2z = ad_store.similarity_search("[-1,-1]", k=3, filter={"xyz": "XYZ"})
-        # assert results2z == []
+            ad_store.clear()
+            results2z = ad_store.similarity_search(
+                "[-1,-1]", k=3, filter={"xyz": "XYZ"}
+            )
+            assert results2z == []
 
     def test_autodetect_default_vectorize_crud(
         self,
@@ -507,30 +516,33 @@ class TestAstraDBVectorStoreAutodetect:
         del_by_md = ad_store.delete_by_metadata_filter(filter={"q2": "Q2"})
         assert del_by_md is not None
         assert del_by_md == 1
-        # TODO: restore the rest once the following hybrid-related fix gets rolled out:
-        # https://github.com/datastax/cassandra/pull/1653
-        # results2n = ad_store.similarity_search("[-1,-1]", k=3, filter={"q2": "Q2"})
-        # assert results2n == []
+        # TODO: Remove this flag once `github.com/datastax/cassandra/pull/1653`
+        # makes it to the testing HCD
+        if "LANGCHAIN_TEST_NO_CNDB13480" not in os.environ:
+            results2n = ad_store.similarity_search("[-1,-1]", k=3, filter={"q2": "Q2"})
+            assert results2n == []
 
-        # def doc_sorter(doc: Document) -> str:
-        #     return doc.id or ""
+            def doc_sorter(doc: Document) -> str:
+                return doc.id or ""
 
-        # # update metadata
-        # ad_store.update_metadata(
-        #     {
-        #         "1": {"m1": "A", "mZ": "Z"},
-        #         "2": {"m1": "B", "mZ": "Z"},
-        #     }
-        # )
-        # matches_z = ad_store.similarity_search("[-1,-1]", k=3, filter={"mZ": "Z"})
-        # assert len(matches_z) == 2
-        # s_matches_z = sorted(matches_z, key=doc_sorter)
-        # assert s_matches_z[0].metadata == {"m1": "A", "m2": "x", "mZ": "Z"}
-        # assert s_matches_z[1].metadata == {"m1": "B", "m2": "y", "mZ": "Z"}
+            # update metadata
+            ad_store.update_metadata(
+                {
+                    "1": {"m1": "A", "mZ": "Z"},
+                    "2": {"m1": "B", "mZ": "Z"},
+                }
+            )
+            matches_z = ad_store.similarity_search("[-1,-1]", k=3, filter={"mZ": "Z"})
+            assert len(matches_z) == 2
+            s_matches_z = sorted(matches_z, key=doc_sorter)
+            assert s_matches_z[0].metadata == {"m1": "A", "m2": "x", "mZ": "Z"}
+            assert s_matches_z[1].metadata == {"m1": "B", "m2": "y", "mZ": "Z"}
 
-        # ad_store.clear()
-        # results2z = ad_store.similarity_search("[-1,-1]", k=3, filter={"xyz": "XYZ"})
-        # assert results2z == []
+            ad_store.clear()
+            results2z = ad_store.similarity_search(
+                "[-1,-1]", k=3, filter={"xyz": "XYZ"}
+            )
+            assert results2z == []
 
     def test_failed_docs_autodetect_flat_novectorize_crud(
         self,
