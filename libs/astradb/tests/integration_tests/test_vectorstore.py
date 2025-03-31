@@ -5,13 +5,16 @@ from __future__ import annotations
 import asyncio
 import json
 import math
-import os
 import random
 from typing import TYPE_CHECKING, Any
 
 import pytest
-from astrapy.authentication import EmbeddingAPIKeyHeaderProvider, StaticTokenProvider
-from astrapy.constants import SortDocuments
+from astrapy.authentication import (
+    EmbeddingAPIKeyHeaderProvider,
+    RerankingAPIKeyHeaderProvider,
+    StaticTokenProvider,
+)
+from astrapy.constants import SortMode
 from langchain_core.documents import Document
 
 from langchain_astradb.utils.astradb import COMPONENT_NAME_VECTORSTORE, SetupMode
@@ -26,7 +29,6 @@ from .conftest import (
 
 if TYPE_CHECKING:
     from astrapy import Collection
-    from astrapy.db import AstraDB
     from langchain_core.embeddings import Embeddings
 
     from .conftest import AstraDBCredentials
@@ -1719,73 +1721,6 @@ class TestAstraDBVectorStore:
         assert cosine_triples[0][2] == "scaled"
         assert euclidean_triples[0][2] == "rotated"
 
-    @pytest.mark.skipif(
-        os.environ.get("ASTRA_DB_ENVIRONMENT", "prod").upper() != "PROD",
-        reason="Can run on Astra DB production environment only",
-    )
-    def test_astradb_vectorstore_coreclients_init_sync(
-        self,
-        core_astra_db: AstraDB,
-        embedding_d2: Embeddings,
-        vector_store_d2: AstraDBVectorStore,
-    ) -> None:
-        """
-        Expect a deprecation warning from passing a (core) AstraDB class,
-        but it must work.
-        """
-        vector_store_d2.add_texts(["[1,2]"])
-
-        with pytest.warns(DeprecationWarning) as rec_warnings:
-            v_store_init_core = AstraDBVectorStore(
-                embedding=embedding_d2,
-                collection_name=vector_store_d2.collection_name,
-                astra_db_client=core_astra_db,
-                metric="euclidean",
-            )
-
-        results = v_store_init_core.similarity_search("[-1,-1]", k=1)
-        # cleaning out 'spurious' "unclosed socket/transport..." warnings
-        f_rec_warnings = [
-            wrn for wrn in rec_warnings if issubclass(wrn.category, DeprecationWarning)
-        ]
-        assert len(f_rec_warnings) == 1
-        assert len(results) == 1
-        assert results[0].page_content == "[1,2]"
-
-    @pytest.mark.skipif(
-        os.environ.get("ASTRA_DB_ENVIRONMENT", "prod").upper() != "PROD",
-        reason="Can run on Astra DB production environment only",
-    )
-    async def test_astradb_vectorstore_coreclients_init_async(
-        self,
-        core_astra_db: AstraDB,
-        embedding_d2: Embeddings,
-        vector_store_d2: AstraDBVectorStore,
-    ) -> None:
-        """
-        Expect a deprecation warning from passing a (core) AstraDB class,
-        but it must work. Async version.
-        """
-        await vector_store_d2.aadd_texts(["[1,2]"])
-
-        with pytest.warns(DeprecationWarning) as rec_warnings:
-            v_store_init_core = AstraDBVectorStore(
-                embedding=embedding_d2,
-                collection_name=vector_store_d2.collection_name,
-                astra_db_client=core_astra_db,
-                metric="euclidean",
-                setup_mode=SetupMode.ASYNC,
-            )
-
-        results = await v_store_init_core.asimilarity_search("[-1,-1]", k=1)
-        # cleaning out 'spurious' "unclosed socket/transport..." warnings
-        f_rec_warnings = [
-            wrn for wrn in rec_warnings if issubclass(wrn.category, DeprecationWarning)
-        ]
-        assert len(f_rec_warnings) == 1
-        assert len(results) == 1
-        assert results[0].page_content == "[1,2]"
-
     @pytest.mark.parametrize(
         "vector_store",
         [
@@ -1803,32 +1738,48 @@ class TestAstraDBVectorStore:
         """Verify changed attributes in 'copy', down in the astra_env of the store."""
         vstore0: AstraDBVectorStore = request.getfixturevalue(vector_store)
 
-        # component_name, deep test
-        # Note this line encodes assumptions on astrapy internals that will fail on 2.0:
-        caller_names0 = {caller[0] for caller in vstore0.astra_env.collection.callers}
+        # component_name, override test
+        caller_names0 = {caller[0] for caller in vstore0.astra_env.full_callers}
         assert COMPONENT_NAME_VECTORSTORE in caller_names0
 
         vstore1 = vstore0.copy(component_name="xyz_component")
 
-        # Note this line encodes assumptions on astrapy internals that will fail on 2.0:
-        caller_names1 = {caller[0] for caller in vstore1.astra_env.collection.callers}
+        caller_names1 = {caller[0] for caller in vstore1.astra_env.full_callers}
         assert COMPONENT_NAME_VECTORSTORE not in caller_names1
         assert "xyz_component" in caller_names1
 
-        # other changeable attributes (this check does not enter astrapy at all)
+        # basic copy (no changes)
+        vstore1b = vstore0.copy()
+
+        assert vstore1b.astra_env.token == vstore0.astra_env.token
+        assert vstore1b.astra_env.ext_callers == vstore0.astra_env.ext_callers
+        assert vstore1b.astra_env.component_name == vstore0.astra_env.component_name
+        assert (
+            vstore1b.astra_env.collection_embedding_api_key
+            == vstore0.astra_env.collection_embedding_api_key
+        )
+        assert (
+            vstore1b.astra_env.collection_reranking_api_key
+            == vstore0.astra_env.collection_reranking_api_key
+        )
+
+        # other changeable attributes
         token2 = StaticTokenProvider("xyz")
-        apikey2 = EmbeddingAPIKeyHeaderProvider(None)
+        apikey2 = EmbeddingAPIKeyHeaderProvider("another_api_key")
+        rrkkey2 = RerankingAPIKeyHeaderProvider("a fancy reranking key")
         vstore2 = vstore0.copy(
             token=token2,
             ext_callers=[("cnx", "cvx")],
             component_name="component_name2",
             collection_embedding_api_key=apikey2,
+            collection_reranking_api_key=rrkkey2,
         )
 
         assert vstore2.astra_env.token == token2
         assert vstore2.astra_env.ext_callers == [("cnx", "cvx")]
         assert vstore2.astra_env.component_name == "component_name2"
         assert vstore2.astra_env.collection_embedding_api_key == apikey2
+        assert vstore2.astra_env.collection_reranking_api_key == rrkkey2
 
     @pytest.mark.parametrize(
         ("vector_store", "is_vectorize"),
@@ -2004,13 +1955,13 @@ class TestAstraDBVectorStore:
         # nonvector sort
         hits9a = vstore.run_query(
             n=3,
-            sort={"int_index": SortDocuments.ASCENDING},
+            sort={"int_index": SortMode.ASCENDING},
         )
         hits9a_l = list(hits9a)
         assert [doc_id for _, doc_id, _, _ in hits9a_l] == ["1", "2", "3"]
         hits9d = vstore.run_query(
             n=3,
-            sort={"int_index": SortDocuments.DESCENDING},
+            sort={"int_index": SortMode.DESCENDING},
         )
         hits9d_l = list(hits9d)
         assert [doc_id for _, doc_id, _, _ in hits9d_l] == ["10", "9", "8"]
@@ -2191,13 +2142,13 @@ class TestAstraDBVectorStore:
         # nonvector sort
         hits9a = await vstore.arun_query(
             n=3,
-            sort={"int_index": SortDocuments.ASCENDING},
+            sort={"int_index": SortMode.ASCENDING},
         )
         hits9a_l = [tpl async for tpl in hits9a]
         assert [doc_id for _, doc_id, _, _ in hits9a_l] == ["1", "2", "3"]
         hits9d = await vstore.arun_query(
             n=3,
-            sort={"int_index": SortDocuments.DESCENDING},
+            sort={"int_index": SortMode.DESCENDING},
         )
         hits9d_l = [tpl async for tpl in hits9d]
         assert [doc_id for _, doc_id, _, _ in hits9d_l] == ["10", "9", "8"]

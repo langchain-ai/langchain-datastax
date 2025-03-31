@@ -25,7 +25,6 @@ from langchain_astradb.utils.astradb import (
 
 if TYPE_CHECKING:
     from astrapy.authentication import TokenProvider
-    from astrapy.db import AstraDB, AsyncAstraDB
 
 logger = logging.getLogger(__name__)
 
@@ -43,14 +42,11 @@ class AstraDBLoader(BaseLoader):
         namespace: str | None = None,
         filter_criteria: dict[str, Any] | None = None,
         projection: dict[str, Any] | None = _NOT_SET,  # type: ignore[assignment]
-        find_options: dict[str, Any] | None = None,
         limit: int | None = None,
         nb_prefetched: int = _NOT_SET,  # type: ignore[assignment]
         page_content_mapper: Callable[[dict], str] = json.dumps,
         metadata_mapper: Callable[[dict], dict[str, Any]] | None = None,
         ext_callers: list[tuple[str | None, str | None] | str | None] | None = None,
-        astra_db_client: AstraDB | None = None,
-        async_astra_db_client: AsyncAstraDB | None = None,
     ) -> None:
         """Load DataStax Astra DB documents.
 
@@ -72,9 +68,6 @@ class AstraDBLoader(BaseLoader):
             filter_criteria: Criteria to filter documents.
             projection: Specifies the fields to return. If not provided, reads
                 fall back to the Data API default projection.
-            find_options: Additional options for the query.
-                *DEPRECATED starting from version 0.3.5.*
-                *For limiting, please use `limit`. Other options are ignored.*
             limit: a maximum number of documents to return in the read query.
             nb_prefetched: Max number of documents to pre-fetch.
                 *IGNORED starting from v. 0.3.5: astrapy v1.0+ does not support it.*
@@ -88,16 +81,6 @@ class AstraDBLoader(BaseLoader):
                 or just strings if no version info is provided, which, if supplied,
                 becomes the leading part of the User-Agent string in all API requests
                 related to this component.
-            astra_db_client:
-                *DEPRECATED starting from version 0.3.5.*
-                *Please use 'token', 'api_endpoint' and optionally 'environment'.*
-                you can pass an already-created 'astrapy.db.AstraDB' instance
-                (alternatively to 'token', 'api_endpoint' and 'environment').
-            async_astra_db_client:
-                *DEPRECATED starting from version 0.3.5.*
-                *Please use 'token', 'api_endpoint' and optionally 'environment'.*
-                you can pass an already-created 'astrapy.db.AsyncAstraDB' instance
-                (alternatively to 'token', 'api_endpoint' and 'environment').
         """
         astra_db_env = _AstraDBCollectionEnvironment(
             collection_name=collection_name,
@@ -108,8 +91,6 @@ class AstraDBLoader(BaseLoader):
             setup_mode=SetupMode.OFF,
             ext_callers=ext_callers,
             component_name=COMPONENT_NAME_LOADER,
-            astra_db_client=astra_db_client,
-            async_astra_db_client=async_astra_db_client,
         )
         self.astra_db_env = astra_db_env
         self.filter = filter_criteria
@@ -127,35 +108,7 @@ class AstraDBLoader(BaseLoader):
                 stacklevel=2,
             )
 
-        # normalizing limit and options and deprecations
-        _find_options = find_options.copy() if find_options else {}
-        if "limit" in _find_options:
-            if limit is not None:
-                msg = (
-                    "Duplicate 'limit' directive supplied. Please remove it "
-                    "from the 'find_options' map parameter."
-                )
-                raise ValueError(msg)
-            warnings.warn(
-                (
-                    "Passing 'limit' as part of the 'find_options' "
-                    "dictionary is deprecated starting from version 0.3.5. "
-                    "Please switch to passing 'limit=<number>' "
-                    "directly in the constructor."
-                ),
-                DeprecationWarning,
-                stacklevel=2,
-            )
-        self.limit = _find_options.pop("limit", limit)
-        if _find_options:
-            warnings.warn(
-                (
-                    "Unknown keys passed in the 'find_options' dictionary. "
-                    "This parameter is deprecated starting from version 0.3.5."
-                ),
-                DeprecationWarning,
-                stacklevel=2,
-            )
+        self.limit = limit
         self.nb_prefetched = nb_prefetched
         self.page_content_mapper = page_content_mapper
         self.metadata_mapper = metadata_mapper or (

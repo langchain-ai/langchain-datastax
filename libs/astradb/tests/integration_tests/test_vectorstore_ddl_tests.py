@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 from astrapy.authentication import EmbeddingAPIKeyHeaderProvider, StaticTokenProvider
+from astrapy.info import CollectionDefinition
 
 from langchain_astradb.utils.astradb import SetupMode
 from langchain_astradb.vectorstores import AstraDBVectorStore, AstraDBVectorStoreError
@@ -207,8 +208,7 @@ class TestAstraDBVectorStoreDDLs:
         """
         database.create_collection(
             EPHEMERAL_LEGACY_IDX_NAME_D2,
-            dimension=2,
-            check_exists=False,
+            definition=CollectionDefinition.builder().set_vector_dimension(2).build(),
         )
 
         with pytest.raises(
@@ -348,8 +348,7 @@ class TestAstraDBVectorStoreDDLs:
         """
         await database.to_async().create_collection(
             EPHEMERAL_LEGACY_IDX_NAME_D2,
-            dimension=2,
-            check_exists=False,
+            definition=CollectionDefinition.builder().set_vector_dimension(2).build(),
         )
 
         with pytest.raises(

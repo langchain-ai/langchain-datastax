@@ -10,6 +10,7 @@ from langchain_astradb.utils.vector_store_autodetect import (
     _detect_document_flatness,
     _detect_documents_content_field,
     _detect_documents_flatness,
+    _detect_documents_have_lexical,
 )
 
 FLAT_DOCUMENT = {"$vector": [0], "metadata": "m", "_id": "a", "x": "x"}
@@ -101,6 +102,16 @@ DOC_CF_TEST_PARAMS = [
     pytest.param(DOCUMENT_WITH_UNKNOWN_CF, None, id="unknown-cf"),
     pytest.param({"x": "LL", "_id": "a"}, "x", id="only-x"),
     pytest.param({"x": 1234, "_id": "a"}, None, id="x-is-number"),
+    pytest.param(
+        {"$lexical": "thelexical", "bla": "abc", "_id": "a"},
+        "bla",
+        id="prefer-nonlexical",
+    ),
+    pytest.param(
+        {"$lexical": "lex", "size": 123, "_id": "a"},
+        "$lexical",
+        id="pick-lexical",
+    ),
     pytest.param({"_id": "a"}, None, id="no-fields"),
 ]
 
@@ -120,6 +131,24 @@ DOCS_CF_TEST_PARAMS = [
     pytest.param([uc, uc], "*", ValueError, id=" [u, u],req='*' "),
     pytest.param([xc, uc, uc], "*", "x", id=" [x, u, u],req='*' "),
     pytest.param([xc, xc, yc, uc, uc, uc], "*", "x", id=" [x, x, y, u, u, u],req='*' "),
+]
+
+DOCS_LEXICAL_TEST_PARAMS = [
+    pytest.param(
+        [{}, {}, {}, {"$lexical": "bla"}, {}],
+        True,
+        id="one_has_it",
+    ),
+    pytest.param(
+        [],
+        False,
+        id="empty_doc_list",
+    ),
+    pytest.param(
+        [{"blo": 1}, {"bla": 2}, {"ble": 3}, {"lexical": "no!"}, {"_id": 5}],
+        False,
+        id="none_has_it",
+    ),
 ]
 
 
@@ -191,3 +220,15 @@ class TestVSAutodetectInferences:
                     documents=documents,
                     requested_content_field=requested_content_field,
                 )
+
+    @pytest.mark.parametrize(
+        ("documents", "expected_has_lexical"),
+        DOCS_LEXICAL_TEST_PARAMS,
+    )
+    def test_detect_documents_have_lexical(
+        self,
+        documents: list[dict[str, Any]],
+        *,
+        expected_has_lexical: bool,
+    ) -> None:
+        assert _detect_documents_have_lexical(documents) is expected_has_lexical

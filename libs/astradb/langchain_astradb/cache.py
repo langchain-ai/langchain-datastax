@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 from functools import lru_cache, wraps
 from typing import TYPE_CHECKING, Any, Awaitable, Callable, Generator
 
-from astrapy.db import AstraDB, AsyncAstraDB, logger
 from langchain_core.caches import RETURN_VAL_TYPE, BaseCache
 from langchain_core.language_models.llms import aget_prompts, get_prompts
 from langchain_core.load.dump import dumps
@@ -31,6 +31,8 @@ ASTRA_DB_CACHE_DEFAULT_COLLECTION_NAME = "langchain_astradb_cache"
 ASTRA_DB_SEMANTIC_CACHE_DEFAULT_COLLECTION_NAME = "langchain_astradb_semantic_cache"
 ASTRA_DB_SEMANTIC_CACHE_DEFAULT_THRESHOLD = 0.85
 ASTRA_DB_SEMANTIC_CACHE_EMBEDDING_CACHE_SIZE = 16
+
+logger = logging.getLogger(__name__)
 
 
 def _hash(_input: str) -> str:
@@ -86,13 +88,15 @@ def _loads_generations(generations_str: str) -> RETURN_VAL_TYPE | None:
         # not relying on `_load_generations_from_json` (which could disappear):
     except (json.JSONDecodeError, TypeError):
         logger.warning(
-            f"Malformed/unparsable cached blob encountered: '{generations_str}'"
+            "Malformed/unparsable cached blob encountered: '%s'",
+            generations_str,
         )
         return None
     else:
         generations = [Generation(**generation_dict) for generation_dict in gen_dicts]
         logger.warning(
-            f"Legacy 'Generation' cached blob encountered: '{generations_str}'"
+            "Legacy 'Generation' cached blob encountered: '%s'",
+            generations_str,
         )
         return generations
 
@@ -113,8 +117,6 @@ class AstraDBCache(BaseCache):
         pre_delete_collection: bool = False,
         setup_mode: SetupMode = SetupMode.SYNC,
         ext_callers: list[tuple[str | None, str | None] | str | None] | None = None,
-        astra_db_client: AstraDB | None = None,
-        async_astra_db_client: AsyncAstraDB | None = None,
     ):
         """Cache that uses Astra DB as a backend.
 
@@ -149,16 +151,6 @@ class AstraDBCache(BaseCache):
                 or just strings if no version info is provided, which, if supplied,
                 becomes the leading part of the User-Agent string in all API requests
                 related to this component.
-            astra_db_client:
-                *DEPRECATED starting from version 0.3.5.*
-                *Please use 'token', 'api_endpoint' and optionally 'environment'.*
-                you can pass an already-created 'astrapy.db.AstraDB' instance
-                (alternatively to 'token', 'api_endpoint' and 'environment').
-            async_astra_db_client:
-                *DEPRECATED starting from version 0.3.5.*
-                *Please use 'token', 'api_endpoint' and optionally 'environment'.*
-                you can pass an already-created 'astrapy.db.AsyncAstraDB' instance
-                (alternatively to 'token', 'api_endpoint' and 'environment').
         """
         self.astra_env = _AstraDBCollectionEnvironment(
             collection_name=collection_name,
@@ -170,8 +162,6 @@ class AstraDBCache(BaseCache):
             pre_delete_collection=pre_delete_collection,
             ext_callers=ext_callers,
             component_name=COMPONENT_NAME_CACHE,
-            astra_db_client=astra_db_client,
-            async_astra_db_client=async_astra_db_client,
         )
         self.collection = self.astra_env.collection
         self.async_collection = self.astra_env.async_collection
@@ -338,8 +328,6 @@ class AstraDBSemanticCache(BaseCache):
         metric: str | None = None,
         similarity_threshold: float = ASTRA_DB_SEMANTIC_CACHE_DEFAULT_THRESHOLD,
         ext_callers: list[tuple[str | None, str | None] | str | None] | None = None,
-        astra_db_client: AstraDB | None = None,
-        async_astra_db_client: AsyncAstraDB | None = None,
     ):
         """Astra DB semantic cache.
 
@@ -384,16 +372,6 @@ class AstraDBSemanticCache(BaseCache):
                 or just strings if no version info is provided, which, if supplied,
                 becomes the leading part of the User-Agent string in all API requests
                 related to this component.
-            astra_db_client:
-                *DEPRECATED starting from version 0.3.5.*
-                *Please use 'token', 'api_endpoint' and optionally 'environment'.*
-                you can pass an already-created 'astrapy.db.AstraDB' instance
-                (alternatively to 'token', 'api_endpoint' and 'environment').
-            async_astra_db_client:
-                *DEPRECATED starting from version 0.3.5.*
-                *Please use 'token', 'api_endpoint' and optionally 'environment'.*
-                you can pass an already-created 'astrapy.db.AsyncAstraDB' instance
-                (alternatively to 'token', 'api_endpoint' and 'environment').
         """
         self.embedding = embedding
         self.metric = metric
@@ -435,8 +413,6 @@ class AstraDBSemanticCache(BaseCache):
             metric=metric,
             ext_callers=ext_callers,
             component_name=COMPONENT_NAME_SEMANTICCACHE,
-            astra_db_client=astra_db_client,
-            async_astra_db_client=async_astra_db_client,
         )
         self.collection = self.astra_env.collection
         self.async_collection = self.astra_env.async_collection

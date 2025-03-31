@@ -16,7 +16,7 @@ from typing import (
     TypeVar,
 )
 
-from astrapy.exceptions import InsertManyException
+from astrapy.exceptions import CollectionInsertManyException
 from langchain_core.stores import BaseStore, ByteStore
 from typing_extensions import override
 
@@ -31,8 +31,7 @@ from langchain_astradb.utils.astradb import (
 
 if TYPE_CHECKING:
     from astrapy.authentication import TokenProvider
-    from astrapy.db import AstraDB, AsyncAstraDB
-    from astrapy.results import UpdateResult
+    from astrapy.results import CollectionUpdateResult
 
 V = TypeVar("V")
 
@@ -104,8 +103,8 @@ class AstraDBBaseStore(BaseStore[str, V], Generic[V]):
                 concurrency=MAX_CONCURRENT_DOCUMENT_INSERTIONS,
             )
             ids_to_replace = []
-        except InsertManyException as err:
-            inserted_ids_set = set(err.partial_result.inserted_ids)
+        except CollectionInsertManyException as err:
+            inserted_ids_set = set(err.inserted_ids)
             ids_to_replace = [
                 document["_id"]
                 for document in documents_to_insert
@@ -124,7 +123,9 @@ class AstraDBBaseStore(BaseStore[str, V], Generic[V]):
                 max_workers=MAX_CONCURRENT_DOCUMENT_REPLACEMENTS
             ) as executor:
 
-                def _replace_document(document: dict[str, Any]) -> UpdateResult:
+                def _replace_document(
+                    document: dict[str, Any],
+                ) -> CollectionUpdateResult:
                     return self.collection.replace_one(
                         {"_id": document["_id"]},
                         document,
@@ -160,8 +161,8 @@ class AstraDBBaseStore(BaseStore[str, V], Generic[V]):
                 ordered=False,
             )
             ids_to_replace = []
-        except InsertManyException as err:
-            inserted_ids_set = set(err.partial_result.inserted_ids)
+        except CollectionInsertManyException as err:
+            inserted_ids_set = set(err.inserted_ids)
             ids_to_replace = [
                 document["_id"]
                 for document in documents_to_insert
@@ -180,7 +181,9 @@ class AstraDBBaseStore(BaseStore[str, V], Generic[V]):
 
             _async_collection = self.async_collection
 
-            async def _replace_document(document: dict[str, Any]) -> UpdateResult:
+            async def _replace_document(
+                document: dict[str, Any],
+            ) -> CollectionUpdateResult:
                 async with sem:
                     return await _async_collection.replace_one(
                         {"_id": document["_id"]},
@@ -243,8 +246,6 @@ class AstraDBStore(AstraDBBaseStore[Any]):
         pre_delete_collection: bool = False,
         setup_mode: SetupMode = SetupMode.SYNC,
         ext_callers: list[tuple[str | None, str | None] | str | None] | None = None,
-        astra_db_client: AstraDB | None = None,
-        async_astra_db_client: AsyncAstraDB | None = None,
     ) -> None:
         """BaseStore implementation using DataStax AstraDB as the underlying store.
 
@@ -285,16 +286,6 @@ class AstraDBStore(AstraDBBaseStore[Any]):
                 or just strings if no version info is provided, which, if supplied,
                 becomes the leading part of the User-Agent string in all API requests
                 related to this component.
-            astra_db_client:
-                *DEPRECATED starting from version 0.3.5.*
-                *Please use 'token', 'api_endpoint' and optionally 'environment'.*
-                you can pass an already-created 'astrapy.db.AstraDB' instance
-                (alternatively to 'token', 'api_endpoint' and 'environment').
-            async_astra_db_client:
-                *DEPRECATED starting from version 0.3.5.*
-                *Please use 'token', 'api_endpoint' and optionally 'environment'.*
-                you can pass an already-created 'astrapy.db.AsyncAstraDB' instance
-                (alternatively to 'token', 'api_endpoint' and 'environment').
         """
         super().__init__(
             collection_name=collection_name,
@@ -306,8 +297,6 @@ class AstraDBStore(AstraDBBaseStore[Any]):
             pre_delete_collection=pre_delete_collection,
             ext_callers=ext_callers,
             component_name=COMPONENT_NAME_STORE,
-            astra_db_client=astra_db_client,
-            async_astra_db_client=async_astra_db_client,
         )
 
     @override
@@ -331,8 +320,6 @@ class AstraDBByteStore(AstraDBBaseStore[bytes], ByteStore):
         pre_delete_collection: bool = False,
         setup_mode: SetupMode = SetupMode.SYNC,
         ext_callers: list[tuple[str | None, str | None] | str | None] | None = None,
-        astra_db_client: AstraDB | None = None,
-        async_astra_db_client: AsyncAstraDB | None = None,
     ) -> None:
         """ByteStore implementation using DataStax AstraDB as the underlying store.
 
@@ -370,16 +357,6 @@ class AstraDBByteStore(AstraDBBaseStore[bytes], ByteStore):
                 or just strings if no version info is provided, which, if supplied,
                 becomes the leading part of the User-Agent string in all API requests
                 related to this component.
-            astra_db_client:
-                *DEPRECATED starting from version 0.3.5.*
-                *Please use 'token', 'api_endpoint' and optionally 'environment'.*
-                you can pass an already-created 'astrapy.db.AstraDB' instance
-                (alternatively to 'token', 'api_endpoint' and 'environment').
-            async_astra_db_client:
-                *DEPRECATED starting from version 0.3.5.*
-                *Please use 'token', 'api_endpoint' and optionally 'environment'.*
-                you can pass an already-created 'astrapy.db.AsyncAstraDB' instance
-                (alternatively to 'token', 'api_endpoint' and 'environment').
         """
         super().__init__(
             collection_name=collection_name,
@@ -391,8 +368,6 @@ class AstraDBByteStore(AstraDBBaseStore[bytes], ByteStore):
             pre_delete_collection=pre_delete_collection,
             ext_callers=ext_callers,
             component_name=COMPONENT_NAME_BYTESTORE,
-            astra_db_client=astra_db_client,
-            async_astra_db_client=async_astra_db_client,
         )
 
     @override

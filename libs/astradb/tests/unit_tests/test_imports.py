@@ -10,7 +10,7 @@ EXPECTED_ALL = [
     "AstraDBLoader",
     "AstraDBVectorStore",
     "AstraDBVectorStoreError",
-    "CollectionVectorServiceOptions",
+    "VectorServiceOptions",
 ]
 
 

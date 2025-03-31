@@ -45,6 +45,7 @@ jobs:
           ASTRA_DB_KEYSPACE: ${{ secrets.ASTRA_DB_KEYSPACE }}
           SHARED_SECRET_NAME_OPENAI: ${{ secrets.SHARED_SECRET_NAME_OPENAI }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          HEADER_EMBEDDING_API_KEY_OPENAI: ${{secrets.HEADER_EMBEDDING_API_KEY_OPENAI}}
         run: |
           make integration_tests
 

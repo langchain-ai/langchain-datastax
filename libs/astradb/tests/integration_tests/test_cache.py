@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 from typing import TYPE_CHECKING
 
 import pytest
@@ -18,7 +17,6 @@ from .conftest import (
 
 if TYPE_CHECKING:
     from astrapy import Collection
-    from astrapy.db import AstraDB
 
     from .conftest import IdentityLLM
 
@@ -174,55 +172,3 @@ class TestAstraDBCache:
         await test_llm.agenerate(["prompt1"])
         await test_llm.agenerate(["prompt1"])
         assert test_llm.num_calls == 2
-
-    @pytest.mark.skipif(
-        os.environ.get("ASTRA_DB_ENVIRONMENT", "prod").upper() != "PROD",
-        reason="Can run on Astra DB production environment only",
-    )
-    def test_cache_coreclients_init_sync(
-        self,
-        core_astra_db: AstraDB,
-        astradb_cache: AstraDBCache,
-    ) -> None:
-        """A deprecation warning from passing a (core) AstraDB, but it works."""
-        gens0 = [Generation(text="gen0_text")]
-        astradb_cache.update("prompt0", "llm_string", gens0)
-        # create an equivalent cache with core AstraDB in init
-        with pytest.warns(DeprecationWarning) as rec_warnings:
-            cache_init_core = AstraDBCache(
-                collection_name=astradb_cache.collection.name,
-                astra_db_client=core_astra_db,
-            )
-        f_rec_warnings = [
-            wrn for wrn in rec_warnings if issubclass(wrn.category, DeprecationWarning)
-        ]
-        assert len(f_rec_warnings) == 1
-        assert cache_init_core.lookup("prompt0", "llm_string") == gens0
-
-    @pytest.mark.skipif(
-        os.environ.get("ASTRA_DB_ENVIRONMENT", "prod").upper() != "PROD",
-        reason="Can run on Astra DB production environment only",
-    )
-    async def test_cache_coreclients_init_async(
-        self,
-        core_astra_db: AstraDB,
-        astradb_cache_async: AstraDBCache,
-    ) -> None:
-        """
-        A deprecation warning from passing a (core) AstraDB, but it works.
-        Async version.
-        """
-        gens0 = [Generation(text="gen0_text")]
-        await astradb_cache_async.aupdate("prompt0", "llm_string", gens0)
-        # create an equivalent cache with core AstraDB in init
-        with pytest.warns(DeprecationWarning) as rec_warnings:
-            cache_init_core = AstraDBCache(
-                collection_name=astradb_cache_async.async_collection.name,
-                astra_db_client=core_astra_db,
-                setup_mode=SetupMode.ASYNC,
-            )
-        f_rec_warnings = [
-            wrn for wrn in rec_warnings if issubclass(wrn.category, DeprecationWarning)
-        ]
-        assert len(f_rec_warnings) == 1
-        assert await cache_init_core.alookup("prompt0", "llm_string") == gens0

@@ -6,10 +6,12 @@ Refer to `test_vectorstores.py` for the requirements to run.
 from __future__ import annotations
 
 import asyncio
+import os
 from typing import TYPE_CHECKING, Any
 
 import pytest
 from astrapy.authentication import StaticTokenProvider
+from astrapy.info import CollectionDefinition
 from langchain_community.graph_vectorstores.base import Node
 from langchain_community.graph_vectorstores.links import Link, add_links
 from langchain_core.documents import Document
@@ -169,6 +171,7 @@ def auth_kwargs(
 @pytest.fixture
 def graph_vector_store_d2(
     auth_kwargs: dict[str, Any],
+    nvidia_reranking_api_key: str | None,
     empty_collection_d2: Collection,
     embedding_d2: Embeddings,
 ) -> AstraDBGraphVectorStore:
@@ -176,6 +179,7 @@ def graph_vector_store_d2(
         embedding=embedding_d2,
         collection_name=empty_collection_d2.name,
         setup_mode=SetupMode.OFF,
+        collection_reranking_api_key=nvidia_reranking_api_key,
         **auth_kwargs,
     )
 
@@ -184,11 +188,13 @@ def graph_vector_store_d2(
 def graph_vector_store_vz(
     auth_kwargs: dict[str, Any],
     openai_api_key: str,
+    nvidia_reranking_api_key: str | None,
     empty_collection_vz: Collection,
 ) -> AstraDBGraphVectorStore:
     return AstraDBGraphVectorStore(
         collection_vector_service_options=OPENAI_VECTORIZE_OPTIONS_HEADER,
         collection_embedding_api_key=openai_api_key,
+        collection_reranking_api_key=nvidia_reranking_api_key,
         collection_name=empty_collection_vz.name,
         setup_mode=SetupMode.OFF,
         **auth_kwargs,
@@ -220,6 +226,7 @@ def autodetect_populated_graph_vector_store_d2(
     embedding_d2: Embeddings,
     graph_vector_store_docs: list[Document],
     ephemeral_collection_cleaner_idxall_d2: str,
+    nvidia_reranking_api_key: str | None,
 ) -> AstraDBGraphVectorStore:
     """
     Pre-populate the collection and have (VectorStore)autodetect work on it,
@@ -228,9 +235,12 @@ def autodetect_populated_graph_vector_store_d2(
     """
     empty_collection_d2_idxall = database.create_collection(
         ephemeral_collection_cleaner_idxall_d2,
-        dimension=2,
-        check_exists=False,
-        metric="euclidean",
+        definition=(
+            CollectionDefinition.builder()
+            .set_vector_dimension(2)
+            .set_vector_metric("euclidean")
+            .build()
+        ),
     )
     empty_collection_d2_idxall.insert_many(
         [
@@ -260,6 +270,7 @@ def autodetect_populated_graph_vector_store_d2(
         metadata_incoming_links_key="x_link_to_x",
         content_field="*",
         autodetect_collection=True,
+        collection_reranking_api_key=nvidia_reranking_api_key,
         **auth_kwargs,
     )
     g_store.add_documents(graph_vector_store_docs)
@@ -270,6 +281,7 @@ def autodetect_populated_graph_vector_store_d2(
 def autodetect_populated_graph_vector_store_vz(
     auth_kwargs: dict[str, Any],
     openai_api_key: str,
+    nvidia_reranking_api_key: str | None,
     graph_vector_store_docs_vz: list[Document],
     empty_collection_idxall_vz: Collection,
 ) -> AstraDBGraphVectorStore:
@@ -305,6 +317,7 @@ def autodetect_populated_graph_vector_store_vz(
         collection_name=empty_collection_idxall_vz.name,
         metadata_incoming_links_key="x_link_to_x",
         autodetect_collection=True,
+        collection_reranking_api_key=nvidia_reranking_api_key,
         **auth_kwargs,
     )
     g_store.add_documents(graph_vector_store_docs_vz)
@@ -326,6 +339,10 @@ def assert_all_flat_docs(collection: Collection, is_vectorize: bool) -> None:  #
 
 @pytest.mark.skipif(
     not astra_db_env_vars_available(), reason="Missing Astra DB env. vars"
+)
+@pytest.mark.skipif(
+    "LANGCHAIN_TEST_ASTRADBGRAPHVECTORSTORE" not in os.environ,
+    reason="AstraDBGraphVectorStore tests omitted by default",
 )
 class TestAstraDBGraphVectorStore:
     @pytest.mark.parametrize(
@@ -358,7 +375,12 @@ class TestAstraDBGraphVectorStore:
 
         ss_response = g_store.similarity_search(query=query, k=2)
         ss_labels = [doc.metadata["label"] for doc in ss_response]
-        assert ss_labels == ["AR", "A0"]
+        if g_store.vector_store.hybrid_search and is_autodetected:
+            # cannot expect exact vector-dictated sequence, there is reranking
+            assert "A0" in ss_labels
+            assert len(ss_labels) == 2
+        else:
+            assert ss_labels == ["AR", "A0"]
 
         if is_vectorize:
             with pytest.raises(
@@ -409,7 +431,12 @@ class TestAstraDBGraphVectorStore:
 
         ss_response = await g_store.asimilarity_search(query=query, k=2)
         ss_labels = [doc.metadata["label"] for doc in ss_response]
-        assert ss_labels == ["AR", "A0"]
+        if g_store.vector_store.hybrid_search and is_autodetected:
+            # cannot expect exact vector-dictated sequence, there is reranking
+            assert "A0" in ss_labels
+            assert len(ss_labels) == 2
+        else:
+            assert ss_labels == ["AR", "A0"]
 
         if is_vectorize:
             with pytest.raises(
@@ -463,7 +490,12 @@ class TestAstraDBGraphVectorStore:
             doc.metadata["label"]
             for doc in g_store.traversal_search(query=query, k=2, depth=2)
         }
-        assert ts_labels == {"AR", "A0", "BR", "B0", "TR", "T0"}
+        if g_store.vector_store.hybrid_search and is_autodetected:
+            # cannot expect exact vector-dictated sequence, there is reranking
+            assert "A0" in ts_labels
+            assert len(ts_labels) >= 2
+        else:
+            assert ts_labels == {"AR", "A0", "BR", "B0", "TR", "T0"}
         if is_autodetected:
             assert_all_flat_docs(
                 g_store.vector_store.astra_env.collection, is_vectorize=is_vectorize
@@ -504,7 +536,12 @@ class TestAstraDBGraphVectorStore:
             doc.metadata["label"]
             async for doc in g_store.atraversal_search(query=query, k=2, depth=2)
         }
-        assert ts_labels == {"AR", "A0", "BR", "B0", "TR", "T0"}
+        if g_store.vector_store.hybrid_search and is_autodetected:
+            # cannot expect exact vector-dictated sequence, there is reranking
+            assert "A0" in ts_labels
+            assert len(ts_labels) >= 2
+        else:
+            assert ts_labels == {"AR", "A0", "BR", "B0", "TR", "T0"}
         if is_autodetected:
             await asyncio.to_thread(
                 assert_all_flat_docs,

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 from typing import TYPE_CHECKING
 
 import pytest
@@ -18,7 +17,6 @@ from .conftest import (
 
 if TYPE_CHECKING:
     from astrapy import Collection
-    from astrapy.db import AstraDB
     from langchain_core.embeddings import Embeddings
 
     from .conftest import IdentityLLM
@@ -200,65 +198,3 @@ class TestAstraDBSemanticCache:
         await test_llm.agenerate(["[3,4]"])
         await test_llm.agenerate(["[3,4]"])
         assert test_llm.num_calls == 2
-
-    @pytest.mark.skipif(
-        os.environ.get("ASTRA_DB_ENVIRONMENT", "prod").upper() != "PROD",
-        reason="Can run on Astra DB production environment only",
-    )
-    def test_semcache_coreclients_init_sync(
-        self,
-        core_astra_db: AstraDB,
-        embedding_d2: Embeddings,
-        astradb_semantic_cache: AstraDBSemanticCache,
-    ) -> None:
-        """A deprecation warning from passing a (core) AstraDB, but it works."""
-        gens0 = [Generation(text="gen0_text")]
-        astradb_semantic_cache.update("[0.999,2.001]", "llm_string", gens0)
-        # create an equivalent cache with core AstraDB in init
-        with pytest.warns(DeprecationWarning) as rec_warnings:
-            semantic_cache_init_core = AstraDBSemanticCache(
-                collection_name=astradb_semantic_cache.collection_name,
-                astra_db_client=core_astra_db,
-                embedding=embedding_d2,
-                metric="euclidean",
-            )
-        f_rec_warnings = [
-            wrn for wrn in rec_warnings if issubclass(wrn.category, DeprecationWarning)
-        ]
-        assert len(f_rec_warnings) == 1
-        hit12 = semantic_cache_init_core.lookup_with_id("[1,2]", "llm_string")
-        assert hit12 is not None
-        assert hit12[1] == gens0
-
-    @pytest.mark.skipif(
-        os.environ.get("ASTRA_DB_ENVIRONMENT", "prod").upper() != "PROD",
-        reason="Can run on Astra DB production environment only",
-    )
-    async def test_semcache_coreclients_init_async(
-        self,
-        core_astra_db: AstraDB,
-        embedding_d2: Embeddings,
-        astradb_semantic_cache_async: AstraDBSemanticCache,
-    ) -> None:
-        """
-        A deprecation warning from passing a (core) AstraDB, but it works.
-        Async version.
-        """
-        gens0 = [Generation(text="gen0_text")]
-        await astradb_semantic_cache_async.aupdate("[0.999,2.001]", "llm_string", gens0)
-        # create an equivalent cache with core AstraDB in init
-        with pytest.warns(DeprecationWarning) as rec_warnings:
-            semantic_cache_init_core = AstraDBSemanticCache(
-                collection_name=astradb_semantic_cache_async.collection_name,
-                astra_db_client=core_astra_db,
-                embedding=embedding_d2,
-                metric="euclidean",
-                setup_mode=SetupMode.ASYNC,
-            )
-        f_rec_warnings = [
-            wrn for wrn in rec_warnings if issubclass(wrn.category, DeprecationWarning)
-        ]
-        assert len(f_rec_warnings) == 1
-        hit12 = await semantic_cache_init_core.alookup_with_id("[1,2]", "llm_string")
-        assert hit12 is not None
-        assert hit12[1] == gens0

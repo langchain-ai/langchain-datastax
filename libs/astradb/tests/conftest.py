@@ -23,6 +23,8 @@ def blockbuster() -> Iterator[BlockBuster]:
         # TODO: GraphVectorStore init is blocking. Should be fixed.
         for method in (
             "socket.socket.connect",
+            "socket.socket.send",
+            "socket.socket.recv",
             "ssl.SSLSocket.send",
             "ssl.SSLSocket.recv",
             "ssl.SSLSocket.read",

@@ -18,19 +18,29 @@ from typing import (
 
 from langchain_community.graph_vectorstores.base import GraphVectorStore, Node
 from langchain_community.graph_vectorstores.links import METADATA_LINKS_KEY, Link
-from langchain_core._api import beta
 from langchain_core.documents import Document
 from typing_extensions import override
 
-from langchain_astradb.utils.astradb import COMPONENT_NAME_GRAPHVECTORSTORE, SetupMode
+from langchain_astradb.utils.astradb import (
+    COMPONENT_NAME_GRAPHVECTORSTORE,
+    HybridSearchMode,
+    SetupMode,
+)
 from langchain_astradb.utils.mmr_helper import MmrHelper
 from langchain_astradb.vectorstores import AstraDBVectorStore
 
 if TYPE_CHECKING:
-    from astrapy.authentication import EmbeddingHeadersProvider, TokenProvider
-    from astrapy.db import AstraDB as AstraDBClient
-    from astrapy.db import AsyncAstraDB as AsyncAstraDBClient
-    from astrapy.info import CollectionVectorServiceOptions
+    from astrapy.authentication import (
+        EmbeddingHeadersProvider,
+        RerankingHeadersProvider,
+        TokenProvider,
+    )
+    from astrapy.info import (
+        CollectionLexicalOptions,
+        CollectionRerankOptions,
+        RerankServiceOptions,
+        VectorServiceOptions,
+    )
     from langchain_core.embeddings import Embeddings
 
 DEFAULT_INDEXING_OPTIONS = {"allow": ["metadata"]}
@@ -99,7 +109,6 @@ def _outgoing_links(node: Node | EmbeddedNode) -> set[Link]:
     return {link for link in node.links if link.direction in ["out", "bidir"]}
 
 
-@beta()
 class AstraDBGraphVectorStore(GraphVectorStore):
     def __init__(
         self,
@@ -121,15 +130,21 @@ class AstraDBGraphVectorStore(GraphVectorStore):
         metadata_indexing_include: Iterable[str] | None = None,
         metadata_indexing_exclude: Iterable[str] | None = None,
         collection_indexing_policy: dict[str, Any] | None = None,
-        collection_vector_service_options: CollectionVectorServiceOptions | None = None,
+        collection_vector_service_options: VectorServiceOptions | None = None,
         collection_embedding_api_key: str | EmbeddingHeadersProvider | None = None,
         content_field: str | None = None,
         ignore_invalid_documents: bool = False,
         autodetect_collection: bool = False,
         ext_callers: list[tuple[str | None, str | None] | str | None] | None = None,
         component_name: str = COMPONENT_NAME_GRAPHVECTORSTORE,
-        astra_db_client: AstraDBClient | None = None,
-        async_astra_db_client: AsyncAstraDBClient | None = None,
+        collection_rerank: CollectionRerankOptions | RerankServiceOptions | None = None,
+        collection_reranking_api_key: str | RerankingHeadersProvider | None = None,
+        collection_lexical: str
+        | dict[str, Any]
+        | CollectionLexicalOptions
+        | None = None,
+        hybrid_search: HybridSearchMode | None = None,
+        hybrid_limit_factor: float | None = None,
     ):
         """Graph Vector Store backed by AstraDB.
 
@@ -234,16 +249,37 @@ class AstraDBGraphVectorStore(GraphVectorStore):
                 stack of usage info passed as the User-Agent string to the Data API.
                 Defaults to "langchain_graphvectorstore", but can be overridden if this
                 component actually serves as the building block for another component.
-            astra_db_client:
-                *DEPRECATED starting from version 0.3.5.*
-                *Please use 'token', 'api_endpoint' and optionally 'environment'.*
-                you can pass an already-created 'astrapy.db.AstraDB' instance
-                (alternatively to 'token', 'api_endpoint' and 'environment').
-            async_astra_db_client:
-                *DEPRECATED starting from version 0.3.5.*
-                *Please use 'token', 'api_endpoint' and optionally 'environment'.*
-                you can pass an already-created 'astrapy.db.AsyncAstraDB' instance
-                (alternatively to 'token', 'api_endpoint' and 'environment').
+            collection_rerank: providing reranking settings is necessary to run
+                hybrid searches for similarity. This parameter can be an instance
+                of the astrapy classes `CollectionRerankOptions` or
+                `RerankServiceOptions`.
+            collection_reranking_api_key: for usage of server-side reranking services
+                within Astra DB. With this parameter one can supply an API Key
+                that will be passed to Astra DB with each data request.
+                This parameter can be either a string or a subclass of
+                ``astrapy.authentication.RerankingHeadersProvider``.
+                This is useful when the service is configured for the collection,
+                but no corresponding secret is stored within
+                Astra's key management system.
+            collection_lexical: configuring a lexical analyzer is necessary to run
+                lexical and hybrid searches. This parameter can be a string or dict,
+                which is then passed as-is for the "analyzer" field of a
+                createCollection's "$lexical.analyzer" value, or a ready-made
+                astrapy `CollectionLexicalOptions` object.
+            hybrid_search: whether similarity searches should be run as Hybrid searches
+                or not. Values are DEFAULT, ON or OFF. In case of DEFAULT, searches
+                are performed as permitted by the collection configuration, with a
+                preference for hybrid search. Forcing this setting to ON for a
+                non-hybrid-enabled collection would result in a server error when
+                running searches.
+            hybrid_limit_factor: subsearch "limit" specification for hybrid searches.
+                If omitted, hybrid searches do not specify it and leave the Data API
+                to use its defaults.
+                If a floating-point positive number is provided: each subsearch
+                participating in the hybrid search (i.e. both the vector-based ANN
+                and the lexical-based) will be requested to fecth up to
+                `int(k*hybrid_limit_factor)` items, where `k` is the desired result
+                count from the whole search.
 
         Note:
             For concurrency in synchronous :meth:`~add_texts`:, as a rule of thumb,
@@ -300,8 +336,11 @@ class AstraDBGraphVectorStore(GraphVectorStore):
                 autodetect_collection=autodetect_collection,
                 ext_callers=ext_callers,
                 component_name=component_name,
-                astra_db_client=astra_db_client,
-                async_astra_db_client=async_astra_db_client,
+                collection_rerank=collection_rerank,
+                collection_reranking_api_key=collection_reranking_api_key,
+                collection_lexical=collection_lexical,
+                hybrid_search=hybrid_search,
+                hybrid_limit_factor=hybrid_limit_factor,
             )
 
             # for the test search, if setup_mode is ASYNC,
@@ -331,8 +370,11 @@ class AstraDBGraphVectorStore(GraphVectorStore):
                     autodetect_collection=autodetect_collection,
                     ext_callers=ext_callers,
                     component_name=component_name,
-                    astra_db_client=astra_db_client,
-                    async_astra_db_client=async_astra_db_client,
+                    collection_rerank=collection_rerank,
+                    collection_reranking_api_key=collection_reranking_api_key,
+                    collection_lexical=collection_lexical,
+                    hybrid_search=hybrid_search,
+                    hybrid_limit_factor=hybrid_limit_factor,
                 )
             else:
                 test_vs = self.vector_store
@@ -457,7 +499,7 @@ class AstraDBGraphVectorStore(GraphVectorStore):
         embedding: Embeddings | None = None,
         metadatas: list[dict] | None = None,
         ids: Iterable[str] | None = None,
-        collection_vector_service_options: CollectionVectorServiceOptions | None = None,
+        collection_vector_service_options: VectorServiceOptions | None = None,
         collection_embedding_api_key: str | EmbeddingHeadersProvider | None = None,
         **kwargs: Any,
     ) -> AstraDBGraphVectorStore:
@@ -479,7 +521,7 @@ class AstraDBGraphVectorStore(GraphVectorStore):
         embedding: Embeddings | None = None,
         metadatas: list[dict] | None = None,
         ids: Iterable[str] | None = None,
-        collection_vector_service_options: CollectionVectorServiceOptions | None = None,
+        collection_vector_service_options: VectorServiceOptions | None = None,
         collection_embedding_api_key: str | EmbeddingHeadersProvider | None = None,
         **kwargs: Any,
     ) -> AstraDBGraphVectorStore:
@@ -501,7 +543,7 @@ class AstraDBGraphVectorStore(GraphVectorStore):
         documents: Iterable[Document],
         embedding: Embeddings | None = None,
         ids: Iterable[str] | None = None,
-        collection_vector_service_options: CollectionVectorServiceOptions | None = None,
+        collection_vector_service_options: VectorServiceOptions | None = None,
         collection_embedding_api_key: str | EmbeddingHeadersProvider | None = None,
         **kwargs: Any,
     ) -> AstraDBGraphVectorStore:
@@ -522,7 +564,7 @@ class AstraDBGraphVectorStore(GraphVectorStore):
         documents: Iterable[Document],
         embedding: Embeddings | None = None,
         ids: Iterable[str] | None = None,
-        collection_vector_service_options: CollectionVectorServiceOptions | None = None,
+        collection_vector_service_options: VectorServiceOptions | None = None,
         collection_embedding_api_key: str | EmbeddingHeadersProvider | None = None,
         **kwargs: Any,
     ) -> AstraDBGraphVectorStore:
