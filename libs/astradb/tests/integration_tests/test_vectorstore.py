@@ -9,7 +9,11 @@ import random
 from typing import TYPE_CHECKING, Any
 
 import pytest
-from astrapy.authentication import EmbeddingAPIKeyHeaderProvider, StaticTokenProvider
+from astrapy.authentication import (
+    EmbeddingAPIKeyHeaderProvider,
+    RerankingAPIKeyHeaderProvider,
+    StaticTokenProvider,
+)
 from astrapy.constants import SortMode
 from langchain_core.documents import Document
 
@@ -1744,20 +1748,38 @@ class TestAstraDBVectorStore:
         assert COMPONENT_NAME_VECTORSTORE not in caller_names1
         assert "xyz_component" in caller_names1
 
+        # basic copy (no changes)
+        vstore1b = vstore0.copy()
+
+        assert vstore1b.astra_env.token == vstore0.astra_env.token
+        assert vstore1b.astra_env.ext_callers == vstore0.astra_env.ext_callers
+        assert vstore1b.astra_env.component_name == vstore0.astra_env.component_name
+        assert (
+            vstore1b.astra_env.collection_embedding_api_key
+            == vstore0.astra_env.collection_embedding_api_key
+        )
+        assert (
+            vstore1b.astra_env.collection_reranking_api_key
+            == vstore0.astra_env.collection_reranking_api_key
+        )
+
         # other changeable attributes
         token2 = StaticTokenProvider("xyz")
-        apikey2 = EmbeddingAPIKeyHeaderProvider(None)
+        apikey2 = EmbeddingAPIKeyHeaderProvider("another_api_key")
+        rrkkey2 = RerankingAPIKeyHeaderProvider("a fancy reranking key")
         vstore2 = vstore0.copy(
             token=token2,
             ext_callers=[("cnx", "cvx")],
             component_name="component_name2",
             collection_embedding_api_key=apikey2,
+            collection_reranking_api_key=rrkkey2,
         )
 
         assert vstore2.astra_env.token == token2
         assert vstore2.astra_env.ext_callers == [("cnx", "cvx")]
         assert vstore2.astra_env.component_name == "component_name2"
         assert vstore2.astra_env.collection_embedding_api_key == apikey2
+        assert vstore2.astra_env.collection_reranking_api_key == rrkkey2
 
     @pytest.mark.parametrize(
         ("vector_store", "is_vectorize"),

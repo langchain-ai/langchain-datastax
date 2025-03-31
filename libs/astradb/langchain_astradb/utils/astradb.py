@@ -82,6 +82,18 @@ SURVEY_NUMBER_OF_DOCUMENTS = 15
 # Data API error code for 'collection exists and it's different'
 EXISTING_COLLECTION_ERROR_CODE = "EXISTING_COLLECTION_DIFFERENT_SETTINGS"
 
+COLLECTION_DEFAULTS_MISMATCH_ERROR_MESSAGE = (
+    "Astra DB collection '{collection_name}' was "
+    "found to be configured differently than requested "
+    "by the vector store creation. This is resulting "
+    "in a hard exception from the Data API (accessible as "
+    "`<this-exception>.__cause__`). Please see "
+    "https://github.com/langchain-ai/langchain-datastax"
+    "/blob/main/libs/astradb/README.md#collection-"
+    "defaults-mismatch for more context about this "
+    "issue and possible mitigations."
+)
+
 logger = logging.getLogger()
 
 
@@ -97,8 +109,8 @@ class HybridSearchMode(Enum):
     """Hybrid Search mode for a Vector Store collection."""
 
     DEFAULT = 1
-    ON = 3
-    OFF = 2
+    ON = 2
+    OFF = 3
 
 
 def _unpack_indexing_policy(
@@ -177,6 +189,15 @@ def _normalize_data_api_environment(
     return parsed_endpoint.environment
 
 
+class AstraDBError(Exception):
+    """An exception during Astra DB- (Data API-) related operations.
+
+    This exception represents any operational exception occurring while
+    working with the generic set-up and/or provisioning of components backed
+    by Astra DB (in particular, collection creation and inspection).
+    """
+
+
 class _AstraDBEnvironment:
     def __init__(
         self,
@@ -202,7 +223,7 @@ class _AstraDBEnvironment:
                 "Attempting to fetch token from environment " "variable '%s'",
                 TOKEN_ENV_VAR,
             )
-            self.token = StaticTokenProvider(os.environ.get(TOKEN_ENV_VAR))
+            self.token = StaticTokenProvider(os.getenv(TOKEN_ENV_VAR))
         elif isinstance(token, TokenProvider):
             self.token = token
         else:
@@ -213,7 +234,7 @@ class _AstraDBEnvironment:
                 "Attempting to fetch API endpoint from environment " "variable '%s'",
                 API_ENDPOINT_ENV_VAR,
             )
-            self.api_endpoint = os.environ.get(API_ENDPOINT_ENV_VAR)
+            self.api_endpoint = os.getenv(API_ENDPOINT_ENV_VAR)
         else:
             self.api_endpoint = api_endpoint
 
@@ -222,7 +243,7 @@ class _AstraDBEnvironment:
                 "Attempting to fetch keyspace from environment " "variable '%s'",
                 KEYSPACE_ENV_VAR,
             )
-            self.keyspace = os.environ.get(KEYSPACE_ENV_VAR)
+            self.keyspace = os.getenv(KEYSPACE_ENV_VAR)
         else:
             self.keyspace = keyspace
 
@@ -283,7 +304,7 @@ class _AstraDBEnvironment:
 
 
 class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
-    def __init__(  # noqa: C901
+    def __init__(
         self,
         collection_name: str,
         *,
@@ -320,18 +341,16 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
             component_name=component_name,
         )
         self.collection_name = collection_name
-        if isinstance(collection_embedding_api_key, EmbeddingHeadersProvider):
-            self.collection_embedding_api_key = collection_embedding_api_key
-        else:
-            self.collection_embedding_api_key = EmbeddingAPIKeyHeaderProvider(
-                collection_embedding_api_key,
-            )
-        if isinstance(collection_reranking_api_key, RerankingHeadersProvider):
-            self.collection_reranking_api_key = collection_reranking_api_key
-        else:
-            self.collection_reranking_api_key = RerankingAPIKeyHeaderProvider(
-                collection_reranking_api_key,
-            )
+        self.collection_embedding_api_key = (
+            collection_embedding_api_key
+            if isinstance(collection_embedding_api_key, EmbeddingHeadersProvider)
+            else EmbeddingAPIKeyHeaderProvider(collection_embedding_api_key)
+        )
+        self.collection_reranking_api_key = (
+            collection_reranking_api_key
+            if isinstance(collection_reranking_api_key, RerankingHeadersProvider)
+            else RerankingAPIKeyHeaderProvider(collection_reranking_api_key)
+        )
         self.collection = self.database.get_collection(
             name=self.collection_name,
             embedding_api_key=self.collection_embedding_api_key,
@@ -406,21 +425,10 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
                             default_indexing_policy=default_indexing_policy,
                         ):
                             # mismatch is not due to indexing
-                            warnings.warn(
-                                (
-                                    f"Astra DB collection '{self.collection_name}' was "
-                                    "found to be configured differently than requested "
-                                    "by the vector store creation. This is resulting "
-                                    "in a hard exception from the Data API. Please see "
-                                    "https://github.com/langchain-ai/langchain-datastax"
-                                    "/blob/main/libs/astradb/README.md#collection-"
-                                    "defaults-mismatch for more context about this "
-                                    "issue and possible mitigations."
-                                ),
-                                UserWarning,
-                                stacklevel=2,
+                            msg = COLLECTION_DEFAULTS_MISMATCH_ERROR_MESSAGE.format(
+                                collection_name=self.collection_name,
                             )
-                            raise
+                            raise AstraDBError(msg) from data_api_exception
                     except ValueError as validation_error:
                         raise validation_error from data_api_exception
                 else:
@@ -479,11 +487,11 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
             else component_name,
             setup_mode=SetupMode.OFF,
             collection_embedding_api_key=self.collection_embedding_api_key
-            if collection_embedding_api_key
+            if collection_embedding_api_key is None
             else collection_embedding_api_key,
             collection_rerank=self.collection_rerank,
             collection_reranking_api_key=self.collection_reranking_api_key
-            if collection_reranking_api_key
+            if collection_reranking_api_key is None
             else collection_reranking_api_key,
             collection_lexical=self.collection_lexical,
             embedding_dimension=self.embedding_dimension,
@@ -546,21 +554,10 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
                         default_indexing_policy=default_indexing_policy,
                     ):
                         # mismatch is not due to indexing
-                        warnings.warn(
-                            (
-                                f"Astra DB collection '{self.collection_name}' was "
-                                "found to be configured differently than requested "
-                                "by the vector store creation. This is resulting "
-                                "in a hard exception from the Data API. Please see "
-                                "https://github.com/langchain-ai/langchain-datastax"
-                                "/blob/main/libs/astradb/README.md#collection-"
-                                "defaults-mismatch for more context about this "
-                                "issue and possible mitigations."
-                            ),
-                            UserWarning,
-                            stacklevel=2,
+                        msg = COLLECTION_DEFAULTS_MISMATCH_ERROR_MESSAGE.format(
+                            collection_name=self.collection_name,
                         )
-                        raise
+                        raise AstraDBError(msg) from data_api_exception
                 except ValueError as validation_error:
                     raise validation_error from data_api_exception
             else:

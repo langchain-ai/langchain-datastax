@@ -768,7 +768,7 @@ class AstraDBVectorStore(VectorStore):
             collection_rerank: providing reranking settings is necessary to run
                 hybrid searches for similarity. This parameter can be an instance
                 of the astrapy classes `CollectionRerankOptions` or
-                `RerankServiceOptions`.
+                ``RerankServiceOptions``.
             collection_reranking_api_key: for usage of server-side reranking services
                 within Astra DB. With this parameter one can supply an API Key
                 that will be passed to Astra DB with each data request.
@@ -868,15 +868,16 @@ class AstraDBVectorStore(VectorStore):
                 has_vectorize=has_vectorize,
             )
 
-            if isinstance(collection_lexical, CollectionLexicalOptions):
-                self.has_lexical = collection_lexical.enabled
-            else:
-                self.has_lexical = collection_lexical is not None
-            _has_reranking: bool
-            if isinstance(collection_rerank, CollectionRerankOptions):
-                _has_reranking = collection_rerank.enabled
-            else:
-                _has_reranking = collection_rerank is not None
+            self.has_lexical = (
+                collection_lexical.enabled
+                if isinstance(collection_lexical, CollectionLexicalOptions)
+                else (collection_lexical is not None)
+            )
+            _has_reranking = (
+                collection_rerank.enabled
+                if isinstance(collection_rerank, CollectionRerankOptions)
+                else (collection_rerank is not None)
+            )
             self.has_hybrid = self.has_lexical and _has_reranking
 
             self.hybrid_search = _decide_hybrid_search_setting(
@@ -2541,7 +2542,7 @@ class AstraDBVectorStore(VectorStore):
             return self._hybrid_search_with_score_id_by_sort(
                 sort=sort,
                 k=k,
-                filter=filter,
+                filter_dict=filter,
                 rerank_on=rerank_on,
                 rerank_query=rerank_query,
             )
@@ -2557,7 +2558,7 @@ class AstraDBVectorStore(VectorStore):
         return self._similarity_find_with_score_id_by_sort(
             sort=sort,
             k=k,
-            filter=filter,
+            filter_dict=filter,
         )
 
     @override
@@ -2639,19 +2640,19 @@ class AstraDBVectorStore(VectorStore):
         return self._similarity_find_with_score_id_by_sort(
             sort=sort,
             k=k,
-            filter=filter,
+            filter_dict=filter,
         )
 
     def _similarity_find_with_score_id_by_sort(
         self,
         sort: dict[str, Any],
         k: int,
-        filter: dict[str, Any] | None,  # noqa: A002
+        filter_dict: dict[str, Any] | None,
     ) -> list[tuple[Document, float, str]]:
         """Run ANN search with a provided sort clause."""
         hits_ite = self.run_query(
             n=k,
-            filter=filter,
+            filter=filter_dict,
             sort=sort,
             include_similarity=True,
         )
@@ -2665,13 +2666,13 @@ class AstraDBVectorStore(VectorStore):
         self,
         sort: dict[str, Any],
         k: int,
-        filter: dict[str, Any] | None,  # noqa: A002
+        filter_dict: dict[str, Any] | None,
         rerank_on: str | None,
         rerank_query: str | None,
     ) -> list[tuple[Document, float, str]]:
         """Run a hybrid search with a provided sort clause."""
         self.astra_env.ensure_db_setup()
-        encoded_filter = self.document_codec.encode_query(filter_dict=filter)
+        encoded_filter = self.document_codec.encode_query(filter_dict=filter_dict)
         hybrid_limits = _make_hybrid_limits(self.hybrid_limit_factor, k)
         hybrid_reranked_results = self.astra_env.collection.find_and_rerank(
             filter=encoded_filter,
@@ -2809,7 +2810,7 @@ class AstraDBVectorStore(VectorStore):
             return await self._ahybrid_search_with_score_id_by_sort(
                 sort=sort,
                 k=k,
-                filter=filter,
+                filter_dict=filter,
                 rerank_on=rerank_on,
                 rerank_query=rerank_query,
             )
@@ -2825,7 +2826,7 @@ class AstraDBVectorStore(VectorStore):
         return await self._asimilarity_find_with_score_id_by_sort(
             sort=sort,
             k=k,
-            filter=filter,
+            filter_dict=filter,
         )
 
     @override
@@ -2907,19 +2908,19 @@ class AstraDBVectorStore(VectorStore):
         return await self._asimilarity_find_with_score_id_by_sort(
             sort=sort,
             k=k,
-            filter=filter,
+            filter_dict=filter,
         )
 
     async def _asimilarity_find_with_score_id_by_sort(
         self,
         sort: dict[str, Any],
         k: int,
-        filter: dict[str, Any] | None,  # noqa: A002
+        filter_dict: dict[str, Any] | None,
     ) -> list[tuple[Document, float, str]]:
         """Run ANN search with a provided sort clause."""
         hits_ite = await self.arun_query(
             n=k,
-            filter=filter,
+            filter=filter_dict,
             sort=sort,
             include_similarity=True,
         )
@@ -2933,13 +2934,13 @@ class AstraDBVectorStore(VectorStore):
         self,
         sort: dict[str, Any],
         k: int,
-        filter: dict[str, Any] | None,  # noqa: A002
+        filter_dict: dict[str, Any] | None,
         rerank_on: str | None,
         rerank_query: str | None,
     ) -> list[tuple[Document, float, str]]:
         """Run a hybrid search with a provided sort clause."""
         await self.astra_env.aensure_db_setup()
-        encoded_filter = self.document_codec.encode_query(filter_dict=filter)
+        encoded_filter = self.document_codec.encode_query(filter_dict=filter_dict)
         hybrid_limits = _make_hybrid_limits(self.hybrid_limit_factor, k)
         hybrid_reranked_results = self.astra_env.async_collection.find_and_rerank(
             filter=encoded_filter,

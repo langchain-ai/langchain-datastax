@@ -128,7 +128,7 @@ NVIDIA_RERANKING_OPTIONS_HEADER = CollectionRerankOptions(
 )
 LEXICAL_OPTIONS = CollectionLexicalOptions(analyzer="standard")
 
-OPENAI_SHARED_SECRET_KEY_NAME = os.environ.get("SHARED_SECRET_NAME_OPENAI")
+OPENAI_SHARED_SECRET_KEY_NAME = os.getenv("SHARED_SECRET_NAME_OPENAI")
 OPENAI_VECTORIZE_OPTIONS_KMS: VectorServiceOptions | None
 if OPENAI_SHARED_SECRET_KEY_NAME:
     OPENAI_VECTORIZE_OPTIONS_KMS = VectorServiceOptions(
@@ -156,7 +156,7 @@ def openai_api_key() -> str:
 
 @pytest.fixture(scope="session")
 def nvidia_reranking_api_key() -> str | None:
-    return os.environ.get("HEADER_RERANKING_API_KEY_NVIDIA")
+    return os.getenv("HEADER_RERANKING_API_KEY_NVIDIA")
 
 
 @pytest.fixture(scope="session")
@@ -174,8 +174,8 @@ def astra_db_credentials() -> AstraDBCredentials:
     return {
         "token": os.environ["ASTRA_DB_APPLICATION_TOKEN"],
         "api_endpoint": os.environ["ASTRA_DB_API_ENDPOINT"],
-        "namespace": os.environ.get("ASTRA_DB_KEYSPACE"),
-        "environment": os.environ.get("ASTRA_DB_ENVIRONMENT", "prod"),
+        "namespace": os.getenv("ASTRA_DB_KEYSPACE"),
+        "environment": os.getenv("ASTRA_DB_ENVIRONMENT", "prod"),
     }
 
 

@@ -18,7 +18,6 @@ from typing import (
 
 from langchain_community.graph_vectorstores.base import GraphVectorStore, Node
 from langchain_community.graph_vectorstores.links import METADATA_LINKS_KEY, Link
-from langchain_core._api import beta
 from langchain_core.documents import Document
 from typing_extensions import override
 
@@ -110,7 +109,6 @@ def _outgoing_links(node: Node | EmbeddedNode) -> set[Link]:
     return {link for link in node.links if link.direction in ["out", "bidir"]}
 
 
-@beta()
 class AstraDBGraphVectorStore(GraphVectorStore):
     def __init__(
         self,
