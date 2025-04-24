@@ -44,11 +44,17 @@ class TestAstraDBEnvironment:
                 env_vars_to_restore[KEYSPACE_ENV_VAR] = os.environ[KEYSPACE_ENV_VAR]
                 del os.environ[KEYSPACE_ENV_VAR]
 
-            # token+endpoint
+            # token+endpoint+keyspace
             env1 = _AstraDBEnvironment(
                 token=FAKE_TOKEN,
                 api_endpoint=a_e_string,
                 keyspace="n",
+            )
+
+            # token+endpoint, no keyspace
+            env2 = _AstraDBEnvironment(
+                token=FAKE_TOKEN,
+                api_endpoint=a_e_string,
             )
 
             # just tokenn, no endpoint
@@ -81,7 +87,7 @@ class TestAstraDBEnvironment:
             assert env1.database == env5.database
             assert env1.async_database == env5.async_database
 
-            # both and also namespace via env vars
+            # both and also keyspace via env vars
             os.environ[TOKEN_ENV_VAR] = FAKE_TOKEN
             os.environ[API_ENDPOINT_ENV_VAR] = a_e_string
             os.environ[KEYSPACE_ENV_VAR] = "n"
@@ -89,6 +95,18 @@ class TestAstraDBEnvironment:
             assert env1.data_api_client == env6.data_api_client
             assert env1.database == env6.database
             assert env1.async_database == env6.async_database
+            del os.environ[TOKEN_ENV_VAR]
+            del os.environ[API_ENDPOINT_ENV_VAR]
+            del os.environ[KEYSPACE_ENV_VAR]
+
+            # an empty-string (stripped) keyspace equals no env var
+            os.environ[TOKEN_ENV_VAR] = FAKE_TOKEN
+            os.environ[API_ENDPOINT_ENV_VAR] = a_e_string
+            os.environ[KEYSPACE_ENV_VAR] = " "
+            env7 = _AstraDBEnvironment()
+            assert env2.data_api_client == env7.data_api_client
+            assert env2.database == env7.database
+            assert env2.async_database == env7.async_database
             del os.environ[TOKEN_ENV_VAR]
             del os.environ[API_ENDPOINT_ENV_VAR]
             del os.environ[KEYSPACE_ENV_VAR]

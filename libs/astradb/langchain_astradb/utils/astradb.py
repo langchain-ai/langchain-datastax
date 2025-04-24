@@ -243,8 +243,17 @@ class _AstraDBEnvironment:
                 "Attempting to fetch keyspace from environment " "variable '%s'",
                 KEYSPACE_ENV_VAR,
             )
-            self.keyspace = os.getenv(KEYSPACE_ENV_VAR)
+            _env_var_keyspace = os.getenv(KEYSPACE_ENV_VAR, "").strip()
+            if _env_var_keyspace:
+                logger.info(
+                    "Using keyspace '%s' from environment variable.",
+                    _env_var_keyspace,
+                )
+                self.keyspace = _env_var_keyspace
+            else:
+                self.keyspace = keyspace
         else:
+            logger.info("No valid keyspace found in environment variable.")
             self.keyspace = keyspace
 
         # init parameters are normalized to self.{token, api_endpoint, keyspace}.
