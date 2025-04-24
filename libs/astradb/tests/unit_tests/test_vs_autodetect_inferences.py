@@ -141,7 +141,7 @@ DOCS_LEXICAL_TEST_PARAMS = [
     ),
     pytest.param(
         [],
-        False,
+        None,
         id="empty_doc_list",
     ),
     pytest.param(
@@ -229,6 +229,6 @@ class TestVSAutodetectInferences:
         self,
         documents: list[dict[str, Any]],
         *,
-        expected_has_lexical: bool,
+        expected_has_lexical: bool | None,
     ) -> None:
         assert _detect_documents_have_lexical(documents) is expected_has_lexical
