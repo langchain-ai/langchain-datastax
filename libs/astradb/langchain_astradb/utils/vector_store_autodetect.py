@@ -98,8 +98,10 @@ def _detect_documents_content_field(
     return requested_content_field
 
 
-def _detect_documents_have_lexical(documents: list[dict[str, Any]]) -> bool:
-    return any(LEXICAL_FIELD_NAME in document for document in documents)
+def _detect_documents_have_lexical(documents: list[dict[str, Any]]) -> bool | None:
+    if documents:
+        return any(LEXICAL_FIELD_NAME in document for document in documents)
+    return None
 
 
 def _detect_document_codec(
@@ -129,21 +131,22 @@ def _detect_document_codec(
         lexical_in_docs,
         has_lexical,
     )
-    if has_lexical and not lexical_in_docs:
-        warnings.warn(
-            "Collection supports lexical; however, autodetect encountered documents "
-            "without a $lexical. The $lexical field will be set for new documents, "
-            "but the pre-existing documents might not be reached by lexical search "
-            "when running hybrid search mode.",
-            stacklevel=2,
-        )
-    if not has_lexical and lexical_in_docs:
-        warnings.warn(
-            "Documents with $lexical encountered on a non-hybrid-capable "
-            "collection. This inconsistency will be ignored moving forward "
-            "(and new documents will not be written with any $lexical).",
-            stacklevel=2,
-        )
+    if lexical_in_docs is not None:
+        if has_lexical and not lexical_in_docs:
+            warnings.warn(
+                "Collection supports lexical; however, autodetect found documents "
+                "without a $lexical. The $lexical field will be set for new documents, "
+                "but the pre-existing documents might not be reached by lexical search "
+                "when running hybrid search mode.",
+                stacklevel=2,
+            )
+        if not has_lexical and lexical_in_docs:
+            warnings.warn(
+                "Documents with $lexical found on a non-hybrid-capable "
+                "collection. This inconsistency will be ignored moving forward "
+                "(and new documents will not be written with any $lexical).",
+                stacklevel=2,
+            )
 
     if has_vectorize:
         if is_flat:
