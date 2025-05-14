@@ -9,7 +9,6 @@ from langchain_astradb import (
     AstraDBByteStore,
     AstraDBCache,
     AstraDBChatMessageHistory,
-    AstraDBGraphVectorStore,
     AstraDBLoader,
     AstraDBSemanticCache,
     AstraDBStore,
@@ -19,7 +18,6 @@ from langchain_astradb.utils.astradb import (
     COMPONENT_NAME_BYTESTORE,
     COMPONENT_NAME_CACHE,
     COMPONENT_NAME_CHATMESSAGEHISTORY,
-    COMPONENT_NAME_GRAPHVECTORSTORE,
     COMPONENT_NAME_LOADER,
     COMPONENT_NAME_SEMANTICCACHE,
     COMPONENT_NAME_STORE,
@@ -349,55 +347,6 @@ class TestCallers:
             header_value_matcher=hv_prefix_matcher_factory(COMPONENT_NAME_VECTORSTORE),
         ).respond_with_json(no_results_json)
         vs0.similarity_search("[0,1]")
-
-    def test_callers_component_graphvectorstore(self, httpserver: HTTPServer) -> None:
-        """
-        End-to-end testing of callers passed through the components.
-        The graphvectorstore, which can also do autodetect operations,
-        requires separate handling.
-        """
-        base_endpoint = httpserver.url_for("/")
-        base_path = "/v1/ks"
-
-        # through the init flow
-        httpserver.expect_oneshot_request(
-            base_path,
-            method="POST",
-            headers={
-                "User-Agent": "ec0/ev0",
-            },
-            header_value_matcher=hv_prefix_matcher_factory(
-                COMPONENT_NAME_GRAPHVECTORSTORE
-            ),
-        ).respond_with_json({"status": {"ok": 1}})
-
-        # the metadata_search test call
-        httpserver.expect_oneshot_request(
-            base_path + "/my_graph_coll",
-            method="POST",
-            headers={
-                "User-Agent": "ec0/ev0",
-            },
-            header_value_matcher=hv_prefix_matcher_factory(
-                COMPONENT_NAME_GRAPHVECTORSTORE
-            ),
-        ).respond_with_json(
-            {
-                "data": {
-                    "nextPageState": None,
-                    "documents": [],
-                },
-            }
-        )
-
-        AstraDBGraphVectorStore(
-            collection_name="my_graph_coll",
-            api_endpoint=base_endpoint,
-            environment=Environment.OTHER,
-            namespace="ks",
-            embedding=ParserEmbeddings(2),
-            ext_callers=[("ec0", "ev0")],
-        )
 
     @pytest.mark.parametrize(
         ("component_class", "component_name", "kwargs"),
