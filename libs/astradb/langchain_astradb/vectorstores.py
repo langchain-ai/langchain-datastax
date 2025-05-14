@@ -87,6 +87,13 @@ RERANK_SCORE_KEY = "$rerank"
 ERROR_LEXICAL_QUERY_ON_NONHYBRID_SEARCH = (
     "Parameter 'lexical_query' cannot be passed for a non-hybrid search"
 )
+# Warning message for retrieving scores on a hybrid search
+WARNING_HYBRID_SEARCH_WITH_SCORES = (
+    "Scores returned as part of a hybrid search, which come from the "
+    "reranking step, may not be deterministically computed solely based "
+    "on the query and result. Using the scores e.g. for "
+    "threshold-filtering may lead to unpredictable results and is discouraged."
+)
 
 logger = logging.getLogger(__name__)
 
@@ -2459,7 +2466,7 @@ class AstraDBVectorStore(VectorStore):
         """
         return [
             doc
-            for (doc, _, _) in self.similarity_search_with_score_id(
+            for (doc, _, _) in self._similarity_search_with_score_id_impl(
                 query=query,
                 k=k,
                 filter=filter,
@@ -2488,9 +2495,11 @@ class AstraDBVectorStore(VectorStore):
         Returns:
             The list of (Document, score), the most similar to the query vector.
         """
+        if self.hybrid_search:
+            warnings.warn(WARNING_HYBRID_SEARCH_WITH_SCORES, stacklevel=2)
         return [
             (doc, score)
-            for (doc, score, _) in self.similarity_search_with_score_id(
+            for (doc, score, _) in self._similarity_search_with_score_id_impl(
                 query=query,
                 k=k,
                 filter=filter,
@@ -2498,14 +2507,14 @@ class AstraDBVectorStore(VectorStore):
             )
         ]
 
-    def similarity_search_with_score_id(
+    def _similarity_search_with_score_id_impl(
         self,
         query: str,
         k: int = 4,
         filter: dict[str, Any] | None = None,  # noqa: A002
         lexical_query: str | None = None,
     ) -> list[tuple[Document, float, str]]:
-        """Return docs most similar to the query with score and id.
+        """Implementation for similarity_search_with_score_id.
 
         Args:
             query: Query to look up documents similar to.
@@ -2559,6 +2568,35 @@ class AstraDBVectorStore(VectorStore):
             sort=sort,
             k=k,
             filter_dict=filter,
+        )
+
+    def similarity_search_with_score_id(
+        self,
+        query: str,
+        k: int = 4,
+        filter: dict[str, Any] | None = None,  # noqa: A002
+        lexical_query: str | None = None,
+    ) -> list[tuple[Document, float, str]]:
+        """Return docs most similar to the query with score and id.
+
+        Args:
+            query: Query to look up documents similar to.
+            k: Number of Documents to return. Defaults to 4.
+            filter: Filter on the metadata to apply.
+            lexical_query: for hybrid search, a specific query for the lexical
+                portion of the retrieval. If omitted or empty, defaults to the same
+                as 'query'. If passed on a non-hybrid search, an error is raised.
+
+        Returns:
+            The list of (Document, score, id), the most similar to the query.
+        """
+        if self.hybrid_search:
+            warnings.warn(WARNING_HYBRID_SEARCH_WITH_SCORES, stacklevel=2)
+        return self._similarity_search_with_score_id_impl(
+            query=query,
+            k=k,
+            filter=filter,
+            lexical_query=lexical_query,
         )
 
     @override
@@ -2727,7 +2765,7 @@ class AstraDBVectorStore(VectorStore):
         """
         return [
             doc
-            for (doc, _, _) in await self.asimilarity_search_with_score_id(
+            for (doc, _, _) in await self._asimilarity_search_with_score_id_impl(
                 query=query,
                 k=k,
                 filter=filter,
@@ -2756,9 +2794,11 @@ class AstraDBVectorStore(VectorStore):
         Returns:
             The list of (Document, score), the most similar to the query vector.
         """
+        if self.hybrid_search:
+            warnings.warn(WARNING_HYBRID_SEARCH_WITH_SCORES, stacklevel=2)
         return [
             (doc, score)
-            for (doc, score, _) in await self.asimilarity_search_with_score_id(
+            for (doc, score, _) in await self._asimilarity_search_with_score_id_impl(
                 query=query,
                 k=k,
                 filter=filter,
@@ -2766,14 +2806,14 @@ class AstraDBVectorStore(VectorStore):
             )
         ]
 
-    async def asimilarity_search_with_score_id(
+    async def _asimilarity_search_with_score_id_impl(
         self,
         query: str,
         k: int = 4,
         filter: dict[str, Any] | None = None,  # noqa: A002
         lexical_query: str | None = None,
     ) -> list[tuple[Document, float, str]]:
-        """Return docs most similar to the query with score and id.
+        """Implementation for asimilarity_search_with_score_id.
 
         Args:
             query: Query to look up documents similar to.
@@ -2827,6 +2867,35 @@ class AstraDBVectorStore(VectorStore):
             sort=sort,
             k=k,
             filter_dict=filter,
+        )
+
+    async def asimilarity_search_with_score_id(
+        self,
+        query: str,
+        k: int = 4,
+        filter: dict[str, Any] | None = None,  # noqa: A002
+        lexical_query: str | None = None,
+    ) -> list[tuple[Document, float, str]]:
+        """Return docs most similar to the query with score and id.
+
+        Args:
+            query: Query to look up documents similar to.
+            k: Number of Documents to return. Defaults to 4.
+            filter: Filter on the metadata to apply.
+            lexical_query: for hybrid search, a specific query for the lexical
+                portion of the retrieval. If omitted or empty, defaults to the same
+                as 'query'. If passed on a non-hybrid search, an error is raised.
+
+        Returns:
+            The list of (Document, score, id), the most similar to the query.
+        """
+        if self.hybrid_search:
+            warnings.warn(WARNING_HYBRID_SEARCH_WITH_SCORES, stacklevel=2)
+        return await self._asimilarity_search_with_score_id_impl(
+            query=query,
+            k=k,
+            filter=filter,
+            lexical_query=lexical_query,
         )
 
     @override
