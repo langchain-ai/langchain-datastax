@@ -1445,8 +1445,8 @@ class TestAstraDBVectorStore:
         metadata_documents: list[Document],
         request: pytest.FixtureRequest,
     ) -> None:
-        """asimilarity_search_with_embedding is used as the building
-        block for other components (like AstraDBGraphVectorStore).
+        """asimilarity_search_with_embedding can be used as building-block
+        primitive by other components.
         """
         vstore: AstraDBVectorStore = await asyncio.to_thread(
             request.getfixturevalue, vector_store
@@ -1480,8 +1480,8 @@ class TestAstraDBVectorStore:
         metadata_documents: list[Document],
         request: pytest.FixtureRequest,
     ) -> None:
-        """asimilarity_search_with_embedding_by_vector is used as the building
-        block for other components (like AstraDBGraphVectorStore).
+        """asimilarity_search_with_embedding_by_vector can be used as
+        building-block primitive by other components.
         """
         vstore: AstraDBVectorStore = await asyncio.to_thread(
             request.getfixturevalue, vector_store
@@ -1517,8 +1517,8 @@ class TestAstraDBVectorStore:
         metadata_documents: list[Document],
         request: pytest.FixtureRequest,
     ) -> None:
-        """similarity_search_with_embedding is used as the building
-        block for other components (like AstraDBGraphVectorStore).
+        """similarity_search_with_embedding can be used as building-block
+        primitive by other components.
         """
         vstore: AstraDBVectorStore = request.getfixturevalue(vector_store)
         vstore.add_documents(metadata_documents)
@@ -1550,8 +1550,8 @@ class TestAstraDBVectorStore:
         metadata_documents: list[Document],
         request: pytest.FixtureRequest,
     ) -> None:
-        """similarity_search_with_embedding_by_vector is used as the building
-        block for other components (like AstraDBGraphVectorStore).
+        """similarity_search_with_embedding_by_vector can be used as
+        building-block primitive by other components.
         """
         vstore: AstraDBVectorStore = request.getfixturevalue(vector_store)
         vstore.add_documents(metadata_documents)

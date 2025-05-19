@@ -6,7 +6,6 @@ EXPECTED_ALL = [
     "AstraDBCache",
     "AstraDBSemanticCache",
     "AstraDBChatMessageHistory",
-    "AstraDBGraphVectorStore",
     "AstraDBLoader",
     "AstraDBVectorStore",
     "AstraDBVectorStoreError",

@@ -20,18 +20,6 @@ if TYPE_CHECKING:
 @pytest.fixture(autouse=True)
 def blockbuster() -> Iterator[BlockBuster]:
     with blockbuster_ctx() as bb:
-        # TODO: GraphVectorStore init is blocking. Should be fixed.
-        for method in (
-            "socket.socket.connect",
-            "socket.socket.send",
-            "socket.socket.recv",
-            "ssl.SSLSocket.send",
-            "ssl.SSLSocket.recv",
-            "ssl.SSLSocket.read",
-        ):
-            bb.functions[method].can_block_functions.append(
-                ("langchain_astradb/graph_vectorstores.py", {"__init__"}),
-            )
         yield bb
 
 

@@ -771,7 +771,7 @@ class AstraDBVectorStore(VectorStore):
                 stack of usage info passed as the User-Agent string to the Data API.
                 Defaults to "langchain_vectorstore", but can be overridden if this
                 component actually serves as the building block for another component
-                (such as a Graph Vector Store).
+                (such as when the vector store is used within a ``GraphRetriever``).
             collection_rerank: providing reranking settings is necessary to run
                 hybrid searches for similarity. This parameter can be an instance
                 of the astrapy classes `CollectionRerankOptions` or
