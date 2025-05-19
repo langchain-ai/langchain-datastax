@@ -41,7 +41,7 @@ runs:
         path: |
           /opt/pipx/venvs/poetry
         # This step caches the poetry installation, so make sure it's keyed on the poetry version as well.
-        key: bin-poetry-${{ runner.os }}-${{ runner.arch }}-py-${{ inputs.python-version }}-${{ inputs.poetry-version }}
+        key: bin-poetry-cached-${{ runner.os }}-${{ runner.arch }}-py-${{ inputs.python-version }}-${{ inputs.poetry-version }}
 
     - name: Refresh shell hashtable and fixup softlinks
       if: steps.cache-bin-poetry.outputs.cache-hit == 'true'
