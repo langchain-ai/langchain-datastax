@@ -33,6 +33,7 @@ from astrapy.info import (
     CollectionRerankOptions,
     RerankServiceOptions,
 )
+from astrapy.utils.api_options import defaultAPIOptions
 
 if TYPE_CHECKING:
     from astrapy.info import CollectionDescriptor, VectorServiceOptions
@@ -139,6 +140,7 @@ def _survey_collection(
     environment: str | None = None,
     ext_callers: list[tuple[str | None, str | None] | str | None] | None = None,
     component_name: str | None = None,
+    api_options: APIOptions | None = None,
 ) -> tuple[CollectionDescriptor | None, list[dict[str, Any]]]:
     """Return the collection descriptor (if found) and a sample of documents."""
     _astra_db_env = _AstraDBEnvironment(
@@ -148,6 +150,7 @@ def _survey_collection(
         environment=environment,
         ext_callers=ext_callers,
         component_name=component_name,
+        api_options=api_options,
     )
     descriptors = [
         coll_d
@@ -207,11 +210,13 @@ class _AstraDBEnvironment:
         environment: str | None = None,
         ext_callers: list[tuple[str | None, str | None] | str | None] | None = None,
         component_name: str | None = None,
+        api_options: APIOptions | None = None,
     ) -> None:
         self.token: TokenProvider
         self.api_endpoint: str | None
         self.keyspace: str | None
         self.environment: str | None
+        self.api_options: APIOptions | None
 
         self.data_api_client: DataAPIClient
         self.database: Database
@@ -270,6 +275,8 @@ class _AstraDBEnvironment:
             self.api_endpoint,
         )
 
+        self.api_options = api_options
+
         # prepare the "callers" list to create the clients.
         # The callers, passed to astrapy, are made of these Caller pairs in this order:
         # - zero, one or more are the "ext_callers" passed to this environment
@@ -292,15 +299,23 @@ class _AstraDBEnvironment:
             (self.component_name, LC_ASTRADB_VERSION),
         ]
         # create the client (set to return plain lists for vectors)
-        self.data_api_client = DataAPIClient(
-            environment=self.environment,
-            api_options=APIOptions(
+        # first must take care of two levels of customizing of the base astrapy options
+        astrapy_default_api_options = defaultAPIOptions(self.environment)
+        adapted_default_api_options = astrapy_default_api_options.with_override(
+            APIOptions(
                 callers=self.full_callers,
                 serdes_options=SerdesOptions(custom_datatypes_in_reading=False),
                 timeout_options=TimeoutOptions(
                     request_timeout_ms=ASTRA_DB_REQUEST_TIMEOUT_MS
                 ),
             ),
+        )
+        final_api_options = adapted_default_api_options.with_override(
+            api_options if api_options is not None else APIOptions()
+        )
+        self.data_api_client = DataAPIClient(
+            environment=self.environment,
+            api_options=final_api_options,
         )
 
         self.database = self.data_api_client.get_database(
@@ -322,6 +337,7 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
         environment: str | None = None,
         ext_callers: list[tuple[str | None, str | None] | str | None] | None = None,
         component_name: str | None = None,
+        api_options: APIOptions | None = None,
         setup_mode: SetupMode = SetupMode.SYNC,
         pre_delete_collection: bool = False,
         embedding_dimension: int | Awaitable[int] | None = None,
@@ -347,6 +363,7 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
             environment=environment,
             ext_callers=ext_callers,
             component_name=component_name,
+            api_options=api_options,
         )
         self.collection_name = collection_name
         self.collection_embedding_api_key = (
@@ -493,6 +510,7 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
             component_name=self.component_name
             if component_name is None
             else component_name,
+            api_options=self.api_options,
             setup_mode=SetupMode.OFF,
             collection_embedding_api_key=self.collection_embedding_api_key
             if collection_embedding_api_key is None

@@ -23,6 +23,7 @@ from langchain_astradb.utils.astradb import (
 )
 
 if TYPE_CHECKING:
+    from astrapy.api_options import APIOptions
     from astrapy.authentication import TokenProvider
     from langchain_core.embeddings import Embeddings
     from langchain_core.language_models import LLM
@@ -117,6 +118,7 @@ class AstraDBCache(BaseCache):
         pre_delete_collection: bool = False,
         setup_mode: SetupMode = SetupMode.SYNC,
         ext_callers: list[tuple[str | None, str | None] | str | None] | None = None,
+        api_options: APIOptions | None = None,
     ):
         """Cache that uses Astra DB as a backend.
 
@@ -151,6 +153,13 @@ class AstraDBCache(BaseCache):
                 or just strings if no version info is provided, which, if supplied,
                 becomes the leading part of the User-Agent string in all API requests
                 related to this component.
+            api_options: an instance of ``astrapy.utils.api_options.APIOptions`` that
+                can be supplied to customize the interaction with the Data API
+                regarding serialization/deserialization, timeouts, custom headers
+                and so on. The provided options are applied on top of settings already
+                tailored to this library, and if specified will take precedence.
+                Passing None (default) means no customization is requested.
+                Refer to the astrapy documentation for details.
         """
         self.astra_env = _AstraDBCollectionEnvironment(
             collection_name=collection_name,
@@ -162,6 +171,7 @@ class AstraDBCache(BaseCache):
             pre_delete_collection=pre_delete_collection,
             ext_callers=ext_callers,
             component_name=COMPONENT_NAME_CACHE,
+            api_options=api_options,
         )
         self.collection = self.astra_env.collection
         self.async_collection = self.astra_env.async_collection
@@ -328,6 +338,7 @@ class AstraDBSemanticCache(BaseCache):
         metric: str | None = None,
         similarity_threshold: float = ASTRA_DB_SEMANTIC_CACHE_DEFAULT_THRESHOLD,
         ext_callers: list[tuple[str | None, str | None] | str | None] | None = None,
+        api_options: APIOptions | None = None,
     ):
         """Astra DB semantic cache.
 
@@ -372,6 +383,13 @@ class AstraDBSemanticCache(BaseCache):
                 or just strings if no version info is provided, which, if supplied,
                 becomes the leading part of the User-Agent string in all API requests
                 related to this component.
+            api_options: an instance of ``astrapy.utils.api_options.APIOptions`` that
+                can be supplied to customize the interaction with the Data API
+                regarding serialization/deserialization, timeouts, custom headers
+                and so on. The provided options are applied on top of settings already
+                tailored to this library, and if specified will take precedence.
+                Passing None (default) means no customization is requested.
+                Refer to the astrapy documentation for details.
         """
         self.embedding = embedding
         self.metric = metric
@@ -413,6 +431,7 @@ class AstraDBSemanticCache(BaseCache):
             metric=metric,
             ext_callers=ext_callers,
             component_name=COMPONENT_NAME_SEMANTICCACHE,
+            api_options=api_options,
         )
         self.collection = self.astra_env.collection
         self.async_collection = self.astra_env.async_collection
