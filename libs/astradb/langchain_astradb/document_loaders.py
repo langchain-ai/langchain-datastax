@@ -24,6 +24,7 @@ from langchain_astradb.utils.astradb import (
 )
 
 if TYPE_CHECKING:
+    from astrapy.api_options import APIOptions
     from astrapy.authentication import TokenProvider
 
 logger = logging.getLogger(__name__)
@@ -47,6 +48,7 @@ class AstraDBLoader(BaseLoader):
         page_content_mapper: Callable[[dict], str] = json.dumps,
         metadata_mapper: Callable[[dict], dict[str, Any]] | None = None,
         ext_callers: list[tuple[str | None, str | None] | str | None] | None = None,
+        api_options: APIOptions | None = None,
     ) -> None:
         """Load DataStax Astra DB documents.
 
@@ -81,6 +83,13 @@ class AstraDBLoader(BaseLoader):
                 or just strings if no version info is provided, which, if supplied,
                 becomes the leading part of the User-Agent string in all API requests
                 related to this component.
+            api_options: an instance of ``astrapy.utils.api_options.APIOptions`` that
+                can be supplied to customize the interaction with the Data API
+                regarding serialization/deserialization, timeouts, custom headers
+                and so on. The provided options are applied on top of settings already
+                tailored to this library, and if specified will take precedence.
+                Passing None (default) means no customization is requested.
+                Refer to the astrapy documentation for details.
         """
         astra_db_env = _AstraDBCollectionEnvironment(
             collection_name=collection_name,
@@ -91,6 +100,7 @@ class AstraDBLoader(BaseLoader):
             setup_mode=SetupMode.OFF,
             ext_callers=ext_callers,
             component_name=COMPONENT_NAME_LOADER,
+            api_options=api_options,
         )
         self.astra_db_env = astra_db_env
         self.filter = filter_criteria

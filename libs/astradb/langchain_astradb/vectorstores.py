@@ -63,6 +63,7 @@ from langchain_astradb.utils.vector_store_codecs import (
 )
 
 if TYPE_CHECKING:
+    from astrapy.api_options import APIOptions
     from astrapy.authentication import (
         EmbeddingHeadersProvider,
         RerankingHeadersProvider,
@@ -104,7 +105,7 @@ class AstraDBQueryResult(NamedTuple):
     This class represents all that can be returned from the collection when running
     a query, which goes beyond just the corresponding Document.
 
-    Atributes:
+    Attributes:
         document: a ``langchain.schema.Document`` object representing the query result.
         id: the ID of the returned document.
         embedding: the embedding vector associated to the document. This may be None,
@@ -656,6 +657,7 @@ class AstraDBVectorStore(VectorStore):
         autodetect_collection: bool = False,
         ext_callers: list[tuple[str | None, str | None] | str | None] | None = None,
         component_name: str = COMPONENT_NAME_VECTORSTORE,
+        api_options: APIOptions | None = None,
         collection_rerank: CollectionRerankOptions | RerankServiceOptions | None = None,
         collection_reranking_api_key: str | RerankingHeadersProvider | None = None,
         collection_lexical: str
@@ -668,7 +670,7 @@ class AstraDBVectorStore(VectorStore):
         | dict[str, float]
         | HybridLimitFactorPrescription = None,
     ) -> None:
-        """A vector store wich uses DataStax Astra DB as backend.
+        """A vector store which uses DataStax Astra DB as backend.
 
         For more on Astra DB, visit
         https://docs.datastax.com/en/astra-db-serverless/index.html
@@ -772,6 +774,13 @@ class AstraDBVectorStore(VectorStore):
                 Defaults to "langchain_vectorstore", but can be overridden if this
                 component actually serves as the building block for another component
                 (such as when the vector store is used within a ``GraphRetriever``).
+            api_options: an instance of ``astrapy.utils.api_options.APIOptions`` that
+                can be supplied to customize the interaction with the Data API
+                regarding serialization/deserialization, timeouts, custom headers
+                and so on. The provided options are applied on top of settings already
+                tailored to this library, and if specified will take precedence.
+                Passing None (default) means no customization is requested.
+                Refer to the astrapy documentation for details.
             collection_rerank: providing reranking settings is necessary to run
                 hybrid searches for similarity. This parameter can be an instance
                 of the astrapy classes `CollectionRerankOptions` or
@@ -937,6 +946,7 @@ class AstraDBVectorStore(VectorStore):
                 environment=self.environment,
                 ext_callers=ext_callers,
                 component_name=component_name,
+                api_options=api_options,
             )
             if c_descriptor is None:
                 msg = f"Collection '{self.collection_name}' not found."
@@ -1018,6 +1028,7 @@ class AstraDBVectorStore(VectorStore):
             collection_embedding_api_key=self.collection_embedding_api_key,
             ext_callers=ext_callers,
             component_name=component_name,
+            api_options=api_options,
             collection_rerank=collection_rerank,
             collection_reranking_api_key=self.collection_reranking_api_key,
             collection_lexical=collection_lexical,

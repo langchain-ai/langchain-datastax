@@ -9,12 +9,14 @@ import random
 from typing import TYPE_CHECKING, Any
 
 import pytest
+from astrapy.api_options import APIOptions, TimeoutOptions
 from astrapy.authentication import (
     EmbeddingAPIKeyHeaderProvider,
     RerankingAPIKeyHeaderProvider,
     StaticTokenProvider,
 )
 from astrapy.constants import SortMode
+from astrapy.exceptions import DataAPITimeoutException
 from langchain_core.documents import Document
 
 from langchain_astradb.utils.astradb import COMPONENT_NAME_VECTORSTORE, SetupMode
@@ -2152,3 +2154,35 @@ class TestAstraDBVectorStore:
         )
         hits9d_l = [tpl async for tpl in hits9d]
         assert [doc_id for _, doc_id, _, _ in hits9d_l] == ["10", "9", "8"]
+
+    def test_astradb_vectorstore_custom_api_options(
+        self,
+        astra_db_credentials: AstraDBCredentials,
+        empty_collection_d2: Collection,
+        embedding_d2: Embeddings,
+    ) -> None:
+        """Craft a custom APIOptions (very low timeout), expect a timeout to occur."""
+        baseline_v_store = AstraDBVectorStore(
+            embedding=embedding_d2,
+            collection_name=empty_collection_d2.name,
+            token=StaticTokenProvider(astra_db_credentials["token"]),
+            api_endpoint=astra_db_credentials["api_endpoint"],
+            namespace=astra_db_credentials["namespace"],
+            environment=astra_db_credentials["environment"],
+            setup_mode=SetupMode.OFF,
+        )
+        baseline_v_store.similarity_search("[0,1]")
+
+        impatient_ao = APIOptions(timeout_options=TimeoutOptions(request_timeout_ms=1))
+        impatient_v_store = AstraDBVectorStore(
+            embedding=embedding_d2,
+            collection_name=empty_collection_d2.name,
+            token=StaticTokenProvider(astra_db_credentials["token"]),
+            api_endpoint=astra_db_credentials["api_endpoint"],
+            namespace=astra_db_credentials["namespace"],
+            environment=astra_db_credentials["environment"],
+            setup_mode=SetupMode.OFF,
+            api_options=impatient_ao,
+        )
+        with pytest.raises(DataAPITimeoutException):
+            impatient_v_store.similarity_search("[0,1]")

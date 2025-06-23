@@ -305,7 +305,7 @@ class _AstraDBVectorStoreDocumentCodec(ABC):
         the resulting query would return Astra DB documents matching the metadata
         clause AND having an ID among those provided to this method. If, instead,
         an OR is required, one should run two separate queries and subsequently merge
-        the result (taking care of avoiding duplcates).
+        the result (taking care of avoiding duplicates).
 
         Args:
             ids: an iterable over Document IDs. If provided, the resulting Astra DB
