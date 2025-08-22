@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     from astrapy import Collection
     from langchain_core.embeddings import Embeddings
 
-    from .conftest import IdentityLLM
+    from tests.conftest import IdentityLLM
 
 
 @pytest.fixture

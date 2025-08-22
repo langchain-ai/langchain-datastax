@@ -42,9 +42,12 @@ class ParserEmbeddings(Embeddings):
             vals = json.loads(text)
         except json.JSONDecodeError:
             return [0.0] * self.dimension
-        else:
-            assert len(vals) == self.dimension
-            return vals
+
+        if not isinstance(vals, list):
+            msg = f"Expected a list of floats, got {vals}"
+            raise TypeError(msg)
+        assert len(vals) == self.dimension
+        return vals
 
     async def aembed_query(self, text: str) -> list[float]:
         return self.embed_query(text)

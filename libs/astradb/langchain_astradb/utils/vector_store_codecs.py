@@ -281,6 +281,9 @@ class _AstraDBVectorStoreDocumentCodec(ABC):
 
     def get_id(self, astra_document: dict[str, Any]) -> str:
         """Return the ID of an encoded document (= a raw JSON read from DB)."""
+        if not isinstance(astra_document["_id"], str):
+            msg = "Document ID is not a string."
+            raise TypeError(msg)
         return astra_document["_id"]
 
     def get_similarity(self, astra_document: dict[str, Any]) -> float | None:
