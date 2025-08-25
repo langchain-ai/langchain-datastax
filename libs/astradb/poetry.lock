@@ -669,7 +669,7 @@ description = "Lightweight in-process concurrent programming"
 optional = false
 python-versions = ">=3.9"
 groups = ["main", "test"]
-markers = "(platform_machine == \"aarch64\" or platform_machine == \"ppc64le\" or platform_machine == \"x86_64\" or platform_machine == \"amd64\" or platform_machine == \"AMD64\" or platform_machine == \"win32\" or platform_machine == \"WIN32\") and python_version <= \"3.13\""
+markers = "(platform_machine == \"aarch64\" or platform_machine == \"ppc64le\" or platform_machine == \"x86_64\" or platform_machine == \"amd64\" or platform_machine == \"AMD64\" or platform_machine == \"win32\" or platform_machine == \"WIN32\") and python_version < \"3.14\""
 files = [
     {file = "greenlet-3.2.4-cp310-cp310-macosx_11_0_universal2.whl", hash = "sha256:8c68325b0d0acf8d91dde4e6f930967dd52a5302cd4062932a6b2e7c2969f47c"},
     {file = "greenlet-3.2.4-cp310-cp310-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:94385f101946790ae13da500603491f04a76b6e4c059dab271b3ce2e283b2590"},
@@ -960,7 +960,7 @@ together = ["langchain-together"]
 type = "git"
 url = "https://github.com/langchain-ai/langchain.git"
 reference = "HEAD"
-resolved_reference = "b825f85bf2dd03d5bdad93c0ebb278d2c5edb94f"
+resolved_reference = "1eb45d17fb520ff997a988f0988c7d61250fb862"
 subdirectory = "libs/langchain"
 
 [[package]]
@@ -1015,7 +1015,7 @@ typing-extensions = ">=4.7"
 type = "git"
 url = "https://github.com/langchain-ai/langchain.git"
 reference = "HEAD"
-resolved_reference = "b825f85bf2dd03d5bdad93c0ebb278d2c5edb94f"
+resolved_reference = "1eb45d17fb520ff997a988f0988c7d61250fb862"
 subdirectory = "libs/core"
 
 [[package]]
@@ -1048,7 +1048,7 @@ vcrpy = ">=7.0"
 type = "git"
 url = "https://github.com/langchain-ai/langchain.git"
 reference = "HEAD"
-resolved_reference = "b825f85bf2dd03d5bdad93c0ebb278d2c5edb94f"
+resolved_reference = "1eb45d17fb520ff997a988f0988c7d61250fb862"
 subdirectory = "libs/standard-tests"
 
 [[package]]
@@ -1069,7 +1069,7 @@ pip = ">=25.2"
 type = "git"
 url = "https://github.com/langchain-ai/langchain.git"
 reference = "HEAD"
-resolved_reference = "b825f85bf2dd03d5bdad93c0ebb278d2c5edb94f"
+resolved_reference = "1eb45d17fb520ff997a988f0988c7d61250fb862"
 subdirectory = "libs/text-splitters"
 
 [[package]]
@@ -1107,7 +1107,7 @@ description = "Python port of markdown-it. Markdown parsing, done right!"
 optional = false
 python-versions = ">=3.8"
 groups = ["test"]
-markers = "python_version == \"3.9\" or platform_python_implementation == \"PyPy\" and python_version < \"3.13\""
+markers = "python_version == \"3.9\""
 files = [
     {file = "markdown-it-py-3.0.0.tar.gz", hash = "sha256:e3f60a94fa066dc52ec76661e37c851cb232d92f9886b15cb560aaada2df8feb"},
     {file = "markdown_it_py-3.0.0-py3-none-any.whl", hash = "sha256:355216845c60bd96232cd8d8c40e8f9765cc86f46880e43a8fd22dc1a1a8cab1"},
@@ -1133,7 +1133,7 @@ description = "Python port of markdown-it. Markdown parsing, done right!"
 optional = false
 python-versions = ">=3.10"
 groups = ["test"]
-markers = "platform_python_implementation != \"PyPy\" and python_version >= \"3.10\" or python_version >= \"3.13\""
+markers = "python_version >= \"3.10\""
 files = [
     {file = "markdown_it_py-4.0.0-py3-none-any.whl", hash = "sha256:87327c59b172c5011896038353a81343b6754500a08cd7a4973bb48c6d578147"},
     {file = "markdown_it_py-4.0.0.tar.gz", hash = "sha256:cb0a2b4aa34f932c007117b194e945bd74e0ec24133ceb5bac59009cda1cb9f3"},
@@ -1447,7 +1447,7 @@ description = "Fundamental package for array computing in Python"
 optional = false
 python-versions = ">=3.9"
 groups = ["main", "test"]
-markers = "python_version == \"3.9\" or platform_python_implementation == \"PyPy\" and python_version < \"3.13\""
+markers = "python_version == \"3.9\""
 files = [
     {file = "numpy-2.0.2-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:51129a29dbe56f9ca83438b706e2e69a39892b5eda6cedcb6b0c9fdc9b0d3ece"},
     {file = "numpy-2.0.2-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:f15975dfec0cf2239224d80e32c3170b1d168335eaedee69da84fbe9f1f9cd04"},
@@ -1503,7 +1503,7 @@ description = "Fundamental package for array computing in Python"
 optional = false
 python-versions = ">=3.10"
 groups = ["main", "test"]
-markers = "platform_python_implementation != \"PyPy\" and python_version >= \"3.10\" and python_version < \"3.13\""
+markers = "python_version >= \"3.10\" and python_version < \"3.12\""
 files = [
     {file = "numpy-2.2.6-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:b412caa66f72040e6d268491a59f2c43bf03eb6c96dd8f0307829feb7fa2b6fb"},
     {file = "numpy-2.2.6-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:8e41fd67c52b86603a91c1a505ebaef50b3314de0213461c7a6e99c9a3beff90"},
@@ -1569,7 +1569,7 @@ description = "Fundamental package for array computing in Python"
 optional = false
 python-versions = ">=3.11"
 groups = ["main", "test"]
-markers = "python_version >= \"3.13\""
+markers = "python_version >= \"3.12\""
 files = [
     {file = "numpy-2.3.2-cp311-cp311-macosx_10_9_x86_64.whl", hash = "sha256:852ae5bed3478b92f093e30f785c98e0cb62fa0a939ed057c31716e18a7a22b9"},
     {file = "numpy-2.3.2-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:7a0e27186e781a69959d0230dd9909b5e26024f8da10683bd6344baea1885168"},
@@ -2813,7 +2813,7 @@ description = "HTTP library with thread-safe connection pooling, file post, and 
 optional = false
 python-versions = ">=3.9"
 groups = ["main", "dev", "test", "typing"]
-markers = "platform_python_implementation != \"PyPy\" and python_version >= \"3.10\""
+markers = "python_version >= \"3.10\" and platform_python_implementation != \"PyPy\""
 files = [
     {file = "urllib3-2.5.0-py3-none-any.whl", hash = "sha256:e6b01673c0fa6a13e374b50871808eb3bf7046c4b125b216f6bf1cc604cff0dc"},
     {file = "urllib3-2.5.0.tar.gz", hash = "sha256:3fc47733c7e419d4bc3f6b3dc2b4f890bb743906a30d56ba4a5bfa4bbff92760"},
@@ -2852,7 +2852,7 @@ files = [
 [package.dependencies]
 PyYAML = "*"
 urllib3 = [
-    {version = "<2", markers = "python_version < \"3.10\" or platform_python_implementation == \"PyPy\""},
+    {version = "<2", markers = "platform_python_implementation == \"PyPy\""},
     {version = "*", markers = "platform_python_implementation != \"PyPy\" and python_version >= \"3.10\""},
 ]
 wrapt = "*"
@@ -3268,4 +3268,4 @@ cffi = ["cffi (>=1.17) ; python_version >= \"3.13\" and platform_python_implemen
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.9,<4.0"
-content-hash = "29e97db4b3275e78dcb6c2af5803c4d39234af50d08ba5fe32b4fbd28727da06"
+content-hash = "2294ed72f1d9f713f0e23cb474654e512f9fd7a4955ba058eab28c0d884d24b7"
