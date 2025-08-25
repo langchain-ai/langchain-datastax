@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 from typing import TYPE_CHECKING
 
 import pytest
@@ -112,10 +111,6 @@ def documents2_novectorize() -> list[Document]:
 
 @pytest.mark.skipif(
     not astra_db_env_vars_available(), reason="Missing Astra DB env. vars"
-)
-@pytest.mark.skipif(
-    "LANGCHAIN_TEST_HYBRID" not in os.environ,
-    reason="Hybrid tests not manually requested",
 )
 class TestAstraDBVectorStoreHybrid:
     def test_astradb_vectorstore_explicit_hybrid_lifecycle_vectorize_sync(
