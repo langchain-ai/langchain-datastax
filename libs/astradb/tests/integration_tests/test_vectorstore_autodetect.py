@@ -618,10 +618,6 @@ class TestAstraDBVectorStoreAutodetect:
             assert len(f_rec_warnings) == 1
         assert len(results_w_post) == 1
 
-    @pytest.mark.skipif(
-        "LANGCHAIN_TEST_HYBRID" not in os.environ,
-        reason="Hybrid tests not manually requested",
-    )
     @pytest.mark.parametrize(
         ("lexical_in_docs", "flat_md"),
         [
@@ -714,10 +710,6 @@ class TestAstraDBVectorStoreAutodetect:
         assert len(hits) == 2
         assert {doc.id for doc in hits} == {"doc0", "doc1"}
 
-    @pytest.mark.skipif(
-        "LANGCHAIN_TEST_HYBRID" not in os.environ,
-        reason="Hybrid tests not manually requested",
-    )
     @pytest.mark.parametrize(
         ("flat_md"),
         [(True), (False)],
@@ -795,10 +787,6 @@ class TestAstraDBVectorStoreAutodetect:
         assert len(hits) == 2
         assert {doc.id for doc in hits} == {"doc0", "doc1"}
 
-    @pytest.mark.skipif(
-        "LANGCHAIN_TEST_HYBRID" not in os.environ,
-        reason="Hybrid tests not manually requested",
-    )
     @pytest.mark.parametrize(
         ("lexical_in_docs", "flat_md"),
         [
@@ -892,10 +880,6 @@ class TestAstraDBVectorStoreAutodetect:
         assert len(hits) == 2
         assert {doc.id for doc in hits} == {"doc0", "doc1"}
 
-    @pytest.mark.skipif(
-        "LANGCHAIN_TEST_HYBRID" not in os.environ,
-        reason="Hybrid tests not manually requested",
-    )
     @pytest.mark.parametrize(
         ("flat_md"),
         [(True), (False)],
