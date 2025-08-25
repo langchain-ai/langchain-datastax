@@ -6,7 +6,7 @@ import hashlib
 import json
 import logging
 from functools import lru_cache, wraps
-from typing import TYPE_CHECKING, Any, Awaitable, Callable, Generator
+from typing import TYPE_CHECKING, Any, Awaitable, Callable
 
 from langchain_core.caches import RETURN_VAL_TYPE, BaseCache
 from langchain_core.language_models.llms import aget_prompts, get_prompts
@@ -23,6 +23,8 @@ from langchain_astradb.utils.astradb import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Generator
+
     from astrapy.api_options import APIOptions
     from astrapy.authentication import TokenProvider
     from langchain_core.embeddings import Embeddings
@@ -285,7 +287,7 @@ class AstraDBCache(BaseCache):
         await self.async_collection.delete_many({})
 
 
-_unset = ["unset"]
+_unset = object()
 
 
 class _CachedAwaitable:
@@ -295,9 +297,11 @@ class _CachedAwaitable:
         self.awaitable = awaitable
         self.result = _unset
 
-    def __await__(self) -> Generator:
+    def __await__(self) -> Generator[None, None, Any]:
         if self.result is _unset:
             self.result = yield from self.awaitable.__await__()
+
+        yield
         return self.result
 
 

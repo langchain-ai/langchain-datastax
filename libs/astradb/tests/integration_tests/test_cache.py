@@ -18,7 +18,7 @@ from .conftest import (
 if TYPE_CHECKING:
     from astrapy import Collection
 
-    from .conftest import IdentityLLM
+    from tests.conftest import IdentityLLM
 
 
 @pytest.fixture

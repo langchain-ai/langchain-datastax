@@ -393,7 +393,7 @@ class TestCallers:
             header_value_matcher=hv_prefix_matcher_factory(component_name),
         ).respond_with_json({"status": {"ok": 1}})
 
-        component_class(  # type: ignore[operator]
+        component_class(
             collection_name="my_coll",
             api_endpoint=base_endpoint,
             environment=Environment.OTHER,

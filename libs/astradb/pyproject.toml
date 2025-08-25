@@ -57,7 +57,7 @@ optional = true
 ruff = "^0.6"
 
 [tool.poetry.group.typing.dependencies]
-mypy = "^0.991"
+mypy = "~=1.17.1"
 langchain-core = { git = "https://github.com/langchain-ai/langchain.git", subdirectory = "libs/core" }
 
 [tool.poetry.group.dev]
@@ -104,7 +104,14 @@ ignore = [
 ]
 
 [tool.mypy]
-disallow_untyped_defs = "True"
+plugins = ["pydantic.mypy"]
+strict = true
+enable_error_code = "deprecated"
+warn_unreachable = true
+
+# TODO: activate for 'strict' checking
+disallow_any_generics = false
+
 
 [tool.coverage.run]
 omit = ["tests/*"]

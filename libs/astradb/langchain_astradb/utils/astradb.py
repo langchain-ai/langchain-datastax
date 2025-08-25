@@ -420,7 +420,7 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
 
                 collection_definition = (
                     CollectionDefinition.builder()
-                    .set_vector_dimension(embedding_dimension)  # type: ignore[arg-type]
+                    .set_vector_dimension(embedding_dimension)
                     .set_vector_metric(metric)
                     .set_indexing(
                         indexing_mode=_idx_mode,
@@ -539,10 +539,11 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
     ) -> None:
         if pre_delete_collection:
             await self.async_database.drop_collection(self.collection_name)
-        if inspect.isawaitable(embedding_dimension):
-            dimension = await embedding_dimension
-        else:
-            dimension = embedding_dimension
+        dimension = (
+            await embedding_dimension
+            if inspect.isawaitable(embedding_dimension)
+            else embedding_dimension
+        )
 
         try:
             _idx_mode, _idx_target = _unpack_indexing_policy(requested_indexing_policy)
