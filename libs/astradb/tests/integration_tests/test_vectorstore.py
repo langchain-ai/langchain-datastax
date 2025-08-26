@@ -756,10 +756,11 @@ class TestAstraDBVectorStore:
         res3 = await vstore.asimilarity_search_with_score_id(
             query="[5,6]", k=1, filter={"k": "c_new"}
         )
-        doc3, _, id3 = res3[0]
-        assert doc3.page_content == "[5,6]"
-        assert doc3.metadata == {"k": "c_new", "ord": 102}
-        assert id3 == "c"
+        if not SKIP_CNDB_14524_TESTS:
+            doc3, _, id3 = res3[0]
+            assert doc3.page_content == "[5,6]"
+            assert doc3.metadata == {"k": "c_new", "ord": 102}
+            assert id3 == "c"
         # delete and count again
         del1_res = await vstore.adelete(["b"])
         assert del1_res is True
