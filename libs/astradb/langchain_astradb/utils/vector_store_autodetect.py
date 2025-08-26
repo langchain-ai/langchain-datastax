@@ -24,21 +24,21 @@ logger = logging.getLogger(__name__)
 
 def _detect_document_flatness(document: dict[str, Any]) -> bool | None:
     """Try to guess, when possible, if this document has metadata-as-a-dict or not."""
-    _metadata = document.get("metadata")
-    _vector = document.get("$vector")
-    _regularfields = set(document.keys()) - {"_id", "$vector"}
-    _regularfields_m = _regularfields - {"metadata"}
+    metadata = document.get("metadata")
+    vector = document.get("$vector")
+    regularfields = set(document.keys()) - {"_id", "$vector"}
+    regularfields_m = regularfields - {"metadata"}
     # cannot determine if ...
-    if _vector is None:
+    if vector is None:
         return None
     # now a determination
-    if isinstance(_metadata, dict) and _regularfields_m:
+    if isinstance(metadata, dict) and regularfields_m:
         return False
-    if isinstance(_metadata, dict) and not _regularfields_m:
+    if isinstance(metadata, dict) and not regularfields_m:
         # this document should not contribute to the survey
         return None
     str_regularfields = {
-        k for k, v in document.items() if isinstance(v, str) if k in _regularfields
+        k for k, v in document.items() if isinstance(v, str) if k in regularfields
     }
     if str_regularfields:
         # Note: even if the only string field is "metadata"

@@ -125,9 +125,9 @@ class TestAstraDBStore:
 
         # massive insertion with many overwrites scattered through
         # (we change the text to later check on DB for successful update)
-        _s, _e, _st = second_group_slicer
+        s, e, st = second_group_slicer
         group1_ids, group1_texts_pre = list(
-            zip(*(ids_and_texts[_s:_e:_st] + ids_and_texts[first_group_size:full_size]))
+            zip(*(ids_and_texts[s:e:st] + ids_and_texts[first_group_size:full_size]))
         )
         group1_texts = [txt.upper() for txt in group1_texts_pre]
         astra_db_empty_store.mset(list(zip(group1_ids, group1_texts)))
@@ -175,9 +175,9 @@ class TestAstraDBStore:
 
         # massive insertion with many overwrites scattered through
         # (we change the text to later check on DB for successful update)
-        _s, _e, _st = second_group_slicer
+        s, e, st = second_group_slicer
         group1_ids, group1_texts_pre = list(
-            zip(*(ids_and_texts[_s:_e:_st] + ids_and_texts[first_group_size:full_size]))
+            zip(*(ids_and_texts[s:e:st] + ids_and_texts[first_group_size:full_size]))
         )
         group1_texts = [txt.upper() for txt in group1_texts_pre]
         await astra_db_empty_store_async.amset(list(zip(group1_ids, group1_texts)))

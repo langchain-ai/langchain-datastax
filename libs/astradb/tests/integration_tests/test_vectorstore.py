@@ -846,11 +846,11 @@ class TestAstraDBVectorStore:
         assert set(inserted_ids0) == set(group0_ids)
         # massive insertion with many overwrites scattered through
         # (we change the text to later check on DB for successful update)
-        _s, _e, _st = second_group_slicer
-        group1_ids = all_ids[_s:_e:_st] + all_ids[first_group_size:full_size]
+        s, e, st = second_group_slicer
+        group1_ids = all_ids[s:e:st] + all_ids[first_group_size:full_size]
         group1_texts = [
             txt.upper()
-            for txt in (all_texts[_s:_e:_st] + all_texts[first_group_size:full_size])
+            for txt in (all_texts[s:e:st] + all_texts[first_group_size:full_size])
         ]
         inserted_ids1 = vector_store_d2.add_texts(
             texts=group1_texts,
@@ -895,11 +895,11 @@ class TestAstraDBVectorStore:
         assert set(inserted_ids0) == set(group0_ids)
         # massive insertion with many overwrites scattered through
         # (we change the text to later check on DB for successful update)
-        _s, _e, _st = second_group_slicer
-        group1_ids = all_ids[_s:_e:_st] + all_ids[first_group_size:full_size]
+        s, e, st = second_group_slicer
+        group1_ids = all_ids[s:e:st] + all_ids[first_group_size:full_size]
         group1_texts = [
             txt.upper()
-            for txt in (all_texts[_s:_e:_st] + all_texts[first_group_size:full_size])
+            for txt in (all_texts[s:e:st] + all_texts[first_group_size:full_size])
         ]
         inserted_ids1 = await vector_store_d2.aadd_texts(
             texts=group1_texts,

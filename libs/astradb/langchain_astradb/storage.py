@@ -179,13 +179,13 @@ class AstraDBBaseStore(BaseStore[str, V], Generic[V]):
 
             sem = asyncio.Semaphore(MAX_CONCURRENT_DOCUMENT_REPLACEMENTS)
 
-            _async_collection = self.async_collection
+            async_collection = self.async_collection
 
             async def _replace_document(
                 document: dict[str, Any],
             ) -> CollectionUpdateResult:
                 async with sem:
-                    return await _async_collection.replace_one(
+                    return await async_collection.replace_one(
                         {"_id": document["_id"]},
                         document,
                     )

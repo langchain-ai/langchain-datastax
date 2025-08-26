@@ -645,14 +645,14 @@ class TestAstraDBVectorStoreAutodetect:
         flat_md: bool,
     ) -> None:
         # populate (with/out $lexical, flat/nested) to then check autodetection result
-        _md_part: dict[str, Any] = (
+        md_part: dict[str, Any] = (
             {"k0": "v0"} if flat_md else {"metadata": {"k0": "v0"}}
         )
         empty_collection_forcehybrid_vectorize.insert_one(
             {
                 "_id": "doc0",
                 "$vectorize": "the content",
-                **_md_part,
+                **md_part,
                 **({"$lexical": "the lex content"} if lexical_in_docs else {}),
             }
         )
@@ -725,14 +725,14 @@ class TestAstraDBVectorStoreAutodetect:
         flat_md: bool,
     ) -> None:
         # populate (flat/nested) to then check autodetection result
-        _md_part: dict[str, Any] = (
+        md_part: dict[str, Any] = (
             {"k0": "v0"} if flat_md else {"metadata": {"k0": "v0"}}
         )
         empty_collection_forcenohybrid_vectorize.insert_one(
             {
                 "_id": "doc0",
                 "$vectorize": "the content",
-                **_md_part,
+                **md_part,
             }
         )
         # instantiate store with autodetect
@@ -814,7 +814,7 @@ class TestAstraDBVectorStoreAutodetect:
         flat_md: bool,
     ) -> None:
         # populate (with/out $lexical, flat/nested) to then check autodetection result
-        _md_part: dict[str, Any] = (
+        md_part: dict[str, Any] = (
             {"k0": "v0"} if flat_md else {"metadata": {"k0": "v0"}}
         )
         empty_collection_forcehybrid_novectorize.insert_one(
@@ -822,7 +822,7 @@ class TestAstraDBVectorStoreAutodetect:
                 "_id": "doc0",
                 CUSTOM_CONTENT_KEY: "[9,3]",
                 "$vector": [9, 3],
-                **_md_part,
+                **md_part,
                 **({"$lexical": "the lex content"} if lexical_in_docs else {}),
             }
         )
@@ -895,7 +895,7 @@ class TestAstraDBVectorStoreAutodetect:
         flat_md: bool,
     ) -> None:
         # populate (flat/nested) to then check autodetection result
-        _md_part: dict[str, Any] = (
+        md_part: dict[str, Any] = (
             {"k0": "v0"} if flat_md else {"metadata": {"k0": "v0"}}
         )
         empty_collection_forcenohybrid_novectorize.insert_one(
@@ -903,7 +903,7 @@ class TestAstraDBVectorStoreAutodetect:
                 "_id": "doc0",
                 CUSTOM_CONTENT_KEY: "[9,3]",
                 "$vector": [9, 3],
-                **_md_part,
+                **md_part,
             }
         )
         # instantiate store with autodetect

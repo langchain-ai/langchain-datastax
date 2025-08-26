@@ -331,9 +331,9 @@ class _AstraDBVectorStoreDocumentCodec(ABC):
             a collection.
         """
         clauses: list[dict[str, Any]] = []
-        _ids_list = list(ids or [])
-        if _ids_list:
-            clauses.append(_astra_generic_encode_ids(_ids_list))
+        ids_list = list(ids or [])
+        if ids_list:
+            clauses.append(_astra_generic_encode_ids(ids_list))
         if filter_dict:
             clauses.append(self.encode_filter(filter_dict))
 
@@ -410,11 +410,11 @@ class _DefaultVSDocumentCodec(_AstraDBVectorStoreDocumentCodec):
 
     @override
     def decode(self, astra_document: dict[str, Any]) -> Document | None:
-        _invalid_doc = (
+        invalid_doc = (
             DEFAULT_METADATA_FIELD_NAME not in astra_document
             or self.content_field not in astra_document
         )
-        if _invalid_doc and self.ignore_invalid_documents:
+        if invalid_doc and self.ignore_invalid_documents:
             invalid_doc_warning = (
                 "Ignoring document with _id = "
                 f"{astra_document.get('_id', '(no _id)')}. "
@@ -512,11 +512,11 @@ class _DefaultVectorizeVSDocumentCodec(_AstraDBVectorStoreDocumentCodec):
 
     @override
     def decode(self, astra_document: dict[str, Any]) -> Document | None:
-        _invalid_doc = (
+        invalid_doc = (
             DEFAULT_METADATA_FIELD_NAME not in astra_document
             or VECTORIZE_FIELD_NAME not in astra_document
         )
-        if _invalid_doc and self.ignore_invalid_documents:
+        if invalid_doc and self.ignore_invalid_documents:
             invalid_doc_warning = (
                 "Ignoring document with _id = "
                 f"{astra_document.get('_id', '(no _id)')}. "
@@ -632,12 +632,12 @@ class _FlatVSDocumentCodec(_AstraDBVectorStoreDocumentCodec):
                 stacklevel=2,
             )
             return None
-        _metadata = {
+        metadata = {
             k: v for k, v in astra_document.items() if k not in self._non_md_fields
         }
         return Document(
             page_content=astra_document[self.content_field],
-            metadata=_metadata,
+            metadata=metadata,
             id=astra_document["_id"],
         )
 
@@ -740,12 +740,12 @@ class _FlatVectorizeVSDocumentCodec(_AstraDBVectorStoreDocumentCodec):
                 stacklevel=2,
             )
             return None
-        _metadata = {
+        metadata = {
             k: v for k, v in astra_document.items() if k not in self._non_md_fields
         }
         return Document(
             page_content=astra_document[VECTORIZE_FIELD_NAME],
-            metadata=_metadata,
+            metadata=metadata,
             id=astra_document["_id"],
         )
 

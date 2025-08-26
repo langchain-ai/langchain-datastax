@@ -145,7 +145,7 @@ def _survey_collection(
     api_options: APIOptions | None = None,
 ) -> tuple[CollectionDescriptor | None, list[dict[str, Any]]]:
     """Return the collection descriptor (if found) and a sample of documents."""
-    _astra_db_env = _AstraDBEnvironment(
+    astra_db_env = _AstraDBEnvironment(
         token=token,
         api_endpoint=api_endpoint,
         keyspace=keyspace,
@@ -156,14 +156,14 @@ def _survey_collection(
     )
     descriptors = [
         coll_d
-        for coll_d in _astra_db_env.database.list_collections()
+        for coll_d in astra_db_env.database.list_collections()
         if coll_d.name == collection_name
     ]
     if not descriptors:
         return None, []
     descriptor = descriptors[0]
     # fetch some documents
-    document_ite = _astra_db_env.database.get_collection(collection_name).find(
+    document_ite = astra_db_env.database.get_collection(collection_name).find(
         filter={},
         projection={"*": True},
         limit=SURVEY_NUMBER_OF_DOCUMENTS,
@@ -249,13 +249,13 @@ class _AstraDBEnvironment:
                 "Attempting to fetch keyspace from environment variable '%s'",
                 KEYSPACE_ENV_VAR,
             )
-            _env_var_keyspace = os.getenv(KEYSPACE_ENV_VAR, "").strip()
-            if _env_var_keyspace:
+            env_var_keyspace = os.getenv(KEYSPACE_ENV_VAR, "").strip()
+            if env_var_keyspace:
                 logger.info(
                     "Using keyspace '%s' from environment variable.",
-                    _env_var_keyspace,
+                    env_var_keyspace,
                 )
-                self.keyspace = _env_var_keyspace
+                self.keyspace = env_var_keyspace
             else:
                 self.keyspace = keyspace
         else:
@@ -416,7 +416,7 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
                 )
                 raise ValueError(msg)
             try:
-                _idx_mode, _idx_target = _unpack_indexing_policy(
+                idx_mode, idx_target = _unpack_indexing_policy(
                     requested_indexing_policy,
                 )
 
@@ -425,8 +425,8 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
                     .set_vector_dimension(embedding_dimension)
                     .set_vector_metric(metric)
                     .set_indexing(
-                        indexing_mode=_idx_mode,
-                        indexing_target=_idx_target,
+                        indexing_mode=idx_mode,
+                        indexing_target=idx_target,
                     )
                     .set_vector_service(collection_vector_service_options)
                     .set_lexical(self.collection_lexical)
@@ -548,14 +548,14 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
         )
 
         try:
-            _idx_mode, _idx_target = _unpack_indexing_policy(requested_indexing_policy)
+            idx_mode, idx_target = _unpack_indexing_policy(requested_indexing_policy)
             collection_definition = (
                 CollectionDefinition.builder()
                 .set_vector_dimension(dimension)
                 .set_vector_metric(metric)
                 .set_indexing(
-                    indexing_mode=_idx_mode,
-                    indexing_target=_idx_target,
+                    indexing_mode=idx_mode,
+                    indexing_target=idx_target,
                 )
                 .set_vector_service(collection_vector_service_options)
                 .set_lexical(self.collection_lexical)
