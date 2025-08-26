@@ -5,10 +5,13 @@ from __future__ import annotations
 import logging
 import warnings
 from abc import ABC, abstractmethod
-from typing import Any, Iterable
+from typing import TYPE_CHECKING, Any
 
 from langchain_core.documents import Document
 from typing_extensions import override
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
 
 NO_NULL_VECTOR_MSG = "Default (non-vectorize) codec cannot encode null vector."
 VECTOR_REQUIRED_PREAMBLE_MSG = (

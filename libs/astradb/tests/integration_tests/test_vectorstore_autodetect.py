@@ -5,7 +5,7 @@ Refer to `test_vectorstores.py` for the requirements to run.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Iterable
+from typing import TYPE_CHECKING, Any
 
 import pytest
 from astrapy.authentication import StaticTokenProvider
@@ -36,6 +36,8 @@ from .conftest import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
+
     from astrapy import Collection, Database
     from langchain_core.embeddings import Embeddings
 
@@ -607,12 +609,14 @@ class TestAstraDBVectorStoreAutodetect:
             ad_store_e.similarity_search("[7,8]", k=3)
 
         # one case should result in just a warning:
-        with pytest.warns(UserWarning) as rec_warnings:
+        with pytest.warns(
+            UserWarning, match="Ignoring document with _id"
+        ) as rec_warnings:
             results_w_post = ad_store_w.similarity_search("[7,8]", k=3)
-            f_rec_warnings = [
-                wrn for wrn in rec_warnings if issubclass(wrn.category, UserWarning)
-            ]
-            assert len(f_rec_warnings) == 1
+        f_rec_warnings = [
+            wrn for wrn in rec_warnings if issubclass(wrn.category, UserWarning)
+        ]
+        assert len(f_rec_warnings) == 1
         assert len(results_w_post) == 1
 
     @pytest.mark.parametrize(

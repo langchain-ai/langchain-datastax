@@ -11,14 +11,9 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import (
     TYPE_CHECKING,
     Any,
-    AsyncIterable,
-    Awaitable,
     Callable,
-    Dict,
-    Iterable,
     Literal,
     NamedTuple,
-    Sequence,
     TypeVar,
     Union,
     cast,
@@ -34,7 +29,6 @@ from astrapy.info import (
     VectorServiceOptions,
 )
 from langchain_community.vectorstores.utils import maximal_marginal_relevance
-from langchain_core.documents import Document
 from langchain_core.runnables.utils import gather_with_concurrency
 from langchain_core.vectorstores import VectorStore
 from typing_extensions import override
@@ -63,6 +57,8 @@ from langchain_astradb.utils.vector_store_codecs import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import AsyncIterable, Awaitable, Iterable, Sequence
+
     from astrapy.api_options import APIOptions
     from astrapy.authentication import (
         EmbeddingHeadersProvider,
@@ -72,11 +68,12 @@ if TYPE_CHECKING:
     from astrapy.cursors import RerankedResult
     from astrapy.info import RerankServiceOptions
     from astrapy.results import CollectionUpdateResult
+    from langchain_core.documents import Document
     from langchain_core.embeddings import Embeddings
 
 T = TypeVar("T")
 U = TypeVar("U")
-DocDict = Dict[str, Any]  # dicts expressing entries to insert
+DocDict = dict[str, Any]  # dicts expressing entries to insert
 
 # error code to check for during bulk insertions
 DOCUMENT_ALREADY_EXISTS_API_ERROR_CODE = "DOCUMENT_ALREADY_EXISTS"
@@ -1489,7 +1486,7 @@ class AstraDBVectorStore(VectorStore):
             # here, assume all in err.exceptions is a DataAPIResponseException:
             error_codes = {
                 err_desc.error_code
-                for in_err in cast(list[DataAPIResponseException], err.exceptions)
+                for in_err in cast("list[DataAPIResponseException]", err.exceptions)
                 for err_desc in in_err.error_descriptors
             }
             if error_codes == {DOCUMENT_ALREADY_EXISTS_API_ERROR_CODE}:
@@ -1632,7 +1629,7 @@ class AstraDBVectorStore(VectorStore):
             # here, assume all in err.exceptions is a DataAPIResponseException:
             error_codes = {
                 err_desc.error_code
-                for in_err in cast(list[DataAPIResponseException], err.exceptions)
+                for in_err in cast("list[DataAPIResponseException]", err.exceptions)
                 for err_desc in in_err.error_descriptors
             }
             if error_codes == {DOCUMENT_ALREADY_EXISTS_API_ERROR_CODE}:
@@ -1991,7 +1988,7 @@ class AstraDBVectorStore(VectorStore):
         if include_sort_vector:
             # the codec option in the AstraDBEnv class disables DataAPIVectors here:
             sort_vector = cast(
-                Union[list[float], None],
+                "Union[list[float], None]",
                 (find_raw_iterator.get_sort_vector() if include_sort_vector else None),
             )
             return sort_vector, final_doc_iterator
@@ -2245,7 +2242,7 @@ class AstraDBVectorStore(VectorStore):
         if include_sort_vector:
             # the codec option in the AstraDBEnv class disables DataAPIVectors here:
             sort_vector = cast(
-                Union[list[float], None],
+                "Union[list[float], None]",
                 (
                     await find_raw_iterator.get_sort_vector()
                     if include_sort_vector
@@ -2707,7 +2704,7 @@ class AstraDBVectorStore(VectorStore):
         )
         # doc is a Document and sim is a float:
         return [
-            cast(tuple[Document, float, str], (doc, sim, did))
+            cast("tuple[Document, float, str]", (doc, sim, did))
             for doc, did, _, sim in hits_ite
         ]
 
@@ -2735,7 +2732,7 @@ class AstraDBVectorStore(VectorStore):
         )
         return [
             cast(
-                tuple[Document, float, str],
+                "tuple[Document, float, str]",
                 (
                     decoded_tuple.document,
                     decoded_tuple.similarity,
@@ -3006,7 +3003,7 @@ class AstraDBVectorStore(VectorStore):
         )
         # doc is a Document and sim is a float:
         return [
-            cast(tuple[Document, float, str], (doc, sim, did))
+            cast("tuple[Document, float, str]", (doc, sim, did))
             async for doc, did, _, sim in hits_ite
         ]
 
@@ -3034,7 +3031,7 @@ class AstraDBVectorStore(VectorStore):
         )
         return [
             cast(
-                tuple[Document, float, str],
+                "tuple[Document, float, str]",
                 (
                     decoded_tuple.document,
                     decoded_tuple.similarity,
@@ -3209,7 +3206,7 @@ class AstraDBVectorStore(VectorStore):
         return (
             sort_vec,
             [
-                cast(tuple[Document, list[float]], (doc, emb))
+                cast("tuple[Document, list[float]]", (doc, emb))
                 for doc, _, emb, _ in hits_ite
             ],
         )
@@ -3239,7 +3236,7 @@ class AstraDBVectorStore(VectorStore):
         return (
             sort_vec,
             [
-                cast(tuple[Document, list[float]], (doc, emb))
+                cast("tuple[Document, list[float]]", (doc, emb))
                 async for doc, _, emb, _ in hits_ite
             ],
         )
@@ -3261,7 +3258,7 @@ class AstraDBVectorStore(VectorStore):
         )
         # this is list[tuple[Document, list[float]]]:
         prefetch_hit_pairs = cast(
-            list[tuple[Document, list[float]]],
+            "list[tuple[Document, list[float]]]",
             [(doc, emb) for doc, _, emb, _ in hits_ite],
         )
         if sort_vec is None:
@@ -3291,7 +3288,7 @@ class AstraDBVectorStore(VectorStore):
         )
         # this is list[tuple[Document, list[float]]]:
         prefetch_hit_pairs = cast(
-            list[tuple[Document, list[float]]],
+            "list[tuple[Document, list[float]]]",
             [(doc, emb) async for doc, _, emb, _ in hits_ite],
         )
         if sort_vec is None:

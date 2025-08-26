@@ -226,7 +226,9 @@ class TestAstraDBVectorStoreDDLs:
             )
 
         # one case should result in just a warning:
-        with pytest.warns(UserWarning) as rec_warnings:
+        with pytest.warns(
+            UserWarning, match="is detected as having indexing turned on for all fields"
+        ) as rec_warnings:
             AstraDBVectorStore(
                 collection_name=EPHEMERAL_LEGACY_IDX_NAME_D2,
                 embedding=embedding_d2,
@@ -235,10 +237,10 @@ class TestAstraDBVectorStoreDDLs:
                 namespace=astra_db_credentials["namespace"],
                 environment=astra_db_credentials["environment"],
             )
-            f_rec_warnings = [
-                wrn for wrn in rec_warnings if issubclass(wrn.category, UserWarning)
-            ]
-            assert len(f_rec_warnings) == 1
+        f_rec_warnings = [
+            wrn for wrn in rec_warnings if issubclass(wrn.category, UserWarning)
+        ]
+        assert len(f_rec_warnings) == 1
 
     @pytest.mark.usefixtures("ephemeral_indexing_collections_cleaner")
     def test_astradb_vectorstore_indexing_default_sync(
@@ -367,7 +369,9 @@ class TestAstraDBVectorStoreDDLs:
             ).aadd_texts(["[4,13]"])
 
         # one case should result in just a warning:
-        with pytest.warns(UserWarning) as rec_warnings:
+        with pytest.warns(
+            UserWarning, match="is detected as having indexing turned on for all fields"
+        ) as rec_warnings:
             await AstraDBVectorStore(
                 collection_name=EPHEMERAL_LEGACY_IDX_NAME_D2,
                 embedding=embedding_d2,
@@ -377,10 +381,10 @@ class TestAstraDBVectorStoreDDLs:
                 environment=astra_db_credentials["environment"],
                 setup_mode=SetupMode.ASYNC,
             ).aadd_texts(["[4,13]"])
-            f_rec_warnings = [
-                wrn for wrn in rec_warnings if issubclass(wrn.category, UserWarning)
-            ]
-            assert len(f_rec_warnings) == 1
+        f_rec_warnings = [
+            wrn for wrn in rec_warnings if issubclass(wrn.category, UserWarning)
+        ]
+        assert len(f_rec_warnings) == 1
 
     @pytest.mark.usefixtures("ephemeral_indexing_collections_cleaner")
     async def test_astradb_vectorstore_indexing_default_async(

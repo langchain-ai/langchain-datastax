@@ -9,10 +9,7 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import (
     TYPE_CHECKING,
     Any,
-    AsyncIterator,
     Generic,
-    Iterator,
-    Sequence,
     TypeVar,
 )
 
@@ -30,6 +27,8 @@ from langchain_astradb.utils.astradb import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import AsyncIterator, Iterator, Sequence
+
     from astrapy.api_options import APIOptions
     from astrapy.authentication import TokenProvider
     from astrapy.results import CollectionUpdateResult

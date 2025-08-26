@@ -288,7 +288,9 @@ class TestAstraDBStore:
     ) -> None:
         """Test of instantiation against a legacy collection."""
         database.create_collection(EPHEMERAL_LEGACY_IDX_NAME)
-        with pytest.warns(UserWarning) as rec_warnings:
+        with pytest.warns(
+            UserWarning, match="is detected as having indexing turned on for all fields"
+        ) as rec_warnings:
             AstraDBStore(
                 collection_name=EPHEMERAL_LEGACY_IDX_NAME,
                 token=StaticTokenProvider(astra_db_credentials["token"]),
@@ -296,10 +298,10 @@ class TestAstraDBStore:
                 namespace=astra_db_credentials["namespace"],
                 environment=astra_db_credentials["environment"],
             )
-            f_rec_warnings = [
-                wrn for wrn in rec_warnings if issubclass(wrn.category, UserWarning)
-            ]
-            assert len(f_rec_warnings) == 1
+        f_rec_warnings = [
+            wrn for wrn in rec_warnings if issubclass(wrn.category, UserWarning)
+        ]
+        assert len(f_rec_warnings) == 1
 
     @pytest.mark.usefixtures("ephemeral_indexing_collections_cleaner")
     async def test_store_indexing_on_legacy_async(
@@ -309,7 +311,9 @@ class TestAstraDBStore:
     ) -> None:
         """Test of instantiation against a legacy collection, async version."""
         await database.to_async().create_collection(EPHEMERAL_LEGACY_IDX_NAME)
-        with pytest.warns(UserWarning) as rec_warnings:
+        with pytest.warns(
+            UserWarning, match="is detected as having indexing turned on for all fields"
+        ) as rec_warnings:
             await AstraDBStore(
                 collection_name=EPHEMERAL_LEGACY_IDX_NAME,
                 token=StaticTokenProvider(astra_db_credentials["token"]),
@@ -318,10 +322,10 @@ class TestAstraDBStore:
                 environment=astra_db_credentials["environment"],
                 setup_mode=SetupMode.ASYNC,
             ).amget(["some_key"])
-            f_rec_warnings = [
-                wrn for wrn in rec_warnings if issubclass(wrn.category, UserWarning)
-            ]
-            assert len(f_rec_warnings) == 1
+        f_rec_warnings = [
+            wrn for wrn in rec_warnings if issubclass(wrn.category, UserWarning)
+        ]
+        assert len(f_rec_warnings) == 1
 
     @pytest.mark.usefixtures("ephemeral_indexing_collections_cleaner")
     def test_store_indexing_on_custom_sync(

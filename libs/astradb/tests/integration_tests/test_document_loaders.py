@@ -48,7 +48,9 @@ class TestAstraDB:
         document_loader_collection: Collection,
     ) -> None:
         """Using 'prefetched' should give a warning but work nonetheless."""
-        with pytest.warns(UserWarning) as rec_warnings:
+        with pytest.warns(
+            UserWarning, match="Parameter 'nb_prefetched' is not supported"
+        ) as rec_warnings:
             loader = AstraDBLoader(
                 document_loader_collection.name,
                 token=StaticTokenProvider(astra_db_credentials["token"]),
@@ -60,10 +62,10 @@ class TestAstraDB:
                 limit=22,
                 filter_criteria={"foo": "bar"},
             )
-            f_rec_warnings = [
-                wrn for wrn in rec_warnings if issubclass(wrn.category, UserWarning)
-            ]
-            assert len(f_rec_warnings) == 1
+        f_rec_warnings = [
+            wrn for wrn in rec_warnings if issubclass(wrn.category, UserWarning)
+        ]
+        assert len(f_rec_warnings) == 1
 
         docs = loader.load()
         assert len(docs) == 22
@@ -160,7 +162,9 @@ class TestAstraDB:
         async_document_loader_collection: AsyncCollection,
     ) -> None:
         """Using 'prefetched' should give a warning but work nonetheless."""
-        with pytest.warns(UserWarning) as rec_warnings:
+        with pytest.warns(
+            UserWarning, match="Parameter 'nb_prefetched' is not supported"
+        ) as rec_warnings:
             loader = AstraDBLoader(
                 async_document_loader_collection.name,
                 token=StaticTokenProvider(astra_db_credentials["token"]),
@@ -172,11 +176,11 @@ class TestAstraDB:
                 limit=22,
                 filter_criteria={"foo": "bar"},
             )
-            # cleaning out 'spurious' "unclosed socket/transport..." warnings
-            f_rec_warnings = [
-                wrn for wrn in rec_warnings if issubclass(wrn.category, UserWarning)
-            ]
-            assert len(f_rec_warnings) == 1
+        # cleaning out 'spurious' "unclosed socket/transport..." warnings
+        f_rec_warnings = [
+            wrn for wrn in rec_warnings if issubclass(wrn.category, UserWarning)
+        ]
+        assert len(f_rec_warnings) == 1
         docs = await loader.aload()
         assert len(docs) == 22
 

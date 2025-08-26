@@ -11,7 +11,7 @@ import warnings
 from asyncio import InvalidStateError, Task
 from enum import Enum
 from importlib.metadata import version
-from typing import TYPE_CHECKING, Any, Awaitable
+from typing import TYPE_CHECKING, Any
 
 import langchain_core
 from astrapy import AsyncDatabase, DataAPIClient, Database
@@ -36,6 +36,8 @@ from astrapy.info import (
 from astrapy.utils.api_options import defaultAPIOptions
 
 if TYPE_CHECKING:
+    from collections.abc import Awaitable
+
     from astrapy.info import CollectionDescriptor, VectorServiceOptions
 
 TOKEN_ENV_VAR = "ASTRA_DB_APPLICATION_TOKEN"  # noqa: S105
@@ -119,7 +121,7 @@ def _unpack_indexing_policy(
     """{} or None => (None, None); {"a": "b"} => ("a", "b"); multikey => error."""
     if indexing_dict:
         if len(indexing_dict) != 1:
-            msg = "Unexpected indexing policy provided: " f"{indexing_dict}"
+            msg = f"Unexpected indexing policy provided: {indexing_dict}"
             raise ValueError(msg)
         return next(iter(indexing_dict.items()))
     return None, None
@@ -224,7 +226,7 @@ class _AstraDBEnvironment:
 
         if token is None:
             logger.info(
-                "Attempting to fetch token from environment " "variable '%s'",
+                "Attempting to fetch token from environment variable '%s'",
                 TOKEN_ENV_VAR,
             )
             self.token = StaticTokenProvider(os.getenv(TOKEN_ENV_VAR))
@@ -235,7 +237,7 @@ class _AstraDBEnvironment:
 
         if api_endpoint is None:
             logger.info(
-                "Attempting to fetch API endpoint from environment " "variable '%s'",
+                "Attempting to fetch API endpoint from environment variable '%s'",
                 API_ENDPOINT_ENV_VAR,
             )
             self.api_endpoint = os.getenv(API_ENDPOINT_ENV_VAR)
@@ -244,7 +246,7 @@ class _AstraDBEnvironment:
 
         if keyspace is None:
             logger.info(
-                "Attempting to fetch keyspace from environment " "variable '%s'",
+                "Attempting to fetch keyspace from environment variable '%s'",
                 KEYSPACE_ENV_VAR,
             )
             _env_var_keyspace = os.getenv(KEYSPACE_ENV_VAR, "").strip()
