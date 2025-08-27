@@ -31,6 +31,7 @@ from .conftest import (
     NVIDIA_RERANKING_OPTIONS_HEADER,
     OPENAI_VECTORIZE_OPTIONS_HEADER,
     SKIP_CNDB_13480_TESTS,
+    SKIP_CNDB_14524_TESTS,
     astra_db_env_vars_available,
 )
 
@@ -234,7 +235,8 @@ class TestAstraDBVectorStoreAutodetect:
 
         # reading with filtering
         results2 = ad_store.similarity_search("[-1,-1]", k=3, filter={"q2": "Q2"})
-        assert results2 == [Document(id=id4, page_content=pc4, metadata=md4)]
+        if not SKIP_CNDB_14524_TESTS:
+            assert results2 == [Document(id=id4, page_content=pc4, metadata=md4)]
 
         # delete by metadata
         del_by_md = ad_store.delete_by_metadata_filter(filter={"q2": "Q2"})
@@ -322,7 +324,8 @@ class TestAstraDBVectorStoreAutodetect:
 
         # reading with filtering
         results2 = ad_store.similarity_search("[9,10]", k=3, filter={"q2": "Q2"})
-        assert results2 == [Document(id=id4, page_content=pc4, metadata=md4)]
+        if not SKIP_CNDB_14524_TESTS:
+            assert results2 == [Document(id=id4, page_content=pc4, metadata=md4)]
 
         # delete by metadata
         del_by_md = ad_store.delete_by_metadata_filter(filter={"q2": "Q2"})
@@ -414,7 +417,8 @@ class TestAstraDBVectorStoreAutodetect:
 
         # reading with filtering
         results2 = ad_store.similarity_search("query", k=3, filter={"q2": "Q2"})
-        assert results2 == [Document(id=id4, page_content=pc4, metadata=md4)]
+        if not SKIP_CNDB_14524_TESTS:
+            assert results2 == [Document(id=id4, page_content=pc4, metadata=md4)]
 
         # delete by metadata
         del_by_md = ad_store.delete_by_metadata_filter(filter={"q2": "Q2"})
@@ -504,7 +508,8 @@ class TestAstraDBVectorStoreAutodetect:
 
         # reading with filtering
         results2 = ad_store.similarity_search("query", k=3, filter={"q2": "Q2"})
-        assert results2 == [Document(id=id4, page_content=pc4, metadata=md4)]
+        if not SKIP_CNDB_14524_TESTS:
+            assert results2 == [Document(id=id4, page_content=pc4, metadata=md4)]
 
         # delete by metadata
         del_by_md = ad_store.delete_by_metadata_filter(filter={"q2": "Q2"})
