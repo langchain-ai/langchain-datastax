@@ -5,7 +5,7 @@ Refer to `test_vectorstores.py` for the requirements to run.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Iterable
+from typing import TYPE_CHECKING, Any
 
 import pytest
 from astrapy.authentication import StaticTokenProvider
@@ -36,6 +36,8 @@ from .conftest import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
+
     from astrapy import Collection, Database
     from langchain_core.embeddings import Embeddings
 
@@ -607,12 +609,14 @@ class TestAstraDBVectorStoreAutodetect:
             ad_store_e.similarity_search("[7,8]", k=3)
 
         # one case should result in just a warning:
-        with pytest.warns(UserWarning) as rec_warnings:
+        with pytest.warns(
+            UserWarning, match="Ignoring document with _id"
+        ) as rec_warnings:
             results_w_post = ad_store_w.similarity_search("[7,8]", k=3)
-            f_rec_warnings = [
-                wrn for wrn in rec_warnings if issubclass(wrn.category, UserWarning)
-            ]
-            assert len(f_rec_warnings) == 1
+        f_rec_warnings = [
+            wrn for wrn in rec_warnings if issubclass(wrn.category, UserWarning)
+        ]
+        assert len(f_rec_warnings) == 1
         assert len(results_w_post) == 1
 
     @pytest.mark.parametrize(
@@ -641,14 +645,14 @@ class TestAstraDBVectorStoreAutodetect:
         flat_md: bool,
     ) -> None:
         # populate (with/out $lexical, flat/nested) to then check autodetection result
-        _md_part: dict[str, Any] = (
+        md_part: dict[str, Any] = (
             {"k0": "v0"} if flat_md else {"metadata": {"k0": "v0"}}
         )
         empty_collection_forcehybrid_vectorize.insert_one(
             {
                 "_id": "doc0",
                 "$vectorize": "the content",
-                **_md_part,
+                **md_part,
                 **({"$lexical": "the lex content"} if lexical_in_docs else {}),
             }
         )
@@ -721,14 +725,14 @@ class TestAstraDBVectorStoreAutodetect:
         flat_md: bool,
     ) -> None:
         # populate (flat/nested) to then check autodetection result
-        _md_part: dict[str, Any] = (
+        md_part: dict[str, Any] = (
             {"k0": "v0"} if flat_md else {"metadata": {"k0": "v0"}}
         )
         empty_collection_forcenohybrid_vectorize.insert_one(
             {
                 "_id": "doc0",
                 "$vectorize": "the content",
-                **_md_part,
+                **md_part,
             }
         )
         # instantiate store with autodetect
@@ -810,7 +814,7 @@ class TestAstraDBVectorStoreAutodetect:
         flat_md: bool,
     ) -> None:
         # populate (with/out $lexical, flat/nested) to then check autodetection result
-        _md_part: dict[str, Any] = (
+        md_part: dict[str, Any] = (
             {"k0": "v0"} if flat_md else {"metadata": {"k0": "v0"}}
         )
         empty_collection_forcehybrid_novectorize.insert_one(
@@ -818,7 +822,7 @@ class TestAstraDBVectorStoreAutodetect:
                 "_id": "doc0",
                 CUSTOM_CONTENT_KEY: "[9,3]",
                 "$vector": [9, 3],
-                **_md_part,
+                **md_part,
                 **({"$lexical": "the lex content"} if lexical_in_docs else {}),
             }
         )
@@ -891,7 +895,7 @@ class TestAstraDBVectorStoreAutodetect:
         flat_md: bool,
     ) -> None:
         # populate (flat/nested) to then check autodetection result
-        _md_part: dict[str, Any] = (
+        md_part: dict[str, Any] = (
             {"k0": "v0"} if flat_md else {"metadata": {"k0": "v0"}}
         )
         empty_collection_forcenohybrid_novectorize.insert_one(
@@ -899,7 +903,7 @@ class TestAstraDBVectorStoreAutodetect:
                 "_id": "doc0",
                 CUSTOM_CONTENT_KEY: "[9,3]",
                 "$vector": [9, 3],
-                **_md_part,
+                **md_part,
             }
         )
         # instantiate store with autodetect

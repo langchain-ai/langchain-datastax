@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING, Any, Iterator
+from typing import TYPE_CHECKING, Any
 
 import pytest
 from blockbuster import BlockBuster, blockbuster_ctx
@@ -14,6 +14,8 @@ from langchain_core.language_models import LLM
 from typing_extensions import override
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+
     from langchain_core.callbacks import CallbackManagerForLLMRun
 
 
