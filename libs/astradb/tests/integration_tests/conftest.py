@@ -114,6 +114,25 @@ def astra_db_env_vars_available() -> bool:
 
 _load_env()
 
+DATA_API_ENVIRONMENT = os.getenv("ASTRA_DB_ENVIRONMENT", "prod")
+IS_ASTRA_DB = DATA_API_ENVIRONMENT.lower() in {
+    "prod",
+    "test",
+    "dev",
+}
+
+# Database bug workaround flags:
+#
+# 1. Image hcd:1.2.1-early-preview used for testing suffers from:
+#    github.com/datastax/cassandra/pull/1653 (aka "cndb 13480").
+#    (It's a bug upon delete-then-run-ANN)
+#    This flag lifts the related tests (remove once a newer HCD is used):
+SKIP_CNDB_13480_TESTS = not IS_ASTRA_DB
+# 2. Astra DB version deployed in prod suffers from:
+#    https://github.com/riptano/cndb/issues/14524
+#    (It's a bug about insert1, ANN, insert2, ANN -> some rows may not be seen)
+#    This flag lifts the related tests (remove once a newer deploy takes place):
+SKIP_CNDB_14524_TESTS = IS_ASTRA_DB
 
 OPENAI_VECTORIZE_OPTIONS_HEADER = VectorServiceOptions(
     provider="openai",
@@ -175,17 +194,13 @@ def astra_db_credentials() -> AstraDBCredentials:
         "token": os.environ["ASTRA_DB_APPLICATION_TOKEN"],
         "api_endpoint": os.environ["ASTRA_DB_API_ENDPOINT"],
         "namespace": os.getenv("ASTRA_DB_KEYSPACE"),
-        "environment": os.getenv("ASTRA_DB_ENVIRONMENT", "prod"),
+        "environment": DATA_API_ENVIRONMENT,
     }
 
 
 @pytest.fixture(scope="session")
-def is_astra_db(astra_db_credentials: AstraDBCredentials) -> bool:
-    return astra_db_credentials["environment"].lower() in {
-        "prod",
-        "test",
-        "dev",
-    }
+def is_astra_db() -> bool:
+    return IS_ASTRA_DB
 
 
 @pytest.fixture(scope="session")

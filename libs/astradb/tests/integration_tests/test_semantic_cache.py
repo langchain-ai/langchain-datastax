@@ -11,6 +11,7 @@ from langchain_astradb import AstraDBSemanticCache
 from langchain_astradb.utils.astradb import SetupMode
 
 from .conftest import (
+    SKIP_CNDB_14524_TESTS,
     AstraDBCredentials,
     astra_db_env_vars_available,
 )
@@ -155,13 +156,15 @@ class TestAstraDBSemanticCache:
         test_llm.generate(["[3,4]"])
         test_llm.generate(["[3,4]"])
         test_llm.generate(["[3,4]"])
-        assert test_llm.num_calls == 1
+        if not SKIP_CNDB_14524_TESTS:
+            assert test_llm.num_calls == 1
 
         # clear the cache and check a new LLM call is actually made
         astradb_semantic_cache.clear()
         test_llm.generate(["[3,4]"])
         test_llm.generate(["[3,4]"])
-        assert test_llm.num_calls == 2
+        if not SKIP_CNDB_14524_TESTS:
+            assert test_llm.num_calls == 2
 
     async def test_semantic_cache_through_llm_async(
         self,
@@ -191,10 +194,12 @@ class TestAstraDBSemanticCache:
         await test_llm.agenerate(["[3,4]"])
         await test_llm.agenerate(["[3,4]"])
         await test_llm.agenerate(["[3,4]"])
-        assert test_llm.num_calls == 1
+        if not SKIP_CNDB_14524_TESTS:
+            assert test_llm.num_calls == 1
 
         # clear the cache and check a new LLM call is actually made
         await astradb_semantic_cache.aclear()
         await test_llm.agenerate(["[3,4]"])
         await test_llm.agenerate(["[3,4]"])
-        assert test_llm.num_calls == 2
+        if not SKIP_CNDB_14524_TESTS:
+            assert test_llm.num_calls == 2

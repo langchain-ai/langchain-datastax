@@ -5,7 +5,6 @@ Refer to `test_vectorstores.py` for the requirements to run.
 
 from __future__ import annotations
 
-import os
 from typing import TYPE_CHECKING, Any, Iterable
 
 import pytest
@@ -31,6 +30,7 @@ from .conftest import (
     LEXICAL_OPTIONS,
     NVIDIA_RERANKING_OPTIONS_HEADER,
     OPENAI_VECTORIZE_OPTIONS_HEADER,
+    SKIP_CNDB_13480_TESTS,
     astra_db_env_vars_available,
 )
 
@@ -240,9 +240,7 @@ class TestAstraDBVectorStoreAutodetect:
         del_by_md = ad_store.delete_by_metadata_filter(filter={"q2": "Q2"})
         assert del_by_md is not None
         assert del_by_md == 1
-        # TODO: Remove this flag once `github.com/datastax/cassandra/pull/1653`
-        # makes it to the testing HCD
-        if "LANGCHAIN_TEST_NO_CNDB13480" not in os.environ:
+        if not SKIP_CNDB_13480_TESTS:
             results2n = ad_store.similarity_search("[-1,-1]", k=3, filter={"q2": "Q2"})
             assert results2n == []
 
@@ -330,9 +328,7 @@ class TestAstraDBVectorStoreAutodetect:
         del_by_md = ad_store.delete_by_metadata_filter(filter={"q2": "Q2"})
         assert del_by_md is not None
         assert del_by_md == 1
-        # TODO: Remove this flag once `github.com/datastax/cassandra/pull/1653`
-        # makes it to the testing HCD
-        if "LANGCHAIN_TEST_NO_CNDB13480" not in os.environ:
+        if not SKIP_CNDB_13480_TESTS:
             results2n = ad_store.similarity_search("[-1,-1]", k=3, filter={"q2": "Q2"})
             assert results2n == []
 
@@ -424,9 +420,7 @@ class TestAstraDBVectorStoreAutodetect:
         del_by_md = ad_store.delete_by_metadata_filter(filter={"q2": "Q2"})
         assert del_by_md is not None
         assert del_by_md == 1
-        # TODO: Remove this flag once `github.com/datastax/cassandra/pull/1653`
-        # makes it to the testing HCD
-        if "LANGCHAIN_TEST_NO_CNDB13480" not in os.environ:
+        if not SKIP_CNDB_13480_TESTS:
             results2n = ad_store.similarity_search("[-1,-1]", k=3, filter={"q2": "Q2"})
             assert results2n == []
 
@@ -516,9 +510,7 @@ class TestAstraDBVectorStoreAutodetect:
         del_by_md = ad_store.delete_by_metadata_filter(filter={"q2": "Q2"})
         assert del_by_md is not None
         assert del_by_md == 1
-        # TODO: Remove this flag once `github.com/datastax/cassandra/pull/1653`
-        # makes it to the testing HCD
-        if "LANGCHAIN_TEST_NO_CNDB13480" not in os.environ:
+        if not SKIP_CNDB_13480_TESTS:
             results2n = ad_store.similarity_search("[-1,-1]", k=3, filter={"q2": "Q2"})
             assert results2n == []
 
