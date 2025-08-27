@@ -11,14 +11,9 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import (
     TYPE_CHECKING,
     Any,
-    AsyncIterable,
-    Awaitable,
     Callable,
-    Dict,
-    Iterable,
     Literal,
     NamedTuple,
-    Sequence,
     TypeVar,
     Union,
     cast,
@@ -33,7 +28,6 @@ from astrapy.info import (
     CollectionRerankOptions,
     VectorServiceOptions,
 )
-from langchain_core.documents import Document
 from langchain_core.runnables.utils import gather_with_concurrency
 from langchain_core.vectorstores import VectorStore
 from typing_extensions import override
@@ -61,7 +55,17 @@ from langchain_astradb.utils.vector_store_codecs import (
     _DefaultVSDocumentCodec,
 )
 
+is_simd_available: bool = False
+try:
+    import simsimd as simd
+
+    is_simd_available = True
+except ImportError:
+    pass
+
 if TYPE_CHECKING:
+    from collections.abc import AsyncIterable, Awaitable, Iterable, Sequence
+
     from astrapy.api_options import APIOptions
     from astrapy.authentication import (
         EmbeddingHeadersProvider,
@@ -71,11 +75,12 @@ if TYPE_CHECKING:
     from astrapy.cursors import RerankedResult
     from astrapy.info import RerankServiceOptions
     from astrapy.results import CollectionUpdateResult
+    from langchain_core.documents import Document
     from langchain_core.embeddings import Embeddings
 
 T = TypeVar("T")
 U = TypeVar("U")
-DocDict = Dict[str, Any]  # dicts expressing entries to insert
+DocDict = dict[str, Any]  # dicts expressing entries to insert
 
 # error code to check for during bulk insertions
 DOCUMENT_ALREADY_EXISTS_API_ERROR_CODE = "DOCUMENT_ALREADY_EXISTS"
@@ -328,24 +333,23 @@ def _cosine_similarity(x: _Matrix, y: _Matrix) -> np.ndarray:
             f"and Y has shape {y.shape}."
         )
         raise ValueError(msg)
-    try:
-        import simsimd as simd
 
+    if is_simd_available:
         x = np.array(x, dtype=np.float32)
         y = np.array(y, dtype=np.float32)
         return 1 - np.array(simd.cdist(x, y, metric="cosine"))
-    except ImportError:
-        logger.debug(
-            "Unable to import simsimd, defaulting to NumPy implementation. If you want "
-            "to use simsimd please install with `pip install simsimd`."
-        )
-        x_norm = np.linalg.norm(x, axis=1)
-        y_norm = np.linalg.norm(y, axis=1)
-        # Ignore divide by zero errors run time warnings as those are handled below.
-        with np.errstate(divide="ignore", invalid="ignore"):
-            similarity: np.ndarray = np.dot(x, y.T) / np.outer(x_norm, y_norm)
-        similarity[np.isnan(similarity) | np.isinf(similarity)] = 0.0
-        return similarity
+
+    logger.debug(
+        "Unable to use simsimd, defaulting to NumPy implementation. If you want "
+        "to use simsimd please install with `pip install simsimd`."
+    )
+    x_norm = np.linalg.norm(x, axis=1)
+    y_norm = np.linalg.norm(y, axis=1)
+    # Ignore divide by zero errors run time warnings as those are handled below.
+    with np.errstate(divide="ignore", invalid="ignore"):
+        similarity: np.ndarray = np.dot(x, y.T) / np.outer(x_norm, y_norm)
+    similarity[np.isnan(similarity) | np.isinf(similarity)] = 0.0
+    return similarity
 
 
 def _maximal_marginal_relevance(
@@ -931,8 +935,8 @@ class AstraDBVectorStore(VectorStore):
             bulk_delete_concurrency or MAX_CONCURRENT_DOCUMENT_DELETIONS
         )
 
-        _setup_mode: SetupMode
-        _embedding_dimension: int | Awaitable[int] | None
+        setup_mode_: SetupMode
+        embedding_dimension: int | Awaitable[int] | None
         self.has_lexical: bool
         self.has_hybrid: bool
         self.hybrid_search: bool  # affecting the actual behaviour when running searches
@@ -943,11 +947,11 @@ class AstraDBVectorStore(VectorStore):
             logger.info(
                 "vector store default init, collection '%s'", self.collection_name
             )
-            _setup_mode = SetupMode.SYNC if setup_mode is None else setup_mode
-            _embedding_dimension = self._prepare_embedding_dimension(_setup_mode)
+            setup_mode_ = SetupMode.SYNC if setup_mode is None else setup_mode
+            embedding_dimension = self._prepare_embedding_dimension(setup_mode_)
             # determine vectorize/nonvectorize
             has_vectorize = self.collection_vector_service_options is not None
-            _content_field = _normalize_content_field(
+            content_field_ = _normalize_content_field(
                 content_field,
                 is_autodetect=False,
                 has_vectorize=has_vectorize,
@@ -958,12 +962,12 @@ class AstraDBVectorStore(VectorStore):
                 if isinstance(collection_lexical, CollectionLexicalOptions)
                 else (collection_lexical is not None)
             )
-            _has_reranking = (
+            has_reranking = (
                 collection_rerank.enabled
                 if isinstance(collection_rerank, CollectionRerankOptions)
                 else (collection_rerank is not None)
             )
-            self.has_hybrid = self.has_lexical and _has_reranking
+            self.has_hybrid = self.has_lexical and has_reranking
 
             self.hybrid_search = _decide_hybrid_search_setting(
                 required_hybrid_search=hybrid_search,
@@ -977,7 +981,7 @@ class AstraDBVectorStore(VectorStore):
                 )
             else:
                 self.document_codec = _DefaultVSDocumentCodec(
-                    content_field=_content_field,
+                    content_field=content_field_,
                     ignore_invalid_documents=ignore_invalid_documents,
                     has_lexical=self.has_lexical,
                 )
@@ -1004,7 +1008,7 @@ class AstraDBVectorStore(VectorStore):
                 collection_lexical=collection_lexical,
                 collection_rerank=collection_rerank,
             )
-            _setup_mode = SetupMode.OFF
+            setup_mode_ = SetupMode.OFF
 
             # fetch collection intelligence
             c_descriptor, c_documents = _survey_collection(
@@ -1025,7 +1029,7 @@ class AstraDBVectorStore(VectorStore):
             if not c_vector_options:
                 msg = "Non-vector collection detected."
                 raise ValueError(msg)
-            _embedding_dimension = c_vector_options.get("dimension")
+            embedding_dimension = c_vector_options.get("dimension")
             self.collection_vector_service_options = c_vector_options.get("service")
             has_vectorize = self.collection_vector_service_options is not None
             logger.info("vector store autodetect: has_vectorize = %s", has_vectorize)
@@ -1054,11 +1058,11 @@ class AstraDBVectorStore(VectorStore):
                 document_codec=self.document_codec,
             )
 
-            _has_reranking = (
+            has_reranking = (
                 c_descriptor.definition.rerank is not None
                 and c_descriptor.definition.rerank.enabled
             )
-            self.has_hybrid = self.has_lexical and _has_reranking
+            self.has_hybrid = self.has_lexical and has_reranking
 
             self.hybrid_search = _decide_hybrid_search_setting(
                 required_hybrid_search=hybrid_search,
@@ -1085,9 +1089,9 @@ class AstraDBVectorStore(VectorStore):
             api_endpoint=self.api_endpoint,
             keyspace=self.namespace,
             environment=self.environment,
-            setup_mode=_setup_mode,
+            setup_mode=setup_mode_,
             pre_delete_collection=pre_delete_collection,
-            embedding_dimension=_embedding_dimension,
+            embedding_dimension=embedding_dimension,
             metric=self.metric,
             requested_indexing_policy=self.indexing_policy,
             default_indexing_policy=(
@@ -1318,8 +1322,8 @@ class AstraDBVectorStore(VectorStore):
             msg = "No ids provided to delete."
             raise ValueError(msg)
 
-        _max_workers = concurrency or self.bulk_delete_concurrency
-        with ThreadPoolExecutor(max_workers=_max_workers) as tpe:
+        max_workers = concurrency or self.bulk_delete_concurrency
+        with ThreadPoolExecutor(max_workers=max_workers) as tpe:
             _ = list(
                 tpe.map(
                     self.delete_by_document_id,
@@ -1358,9 +1362,9 @@ class AstraDBVectorStore(VectorStore):
             msg = "No ids provided to delete."
             raise ValueError(msg)
 
-        _max_workers = concurrency or self.bulk_delete_concurrency
+        max_workers = concurrency or self.bulk_delete_concurrency
         await gather_with_concurrency(
-            _max_workers, *[self.adelete_by_document_id(doc_id) for doc_id in ids]
+            max_workers, *[self.adelete_by_document_id(doc_id) for doc_id in ids]
         )
         return True
 
@@ -1558,7 +1562,7 @@ class AstraDBVectorStore(VectorStore):
             # here, assume all in err.exceptions is a DataAPIResponseException:
             error_codes = {
                 err_desc.error_code
-                for in_err in cast(list[DataAPIResponseException], err.exceptions)
+                for in_err in cast("list[DataAPIResponseException]", err.exceptions)
                 for err_desc in in_err.error_descriptors
             }
             if error_codes == {DOCUMENT_ALREADY_EXISTS_API_ERROR_CODE}:
@@ -1582,11 +1586,11 @@ class AstraDBVectorStore(VectorStore):
                 if self.document_codec.get_id(document) in ids_to_replace
             ]
 
-            _max_workers = (
+            max_workers = (
                 overwrite_concurrency or self.bulk_insert_overwrite_concurrency
             )
             with ThreadPoolExecutor(
-                max_workers=_max_workers,
+                max_workers=max_workers,
             ) as executor:
 
                 def _replace_document(
@@ -1701,7 +1705,7 @@ class AstraDBVectorStore(VectorStore):
             # here, assume all in err.exceptions is a DataAPIResponseException:
             error_codes = {
                 err_desc.error_code
-                for in_err in cast(list[DataAPIResponseException], err.exceptions)
+                for in_err in cast("list[DataAPIResponseException]", err.exceptions)
                 for err_desc in in_err.error_descriptors
             }
             if error_codes == {DOCUMENT_ALREADY_EXISTS_API_ERROR_CODE}:
@@ -1729,14 +1733,14 @@ class AstraDBVectorStore(VectorStore):
                 overwrite_concurrency or self.bulk_insert_overwrite_concurrency,
             )
 
-            _async_collection = self.astra_env.async_collection
+            async_collection = self.astra_env.async_collection
 
             async def _replace_document(
                 document: DocDict,
             ) -> tuple[CollectionUpdateResult, str]:
                 async with sem:
                     doc_id = self.document_codec.get_id(document)
-                    return await _async_collection.replace_one(
+                    return await async_collection.replace_one(
                         self.document_codec.encode_query(ids=[doc_id]),
                         document,
                     ), doc_id
@@ -1787,9 +1791,9 @@ class AstraDBVectorStore(VectorStore):
         """
         self.astra_env.ensure_db_setup()
 
-        _max_workers = overwrite_concurrency or self.bulk_insert_overwrite_concurrency
+        max_workers = overwrite_concurrency or self.bulk_insert_overwrite_concurrency
         with ThreadPoolExecutor(
-            max_workers=_max_workers,
+            max_workers=max_workers,
         ) as executor:
 
             def _update_document(
@@ -1842,7 +1846,7 @@ class AstraDBVectorStore(VectorStore):
             overwrite_concurrency or self.bulk_insert_overwrite_concurrency,
         )
 
-        _async_collection = self.astra_env.async_collection
+        async_collection = self.astra_env.async_collection
 
         async def _update_document(
             id_md_pair: tuple[str, dict],
@@ -1850,7 +1854,7 @@ class AstraDBVectorStore(VectorStore):
             document_id, update_metadata = id_md_pair
             encoded_metadata = self.filter_to_query(update_metadata)
             async with sem:
-                return await _async_collection.update_one(
+                return await async_collection.update_one(
                     self.document_codec.encode_query(ids=[document_id]),
                     {"$set": encoded_metadata},
                 )
@@ -2060,7 +2064,7 @@ class AstraDBVectorStore(VectorStore):
         if include_sort_vector:
             # the codec option in the AstraDBEnv class disables DataAPIVectors here:
             sort_vector = cast(
-                Union[list[float], None],
+                "Union[list[float], None]",
                 (find_raw_iterator.get_sort_vector() if include_sort_vector else None),
             )
             return sort_vector, final_doc_iterator
@@ -2314,7 +2318,7 @@ class AstraDBVectorStore(VectorStore):
         if include_sort_vector:
             # the codec option in the AstraDBEnv class disables DataAPIVectors here:
             sort_vector = cast(
-                Union[list[float], None],
+                "Union[list[float], None]",
                 (
                     await find_raw_iterator.get_sort_vector()
                     if include_sort_vector
@@ -2776,7 +2780,7 @@ class AstraDBVectorStore(VectorStore):
         )
         # doc is a Document and sim is a float:
         return [
-            cast(tuple[Document, float, str], (doc, sim, did))
+            cast("tuple[Document, float, str]", (doc, sim, did))
             for doc, did, _, sim in hits_ite
         ]
 
@@ -2804,7 +2808,7 @@ class AstraDBVectorStore(VectorStore):
         )
         return [
             cast(
-                tuple[Document, float, str],
+                "tuple[Document, float, str]",
                 (
                     decoded_tuple.document,
                     decoded_tuple.similarity,
@@ -3075,7 +3079,7 @@ class AstraDBVectorStore(VectorStore):
         )
         # doc is a Document and sim is a float:
         return [
-            cast(tuple[Document, float, str], (doc, sim, did))
+            cast("tuple[Document, float, str]", (doc, sim, did))
             async for doc, did, _, sim in hits_ite
         ]
 
@@ -3103,7 +3107,7 @@ class AstraDBVectorStore(VectorStore):
         )
         return [
             cast(
-                tuple[Document, float, str],
+                "tuple[Document, float, str]",
                 (
                     decoded_tuple.document,
                     decoded_tuple.similarity,
@@ -3278,7 +3282,7 @@ class AstraDBVectorStore(VectorStore):
         return (
             sort_vec,
             [
-                cast(tuple[Document, list[float]], (doc, emb))
+                cast("tuple[Document, list[float]]", (doc, emb))
                 for doc, _, emb, _ in hits_ite
             ],
         )
@@ -3308,7 +3312,7 @@ class AstraDBVectorStore(VectorStore):
         return (
             sort_vec,
             [
-                cast(tuple[Document, list[float]], (doc, emb))
+                cast("tuple[Document, list[float]]", (doc, emb))
                 async for doc, _, emb, _ in hits_ite
             ],
         )
@@ -3330,7 +3334,7 @@ class AstraDBVectorStore(VectorStore):
         )
         # this is list[tuple[Document, list[float]]]:
         prefetch_hit_pairs = cast(
-            list[tuple[Document, list[float]]],
+            "list[tuple[Document, list[float]]]",
             [(doc, emb) for doc, _, emb, _ in hits_ite],
         )
         if sort_vec is None:
@@ -3360,7 +3364,7 @@ class AstraDBVectorStore(VectorStore):
         )
         # this is list[tuple[Document, list[float]]]:
         prefetch_hit_pairs = cast(
-            list[tuple[Document, list[float]]],
+            "list[tuple[Document, list[float]]]",
             [(doc, emb) async for doc, _, emb, _ in hits_ite],
         )
         if sort_vec is None:
@@ -3593,9 +3597,9 @@ class AstraDBVectorStore(VectorStore):
         cls: type[AstraDBVectorStore],
         **kwargs: Any,
     ) -> AstraDBVectorStore:
-        _args = inspect.getfullargspec(AstraDBVectorStore.__init__).args
-        _kwargs = inspect.getfullargspec(AstraDBVectorStore.__init__).kwonlyargs
-        known_kwarg_keys = (set(_args) | set(_kwargs)) - {"self"}
+        args = inspect.getfullargspec(AstraDBVectorStore.__init__).args
+        kwargs_ = inspect.getfullargspec(AstraDBVectorStore.__init__).kwonlyargs
+        known_kwarg_keys = (set(args) | set(kwargs_)) - {"self"}
         if kwargs:
             unknown_kwarg_keys = set(kwargs.keys()) - known_kwarg_keys
             if unknown_kwarg_keys:
@@ -3639,22 +3643,21 @@ class AstraDBVectorStore(VectorStore):
         Returns:
             an ``AstraDBVectorStore`` vectorstore.
         """
-        _add_texts_inspection = inspect.getfullargspec(AstraDBVectorStore.add_texts)
-        _method_args = (
-            set(_add_texts_inspection.kwonlyargs)
-            | set(_add_texts_inspection.kwonlyargs)
+        add_texts_inspection = inspect.getfullargspec(AstraDBVectorStore.add_texts)
+        method_args = (
+            set(add_texts_inspection.kwonlyargs) | set(add_texts_inspection.kwonlyargs)
         ) - {"self", "texts", "metadatas", "ids"}
-        _init_kwargs = {k: v for k, v in kwargs.items() if k not in _method_args}
-        _method_kwargs = {k: v for k, v in kwargs.items() if k in _method_args}
+        init_kwargs = {k: v for k, v in kwargs.items() if k not in method_args}
+        method_kwargs = {k: v for k, v in kwargs.items() if k in method_args}
         astra_db_store = AstraDBVectorStore._from_kwargs(
             embedding=embedding,
-            **_init_kwargs,
+            **init_kwargs,
         )
         astra_db_store.add_texts(
             texts=texts,
             metadatas=metadatas,
             ids=ids,
-            **_method_kwargs,
+            **method_kwargs,
         )
         return astra_db_store
 
@@ -3683,22 +3686,22 @@ class AstraDBVectorStore(VectorStore):
         Returns:
             an ``AstraDBVectorStore`` vectorstore.
         """
-        _aadd_texts_inspection = inspect.getfullargspec(AstraDBVectorStore.aadd_texts)
-        _method_args = (
-            set(_aadd_texts_inspection.kwonlyargs)
-            | set(_aadd_texts_inspection.kwonlyargs)
+        aadd_texts_inspection = inspect.getfullargspec(AstraDBVectorStore.aadd_texts)
+        method_args = (
+            set(aadd_texts_inspection.kwonlyargs)
+            | set(aadd_texts_inspection.kwonlyargs)
         ) - {"self", "texts", "metadatas", "ids"}
-        _init_kwargs = {k: v for k, v in kwargs.items() if k not in _method_args}
-        _method_kwargs = {k: v for k, v in kwargs.items() if k in _method_args}
+        init_kwargs = {k: v for k, v in kwargs.items() if k not in method_args}
+        method_kwargs = {k: v for k, v in kwargs.items() if k in method_args}
         astra_db_store = AstraDBVectorStore._from_kwargs(
             embedding=embedding,
-            **_init_kwargs,
+            **init_kwargs,
         )
         await astra_db_store.aadd_texts(
             texts=texts,
             metadatas=metadatas,
             ids=ids,
-            **_method_kwargs,
+            **method_kwargs,
         )
         return astra_db_store
 
@@ -3743,8 +3746,8 @@ class AstraDBVectorStore(VectorStore):
             )
             ids = kwargs.pop("ids")
         else:
-            _ids = [doc.id for doc in documents]
-            ids = _ids if any(the_id is not None for the_id in _ids) else None
+            ids_ = [doc.id for doc in documents]
+            ids = ids_ if any(the_id is not None for the_id in ids_) else None
         return cls.from_texts(
             texts,
             embedding=embedding,
@@ -3786,8 +3789,8 @@ class AstraDBVectorStore(VectorStore):
             )
             ids = kwargs.pop("ids")
         else:
-            _ids = [doc.id for doc in documents]
-            ids = _ids if any(the_id is not None for the_id in _ids) else None
+            ids_ = [doc.id for doc in documents]
+            ids = ids_ if any(the_id is not None for the_id in ids_) else None
         return await cls.afrom_texts(
             texts,
             embedding=embedding,

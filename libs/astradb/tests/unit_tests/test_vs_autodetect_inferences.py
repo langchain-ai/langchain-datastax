@@ -81,7 +81,7 @@ DOC_FLATNESS_PAIRS = [
 DOC_FLATNESS_TEST_IDS = [f"DOC=<{json.dumps(doc)}>" for doc, _ in DOC_FLATNESS_PAIRS]
 
 ff = FLAT_DOCUMENT
-df = DEEP_DOCUMENT  # noqa: PD901
+df = DEEP_DOCUMENT
 uf = UNKNOWN_FLATNESS_DOCUMENT
 DOCS_FLATNESS_TEST_PARAMS = [
     pytest.param([], False, id=" docs=[] "),
@@ -159,6 +159,7 @@ class TestVSAutodetectInferences:
     def test_detect_document_flatness(
         self,
         document: dict[str, Any],
+        *,
         expected_flatness: bool | None,
     ) -> None:
         """Test expected results for flatness detection."""
@@ -171,6 +172,7 @@ class TestVSAutodetectInferences:
     def test_detect_documents_flatness(
         self,
         documents: list[dict[str, Any]],
+        *,
         expected_flatness: bool | Exception,
     ) -> None:
         """Test flatness detection from a list of documents."""

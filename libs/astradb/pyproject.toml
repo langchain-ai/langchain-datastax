@@ -52,7 +52,7 @@ optional = true
 optional = true
 
 [tool.poetry.group.lint.dependencies]
-ruff = "^0.6"
+ruff = "<0.13,>=0.12.10"
 
 [tool.poetry.group.typing.dependencies]
 mypy = "~=1.17.1"
@@ -63,6 +63,9 @@ optional = true
 
 [tool.poetry.group.dev.dependencies]
 langchain-core = { git = "https://github.com/langchain-ai/langchain.git", subdirectory = "libs/core" }
+
+[tool.ruff]
+target-version = "py39"
 
 [tool.ruff.lint]
 pydocstyle.convention = "google"

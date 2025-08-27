@@ -292,7 +292,9 @@ class TestVSDocCodecs:
             ignore_invalid_documents=True,
             has_lexical=False,
         )
-        with pytest.warns(UserWarning) as rec_warnings:
+        with pytest.warns(
+            UserWarning, match="Ignoring document with _id"
+        ) as rec_warnings:
             decoded_doc = codec_w.decode({"_id": 0})
         codec_w.decode({"_id": 0, "$vectorize": "a", "metadata": {"k": "v"}})
         codec_e.decode({"_id": 0, "$vectorize": "a", "metadata": {"k": "v"}})
@@ -372,7 +374,9 @@ class TestVSDocCodecs:
         codec_w = _FlatVSDocumentCodec(
             content_field="content_x", ignore_invalid_documents=True, has_lexical=False
         )
-        with pytest.warns(UserWarning) as rec_warnings:
+        with pytest.warns(
+            UserWarning, match="Ignoring document with _id"
+        ) as rec_warnings:
             decoded_doc = codec_w.decode({"_id": 0})
         codec_w.decode({"_id": 0, "content_x": "a", "m": "v"})
         codec_e.decode({"_id": 0, "content_x": "a", "m": "v"})
@@ -454,7 +458,9 @@ class TestVSDocCodecs:
             ignore_invalid_documents=True,
             has_lexical=False,
         )
-        with pytest.warns(UserWarning) as rec_warnings:
+        with pytest.warns(
+            UserWarning, match="Ignoring document with _id"
+        ) as rec_warnings:
             decoded_doc = codec_w.decode({"_id": 0})
         codec_w.decode({"_id": 0, "$vectorize": "a", "m": "v"})
         codec_e.decode({"_id": 0, "$vectorize": "a", "m": "v"})

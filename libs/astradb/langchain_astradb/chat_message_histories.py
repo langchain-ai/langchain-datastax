@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import time
 from operator import itemgetter
-from typing import TYPE_CHECKING, Sequence
+from typing import TYPE_CHECKING
 
 from langchain_core.chat_history import BaseChatMessageHistory
 from langchain_core.messages import (
@@ -22,6 +22,8 @@ from langchain_astradb.utils.astradb import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from astrapy.api_options import APIOptions
     from astrapy.authentication import TokenProvider
 

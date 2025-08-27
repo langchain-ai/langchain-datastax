@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import TYPE_CHECKING, Iterable, TypedDict
+from typing import TYPE_CHECKING, TypedDict
 
 import pytest
 from astrapy import DataAPIClient
@@ -35,6 +35,7 @@ from astrapy.info import (
     RerankServiceOptions,
     VectorServiceOptions,
 )
+from dotenv import load_dotenv
 
 from langchain_astradb.utils.astradb import SetupMode, _unpack_indexing_policy
 from langchain_astradb.utils.vector_store_codecs import (
@@ -44,6 +45,8 @@ from langchain_astradb.vectorstores import AstraDBVectorStore
 from tests.conftest import IdentityLLM, ParserEmbeddings
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
+
     from astrapy import Collection, Database
     from langchain_core.embeddings import Embeddings
     from langchain_core.language_models import LLM
@@ -98,8 +101,6 @@ MATCH_EPSILON = 0.0001
 def _load_env() -> None:
     dotenv_path = Path(PROJECT_DIR) / "tests" / "integration_tests" / ".env"
     if Path(dotenv_path).exists():
-        from dotenv import load_dotenv
-
         load_dotenv(dotenv_path)
 
 

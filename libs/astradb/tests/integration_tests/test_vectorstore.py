@@ -158,7 +158,11 @@ class TestAstraDBVectorStore:
         assert res_id_0 == "ft3"
 
         # testing additional kwargs & from_text-specific kwargs
-        with pytest.warns(UserWarning):
+        with pytest.warns(
+            UserWarning,
+            match="Method 'from_texts/afrom_texts' of AstraDBVectorStore vector store "
+            "invoked with unsupported arguments",
+        ):
             # unknown kwargs going to the constructor through _from_kwargs
             AstraDBVectorStore.from_texts(
                 texts=page_contents[2:4],
@@ -265,7 +269,11 @@ class TestAstraDBVectorStore:
         v_store.clear()
 
         # IDs passed separately.
-        with pytest.warns(DeprecationWarning) as rec_warnings:
+        with pytest.warns(
+            DeprecationWarning,
+            match="Parameter `ids` to AstraDBVectorStore's `from_documents` method is "
+            "deprecated.",
+        ) as rec_warnings:
             v_store_2 = AstraDBVectorStore.from_documents(
                 [
                     Document(page_content=pc1, metadata={"m": 1}),
@@ -313,7 +321,11 @@ class TestAstraDBVectorStore:
         v_store_3.clear()
 
         # IDs both in documents and aside.
-        with pytest.warns(DeprecationWarning) as rec_warnings:
+        with pytest.warns(
+            DeprecationWarning,
+            match="Parameter `ids` to AstraDBVectorStore's `from_documents` method is "
+            "deprecated.",
+        ) as rec_warnings:
             v_store_4 = AstraDBVectorStore.from_documents(
                 [
                     Document(page_content=pc1, metadata={"m": 1}),
@@ -415,7 +427,11 @@ class TestAstraDBVectorStore:
         assert res_id_0 == "ft3"
 
         # testing additional kwargs & from_text-specific kwargs
-        with pytest.warns(UserWarning):
+        with pytest.warns(
+            UserWarning,
+            match="Method 'from_texts/afrom_texts' of AstraDBVectorStore vector store "
+            "invoked with unsupported arguments",
+        ):
             # unknown kwargs going to the constructor through _from_kwargs
             await AstraDBVectorStore.afrom_texts(
                 texts=page_contents[2:4],
@@ -527,7 +543,11 @@ class TestAstraDBVectorStore:
         await v_store.aclear()
 
         # IDs passed separately.
-        with pytest.warns(DeprecationWarning) as rec_warnings:
+        with pytest.warns(
+            DeprecationWarning,
+            match="Parameter `ids` to AstraDBVectorStore's `from_documents` method is "
+            "deprecated.",
+        ) as rec_warnings:
             v_store_2 = await AstraDBVectorStore.afrom_documents(
                 [
                     Document(page_content=pc1, metadata={"m": 1}),
@@ -575,7 +595,11 @@ class TestAstraDBVectorStore:
         await v_store_3.aclear()
 
         # IDs both in documents and aside.
-        with pytest.warns(DeprecationWarning) as rec_warnings:
+        with pytest.warns(
+            DeprecationWarning,
+            match="Parameter `ids` to AstraDBVectorStore's `from_documents` method is "
+            "deprecated.",
+        ) as rec_warnings:
             v_store_4 = await AstraDBVectorStore.afrom_documents(
                 [
                     Document(page_content=pc1, metadata={"m": 1}),
@@ -822,11 +846,11 @@ class TestAstraDBVectorStore:
         assert set(inserted_ids0) == set(group0_ids)
         # massive insertion with many overwrites scattered through
         # (we change the text to later check on DB for successful update)
-        _s, _e, _st = second_group_slicer
-        group1_ids = all_ids[_s:_e:_st] + all_ids[first_group_size:full_size]
+        s, e, st = second_group_slicer
+        group1_ids = all_ids[s:e:st] + all_ids[first_group_size:full_size]
         group1_texts = [
             txt.upper()
-            for txt in (all_texts[_s:_e:_st] + all_texts[first_group_size:full_size])
+            for txt in (all_texts[s:e:st] + all_texts[first_group_size:full_size])
         ]
         inserted_ids1 = vector_store_d2.add_texts(
             texts=group1_texts,
@@ -871,11 +895,11 @@ class TestAstraDBVectorStore:
         assert set(inserted_ids0) == set(group0_ids)
         # massive insertion with many overwrites scattered through
         # (we change the text to later check on DB for successful update)
-        _s, _e, _st = second_group_slicer
-        group1_ids = all_ids[_s:_e:_st] + all_ids[first_group_size:full_size]
+        s, e, st = second_group_slicer
+        group1_ids = all_ids[s:e:st] + all_ids[first_group_size:full_size]
         group1_texts = [
             txt.upper()
-            for txt in (all_texts[_s:_e:_st] + all_texts[first_group_size:full_size])
+            for txt in (all_texts[s:e:st] + all_texts[first_group_size:full_size])
         ]
         inserted_ids1 = await vector_store_d2.aadd_texts(
             texts=group1_texts,
@@ -1836,14 +1860,16 @@ class TestAstraDBVectorStore:
 
         documents_to_insert = [
             Document(
-                page_content=f"This is number {i+1}" if is_vectorize else f"[1,{i+1}]",
+                page_content=f"This is number {i + 1}"
+                if is_vectorize
+                else f"[1,{i + 1}]",
                 metadata={
                     **({"a": "a"} if i < 5 else {}),
                     **({"b": "b"} if i < 7 and i >= 3 else {}),
                     **({"c": "c"} if i >= 5 else {}),
                     "int_index": i + 1,
                 },
-                id=f"{i+1}",
+                id=f"{i + 1}",
             )
             for i in range(10)
         ]
@@ -2023,14 +2049,16 @@ class TestAstraDBVectorStore:
 
         documents_to_insert = [
             Document(
-                page_content=f"This is number {i+1}" if is_vectorize else f"[1,{i+1}]",
+                page_content=f"This is number {i + 1}"
+                if is_vectorize
+                else f"[1,{i + 1}]",
                 metadata={
                     **({"a": "a"} if i < 5 else {}),
                     **({"b": "b"} if i < 7 and i >= 3 else {}),
                     **({"c": "c"} if i >= 5 else {}),
                     "int_index": i + 1,
                 },
-                id=f"{i+1}",
+                id=f"{i + 1}",
             )
             for i in range(10)
         ]

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from typing import TYPE_CHECKING
 
 import pytest
@@ -256,7 +257,7 @@ class TestAstraDBVectorStoreHybrid:
                 collection_embedding_api_key=openai_api_key,
                 collection_reranking_api_key=nvidia_reranking_api_key,
                 autodetect_collection=True,
-                hybrid_limit_factor=3.1415,
+                hybrid_limit_factor=math.pi,
             )
             # run a 'search' (trusting it to be hybrid), some checks on the results
             hits_triples = store3_ad.similarity_search_with_score_id(QUERY_TEXT, k=2)
@@ -504,7 +505,7 @@ class TestAstraDBVectorStoreHybrid:
                 collection_rerank=NVIDIA_RERANKING_OPTIONS_HEADER,
                 collection_reranking_api_key=nvidia_reranking_api_key,
                 collection_lexical=LEXICAL_OPTIONS,
-                hybrid_limit_factor=3.1415,
+                hybrid_limit_factor=math.pi,
             )
             assert store1b.hybrid_search
             hits_triples = await store1b.asimilarity_search_with_score_id(
@@ -792,7 +793,7 @@ class TestAstraDBVectorStoreHybrid:
                 environment=astra_db_credentials["environment"],
                 collection_reranking_api_key=nvidia_reranking_api_key,
                 autodetect_collection=True,
-                hybrid_limit_factor=3.1415,
+                hybrid_limit_factor=math.pi,
             )
             # run a 'search' (trusting it to be hybrid), some checks on the results
             hits_triples = store3_ad.similarity_search_with_score_id(
@@ -1044,7 +1045,7 @@ class TestAstraDBVectorStoreHybrid:
                 collection_rerank=NVIDIA_RERANKING_OPTIONS_HEADER,
                 collection_reranking_api_key=nvidia_reranking_api_key,
                 collection_lexical=LEXICAL_OPTIONS,
-                hybrid_limit_factor=3.1415,
+                hybrid_limit_factor=math.pi,
             )
             assert store1b.hybrid_search
             hits_triples = await store1b.asimilarity_search_with_score_id(
@@ -1319,7 +1320,7 @@ class TestAstraDBVectorStoreHybrid:
                 namespace=astra_db_credentials["namespace"],
                 environment=astra_db_credentials["environment"],
                 autodetect_collection=True,
-                hybrid_limit_factor=3.1415,
+                hybrid_limit_factor=math.pi,
             )
             # run a 'search' (trusting it to be hybrid), some checks on the results
             hits_triples = store3_ad.similarity_search_with_score_id(

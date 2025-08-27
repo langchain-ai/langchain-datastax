@@ -9,10 +9,7 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import (
     TYPE_CHECKING,
     Any,
-    AsyncIterator,
     Generic,
-    Iterator,
-    Sequence,
     TypeVar,
 )
 
@@ -30,6 +27,8 @@ from langchain_astradb.utils.astradb import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import AsyncIterator, Iterator, Sequence
+
     from astrapy.api_options import APIOptions
     from astrapy.authentication import TokenProvider
     from astrapy.results import CollectionUpdateResult
@@ -180,13 +179,13 @@ class AstraDBBaseStore(BaseStore[str, V], Generic[V]):
 
             sem = asyncio.Semaphore(MAX_CONCURRENT_DOCUMENT_REPLACEMENTS)
 
-            _async_collection = self.async_collection
+            async_collection = self.async_collection
 
             async def _replace_document(
                 document: dict[str, Any],
             ) -> CollectionUpdateResult:
                 async with sem:
-                    return await _async_collection.replace_one(
+                    return await async_collection.replace_one(
                         {"_id": document["_id"]},
                         document,
                     )
