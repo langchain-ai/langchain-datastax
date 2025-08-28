@@ -27,6 +27,7 @@ from typing import TYPE_CHECKING, TypedDict
 
 import pytest
 from astrapy import DataAPIClient
+from astrapy.api_options import APIOptions, TimeoutOptions
 from astrapy.authentication import StaticTokenProvider
 from astrapy.info import (
     CollectionDefinition,
@@ -210,7 +211,12 @@ def database(
     is_astra_db: bool,
     astra_db_credentials: AstraDBCredentials,
 ) -> Database:
-    client = DataAPIClient(environment=astra_db_credentials["environment"])
+    client = DataAPIClient(
+        environment=astra_db_credentials["environment"],
+        api_options=APIOptions(
+            timeout_options=TimeoutOptions(request_timeout_ms=20000)
+        ),
+    )
     db = client.get_database(
         astra_db_credentials["api_endpoint"],
         token=StaticTokenProvider(astra_db_credentials["token"]),

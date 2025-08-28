@@ -12,7 +12,7 @@ license = "MIT"
 
 [tool.poetry.dependencies]
 python = ">=3.9,<4.0"
-langchain-community = ">=0.3.1"
+langchain-core = ">=0.3.74"
 numpy = [
   { version = ">=1.21", python = ">=3.10,<3.12" },
   { version = ">=1.26", python = ">=3.12,<3.13" },
@@ -33,9 +33,7 @@ pytest-mock = "^3.10.0"
 syrupy = "^4.0.2"
 pytest-watcher = "^0.3.4"
 pytest-asyncio = "^0.21.1"
-langchain = { git = "https://github.com/langchain-ai/langchain.git", subdirectory = "libs/langchain" }
-langchain-text-splitters = { git = "https://github.com/langchain-ai/langchain.git", subdirectory = "libs/text-splitters" }
-langchain-core = { git = "https://github.com/langchain-ai/langchain.git", subdirectory = "libs/core" }
+langchain = "^0.3.21"
 langchain-tests = { git = "https://github.com/langchain-ai/langchain.git", subdirectory = "libs/standard-tests" }
 blockbuster = "^1.2.0"
 
@@ -58,7 +56,7 @@ ruff = "<0.13,>=0.12.10"
 
 [tool.poetry.group.typing.dependencies]
 mypy = "~=1.17.1"
-langchain-core = { git = "https://github.com/langchain-ai/langchain.git", subdirectory = "libs/core" }
+simsimd = "^6.5.1"
 
 [tool.poetry.group.dev]
 optional = true
