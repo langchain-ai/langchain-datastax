@@ -859,8 +859,8 @@ class TestAstraDBVectorStore:
         assert set(inserted_ids1) == set(group1_ids)
         # final read (we want the IDs to do a full check)
         expected_text_by_id = {
-            **dict(zip(group0_ids, group0_texts)),
-            **dict(zip(group1_ids, group1_texts)),
+            **dict(zip(group0_ids, group0_texts, strict=True)),
+            **dict(zip(group1_ids, group1_texts, strict=True)),
         }
         full_results = vector_store_d2.similarity_search_with_score_id_by_vector(
             embedding=[1.0, 1.0],
@@ -907,7 +907,7 @@ class TestAstraDBVectorStore:
         )
         assert set(inserted_ids1) == set(group1_ids)
         # final read (we want the IDs to do a full check)
-        expected_text_by_id = dict(zip(all_ids, all_texts))
+        expected_text_by_id = dict(zip(all_ids, all_texts, strict=True))
         full_results = await vector_store_d2.asimilarity_search_with_score_id_by_vector(
             embedding=[1.0, 1.0],
             k=full_size,
@@ -1031,7 +1031,7 @@ class TestAstraDBVectorStore:
             key=doc_sorter,
         )
         assert len(all_documents) == len(orig_documents)
-        for doc, orig_doc in zip(all_documents, orig_documents):
+        for doc, orig_doc in zip(all_documents, orig_documents, strict=True):
             assert doc.id == orig_doc.id
             if doc.id in update_map:
                 assert doc.metadata == orig_doc.metadata | update_map[doc.id]
@@ -1084,7 +1084,7 @@ class TestAstraDBVectorStore:
             key=doc_sorter,
         )
         assert len(all_documents) == len(orig_documents)
-        for doc, orig_doc in zip(all_documents, orig_documents):
+        for doc, orig_doc in zip(all_documents, orig_documents, strict=True):
             assert doc.id == orig_doc.id
             if doc.id in update_map:
                 assert doc.metadata == orig_doc.metadata | update_map[doc.id]
