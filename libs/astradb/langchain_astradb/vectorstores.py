@@ -110,7 +110,8 @@ class AstraDBQueryResult(NamedTuple):
     a query, which goes beyond just the corresponding Document.
 
     Attributes:
-        document: a ``langchain.schema.Document`` object representing the query result.
+        document: a ``langchain_core.documents.Document`` object representing the query
+            result.
         id: the ID of the returned document.
         embedding: the embedding vector associated to the document. This may be None,
             depending on whether the embeddings were requested in the query or not.
