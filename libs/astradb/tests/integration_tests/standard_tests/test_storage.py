@@ -5,7 +5,6 @@ from typing import TYPE_CHECKING
 import pytest
 from astrapy.authentication import StaticTokenProvider
 from langchain_tests.integration_tests import BaseStoreAsyncTests, BaseStoreSyncTests
-from typing_extensions import override
 
 from langchain_astradb import AstraDBByteStore, AstraDBStore
 from langchain_astradb.utils.astradb import SetupMode
@@ -13,7 +12,6 @@ from tests.integration_tests.conftest import astra_db_env_vars_available
 
 if TYPE_CHECKING:
     from astrapy import Collection
-    from langchain_core.stores import BaseStore
 
     from tests.integration_tests.conftest import AstraDBCredentials
 
@@ -57,16 +55,6 @@ class TestAstraDBStoreASync(_BaseTestAstraDBStore, BaseStoreAsyncTests[str]):
     async def kv_store(self) -> AstraDBStore:
         return self._store
 
-    @pytest.mark.xfail(
-        reason="Bug in BaseStoreAsyncTests.test_set_values_is_idempotent: "
-        "it makes a blocking call to store.yield_keys() which triggers blockbuster."
-    )
-    @override
-    async def test_set_values_is_idempotent(
-        self, kv_store: BaseStore[str, str], three_values: tuple[str, str, str]
-    ) -> None:
-        pass
-
 
 class _BaseTestAstraDBByteStore:
     @pytest.fixture(autouse=True)
@@ -106,13 +94,3 @@ class TestAstraDBByteStoreASync(_BaseTestAstraDBByteStore, BaseStoreAsyncTests[b
     @pytest.fixture
     async def kv_store(self) -> AstraDBByteStore:
         return self._store
-
-    @pytest.mark.xfail(
-        reason="Bug in BaseStoreAsyncTests.test_set_values_is_idempotent: "
-        "it makes a blocking call to store.yield_keys() which triggers blockbuster."
-    )
-    @override
-    async def test_set_values_is_idempotent(
-        self, kv_store: BaseStore[str, bytes], three_values: tuple[bytes, bytes, bytes]
-    ) -> None:
-        pass
