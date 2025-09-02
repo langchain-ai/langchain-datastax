@@ -6,9 +6,11 @@ on:
       working-directory:
         required: true
         type: string
+        description: "From which folder this pipeline executes"
 
 env:
-  POETRY_VERSION: "1.7.1"
+  UV_FROZEN: "true"
+  UV_NO_SYNC: "true"
 
 jobs:
   build:
@@ -19,23 +21,19 @@ jobs:
     strategy:
       matrix:
         python-version:
-          # - "3.9"
-          - "3.12"
+          - "3.13"
     name: "make integration_tests #${{ matrix.python-version }}"
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python ${{ matrix.python-version }} + Poetry ${{ env.POETRY_VERSION }}
-        uses: "./.github/actions/poetry_setup"
+      - name: Set up Python ${{ matrix.python-version }} + uv
+        uses: "./.github/actions/uv_setup"
+        id: setup-python
         with:
           python-version: ${{ matrix.python-version }}
-          poetry-version: ${{ env.POETRY_VERSION }}
-          working-directory: ${{ inputs.working-directory }}
-          cache-key: core
-
       - name: Install dependencies
         shell: bash
-        run: poetry install --with test,test_integration
+        run: uv sync --group test --group test_integration --dev
 
       - name: Run integration tests
         shell: bash
