@@ -27,7 +27,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: '3.13'
       - id: files
         uses: Ana06/get-changed-files@v2.3.0
       - id: set-matrix
