@@ -692,17 +692,19 @@ subdirectory = "libs/core"
 
 [[package]]
 name = "langchain-tests"
-version = "0.3.20"
+version = "0.3.21"
 description = "Standard tests for LangChain implementations"
 optional = false
 python-versions = ">=3.9"
 groups = ["test"]
-files = []
-develop = false
+files = [
+    {file = "langchain_tests-0.3.21-py3-none-any.whl", hash = "sha256:e2325f00ada73ac79e4da4b04002ffef0a87c7e7dbadf8cd54830950343925e0"},
+    {file = "langchain_tests-0.3.21.tar.gz", hash = "sha256:be7959a7961050fb3333d0946c55f08d707f7f8f9be1a5d8f55e8c43ea416295"},
+]
 
 [package.dependencies]
 httpx = ">=0.28.1,<1"
-langchain-core = ">=0.3.63,<1.0.0"
+langchain-core = ">=0.3.75,<2.0.0"
 numpy = [
     {version = ">=1.26.2", markers = "python_version < \"3.13\""},
     {version = ">=2.1.0", markers = "python_version >= \"3.13\""},
@@ -715,13 +717,6 @@ pytest-recording = "*"
 pytest-socket = ">=0.7.0,<1"
 syrupy = ">=4,<5"
 vcrpy = ">=7.0"
-
-[package.source]
-type = "git"
-url = "https://github.com/langchain-ai/langchain.git"
-reference = "HEAD"
-resolved_reference = "1fe2c4084b1c6338d2aee23da3cbc936cd5f7c8a"
-subdirectory = "libs/standard-tests"
 
 [[package]]
 name = "langchain-text-splitters"
@@ -2993,4 +2988,4 @@ cffi = ["cffi (>=1.17) ; python_version >= \"3.13\" and platform_python_implemen
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.9,<4.0"
-content-hash = "954363b394d58bc96661610086bce4f41806842533c323832a63313bf4ea5d76"
+content-hash = "46719aaf2a447de2d62b2d2a2637359fc98349d3d69847dc36b66aa585b2b421"
