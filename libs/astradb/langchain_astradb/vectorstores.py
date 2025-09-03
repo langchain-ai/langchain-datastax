@@ -33,9 +33,11 @@ from typing_extensions import override
 from langchain_astradb.utils.astradb import (
     COMPONENT_NAME_VECTORSTORE,
     DEFAULT_DOCUMENT_CHUNK_SIZE,
+    DEFAULT_ID_LIST_SIZE,
     MAX_CONCURRENT_DOCUMENT_DELETIONS,
     MAX_CONCURRENT_DOCUMENT_INSERTIONS,
     MAX_CONCURRENT_DOCUMENT_REPLACEMENTS,
+    MAX_CONCURRENT_GET_BY_IDS_REQUESTS,
     HybridSearchMode,
     SetupMode,
     _AstraDBCollectionEnvironment,
@@ -2523,6 +2525,61 @@ class AstraDBVectorStore(VectorStore):
             return hits[0]
 
         return None
+
+    @override
+    def get_by_ids(
+        self,
+        ids: Sequence[str],
+        /,
+        batch_size: int | None = None,
+        batch_concurrency: int | None = None,
+    ) -> list[Document]:
+        """Get documents by their IDs.
+
+        The returned documents have the ID field set to the ID of the
+        document in the vector store.
+
+        Fewer documents may be returned than requested if some IDs are not found or
+        if there are duplicated IDs.
+
+        Users should not assume that the order of the returned documents matches
+        the order of the input IDs. Instead, users should rely on the ID field of the
+        returned documents.
+
+        Args:
+            ids: List of ids to retrieve.
+            batch_size: If many IDs are requested, these are split in chunks and
+                multiple requests are run and collated. This sets the size of each
+                such chunk of IDs.
+                Default is 80. The database sets a hard limit of 100.
+            batch_concurrency: Number of threads for executing multiple requests
+                if needed. Default is 20.
+
+        Returns:
+            List of Documents.
+        """
+        batch_size_ = batch_size or DEFAULT_ID_LIST_SIZE
+        batch_concurrency_ = batch_concurrency or MAX_CONCURRENT_GET_BY_IDS_REQUESTS
+        id_list1 = list(set(ids))
+        num_chunks = 1 + (len(id_list1) - 1) // batch_size_
+        id_chunks = [
+            id_list1[batch_size_ * chunk_id : batch_size_ * (chunk_id + 1)]
+            for chunk_id in range(num_chunks)
+        ]
+
+        def query_for_ids(id_chunk: list[str]) -> Iterable[AstraDBQueryResult]:
+            return self.run_query(n=batch_size_, ids=id_chunk)
+
+        with ThreadPoolExecutor(max_workers=batch_concurrency_) as executor:
+            hit_lists = executor.map(
+                query_for_ids,
+                id_chunks,
+            )
+        return [doc for hit_list in hit_lists for doc, _, _, _ in hit_list]
+
+    # TODO: aget
+    # @override
+    # async def aget_by_ids(self, ids: Sequence[str], /) -> list[Document]:
 
     @override
     def similarity_search(
