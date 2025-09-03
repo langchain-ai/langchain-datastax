@@ -1469,7 +1469,7 @@ class AstraDBVectorStore(VectorStore):
                 embedding_vectors,
                 ids,
                 metadatas,
-                strict=False,
+                strict=True,
             )
         ]
         # make unique by id, keeping the last
