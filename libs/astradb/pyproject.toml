@@ -40,7 +40,6 @@ test = [
     "blockbuster<1.6.0,>=1.5.25",
 ]
 test_integration = [
-    "langchain<2.0.0,>=0.3.27",
     "langchain-tests<2.0.0,>=0.3.21",
 ]
 codespell = ["codespell<3.0.0,>=2.2.0"]
