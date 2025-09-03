@@ -6,7 +6,7 @@ import hashlib
 import json
 import logging
 from functools import lru_cache, wraps
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any
 
 from langchain_core.caches import RETURN_VAL_TYPE, BaseCache
 from langchain_core.language_models.llms import aget_prompts, get_prompts
@@ -23,7 +23,7 @@ from langchain_astradb.utils.astradb import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Awaitable, Generator
+    from collections.abc import Awaitable, Callable, Generator
 
     from astrapy.api_options import APIOptions
     from astrapy.authentication import TokenProvider

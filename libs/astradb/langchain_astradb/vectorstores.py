@@ -11,11 +11,9 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
     Literal,
     NamedTuple,
     TypeVar,
-    Union,
     cast,
     overload,
 )
@@ -64,7 +62,7 @@ except ImportError:
     pass
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterable, Awaitable, Iterable, Sequence
+    from collections.abc import AsyncIterable, Awaitable, Callable, Iterable, Sequence
 
     from astrapy.api_options import APIOptions
     from astrapy.authentication import (
@@ -317,7 +315,7 @@ def _insertmany_error_message(err: CollectionInsertManyException) -> str:
     return err_msg
 
 
-_Matrix = Union[list[list[float]], list[np.ndarray], np.ndarray]
+_Matrix = list[list[float]] | list[np.ndarray] | np.ndarray
 
 
 def _cosine_similarity(x: _Matrix, y: _Matrix) -> np.ndarray:
@@ -1471,6 +1469,7 @@ class AstraDBVectorStore(VectorStore):
                 embedding_vectors,
                 ids,
                 metadatas,
+                strict=True,
             )
         ]
         # make unique by id, keeping the last
@@ -2064,7 +2063,7 @@ class AstraDBVectorStore(VectorStore):
         if include_sort_vector:
             # the codec option in the AstraDBEnv class disables DataAPIVectors here:
             sort_vector = cast(
-                "Union[list[float], None]",
+                "list[float] | None",
                 (find_raw_iterator.get_sort_vector() if include_sort_vector else None),
             )
             return sort_vector, final_doc_iterator
@@ -2318,7 +2317,7 @@ class AstraDBVectorStore(VectorStore):
         if include_sort_vector:
             # the codec option in the AstraDBEnv class disables DataAPIVectors here:
             sort_vector = cast(
-                "Union[list[float], None]",
+                "list[float] | None",
                 (
                     await find_raw_iterator.get_sort_vector()
                     if include_sort_vector

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any
 
 import pytest
 from astrapy.constants import Environment
@@ -27,6 +27,8 @@ from langchain_astradb.utils.astradb import (
 from tests.conftest import ParserEmbeddings
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from pytest_httpserver import HTTPServer
 
 

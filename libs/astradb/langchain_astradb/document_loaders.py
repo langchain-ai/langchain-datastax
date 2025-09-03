@@ -8,7 +8,6 @@ import warnings
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
 )
 
 from langchain_core.document_loaders import BaseLoader
@@ -22,7 +21,7 @@ from langchain_astradb.utils.astradb import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator, Iterator
+    from collections.abc import AsyncIterator, Callable, Iterator
 
     from astrapy.api_options import APIOptions
     from astrapy.authentication import TokenProvider

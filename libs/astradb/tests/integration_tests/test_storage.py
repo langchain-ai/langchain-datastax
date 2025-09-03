@@ -120,22 +120,27 @@ class TestAstraDBStore:
         ]
 
         # massive insertion on empty (zip and rezip for uniformity with later)
-        group0_ids, group0_texts = list(zip(*ids_and_texts[0:first_group_size]))
-        astra_db_empty_store.mset(list(zip(group0_ids, group0_texts)))
+        group0_ids, group0_texts = list(
+            zip(*ids_and_texts[0:first_group_size], strict=True)
+        )
+        astra_db_empty_store.mset(list(zip(group0_ids, group0_texts, strict=True)))
 
         # massive insertion with many overwrites scattered through
         # (we change the text to later check on DB for successful update)
         s, e, st = second_group_slicer
         group1_ids, group1_texts_pre = list(
-            zip(*(ids_and_texts[s:e:st] + ids_and_texts[first_group_size:full_size]))
+            zip(
+                *(ids_and_texts[s:e:st] + ids_and_texts[first_group_size:full_size]),
+                strict=True,
+            )
         )
         group1_texts = [txt.upper() for txt in group1_texts_pre]
-        astra_db_empty_store.mset(list(zip(group1_ids, group1_texts)))
+        astra_db_empty_store.mset(list(zip(group1_ids, group1_texts, strict=True)))
 
         # final read (we want the IDs to do a full check)
         expected_text_by_id = {
-            **dict(zip(group0_ids, group0_texts)),
-            **dict(zip(group1_ids, group1_texts)),
+            **dict(zip(group0_ids, group0_texts, strict=True)),
+            **dict(zip(group1_ids, group1_texts, strict=True)),
         }
         all_ids = [doc_id for doc_id, _ in ids_and_texts]
         # The Data API can handle at most max_values_in_in entries, let's chunk
@@ -146,7 +151,7 @@ class TestAstraDBStore:
                 all_ids[chunk_start : chunk_start + max_values_in_in]
             )
         ]
-        for val, doc_id in zip(all_vals, all_ids):
+        for val, doc_id in zip(all_vals, all_ids, strict=True):
             assert val == expected_text_by_id[doc_id]
 
     async def test_store_massive_write_with_replace_async(
@@ -170,22 +175,31 @@ class TestAstraDBStore:
         ]
 
         # massive insertion on empty (zip and rezip for uniformity with later)
-        group0_ids, group0_texts = list(zip(*ids_and_texts[0:first_group_size]))
-        await astra_db_empty_store_async.amset(list(zip(group0_ids, group0_texts)))
+        group0_ids, group0_texts = list(
+            zip(*ids_and_texts[0:first_group_size], strict=True)
+        )
+        await astra_db_empty_store_async.amset(
+            list(zip(group0_ids, group0_texts, strict=True))
+        )
 
         # massive insertion with many overwrites scattered through
         # (we change the text to later check on DB for successful update)
         s, e, st = second_group_slicer
         group1_ids, group1_texts_pre = list(
-            zip(*(ids_and_texts[s:e:st] + ids_and_texts[first_group_size:full_size]))
+            zip(
+                *(ids_and_texts[s:e:st] + ids_and_texts[first_group_size:full_size]),
+                strict=True,
+            )
         )
         group1_texts = [txt.upper() for txt in group1_texts_pre]
-        await astra_db_empty_store_async.amset(list(zip(group1_ids, group1_texts)))
+        await astra_db_empty_store_async.amset(
+            list(zip(group1_ids, group1_texts, strict=True))
+        )
 
         # final read (we want the IDs to do a full check)
         expected_text_by_id = {
-            **dict(zip(group0_ids, group0_texts)),
-            **dict(zip(group1_ids, group1_texts)),
+            **dict(zip(group0_ids, group0_texts, strict=True)),
+            **dict(zip(group1_ids, group1_texts, strict=True)),
         }
         all_ids = [doc_id for doc_id, _ in ids_and_texts]
         # The Data API can handle at most max_values_in_in entries, let's chunk
@@ -196,7 +210,7 @@ class TestAstraDBStore:
                 all_ids[chunk_start : chunk_start + max_values_in_in]
             )
         ]
-        for val, doc_id in zip(all_vals, all_ids):
+        for val, doc_id in zip(all_vals, all_ids, strict=True):
             assert val == expected_text_by_id[doc_id]
 
     def test_store_yield_keys_sync(
