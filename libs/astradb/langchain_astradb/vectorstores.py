@@ -2580,6 +2580,43 @@ class AstraDBVectorStore(VectorStore):
             )
         return [doc for hit_list in hit_lists for doc, _, _, _ in hit_list]
 
+    def get_by_document_ids(
+        self,
+        ids: Sequence[str],
+        /,
+        batch_size: int | None = None,
+        batch_concurrency: int | None = None,
+    ) -> list[Document]:
+        """Get documents by their IDs.
+
+        The returned documents have the ID field set to the ID of the
+        document in the vector store.
+
+        Fewer documents may be returned than requested if some IDs are not found or
+        if there are duplicated IDs.
+
+        Users should not assume that the order of the returned documents matches
+        the order of the input IDs. Instead, users should rely on the ID field of the
+        returned documents.
+
+        Args:
+            ids: List of ids to retrieve.
+            batch_size: If many IDs are requested, these are split in chunks and
+                multiple requests are run and collated. This sets the size of each
+                such chunk of IDs.
+                Default is 80. The database sets a hard limit of 100.
+            batch_concurrency: Number of threads for executing multiple requests
+                if needed. Default is 20.
+
+        Returns:
+            List of Documents.
+        """
+        return self.get_by_ids(
+            ids,
+            batch_size=batch_size,
+            batch_concurrency=batch_concurrency,
+        )
+
     @override
     async def aget_by_ids(
         self,
@@ -2632,6 +2669,43 @@ class AstraDBVectorStore(VectorStore):
         tasks = [asyncio.create_task(query_for_ids(id_chunk)) for id_chunk in id_chunks]
         hit_lists = await asyncio.gather(*tasks, return_exceptions=False)
         return [doc for hit_list in hit_lists async for doc, _, _, _ in hit_list]
+
+    async def aget_by_document_ids(
+        self,
+        ids: Sequence[str],
+        /,
+        batch_size: int | None = None,
+        batch_concurrency: int | None = None,
+    ) -> list[Document]:
+        """Get documents by their IDs.
+
+        The returned documents have the ID field set to the ID of the
+        document in the vector store.
+
+        Fewer documents may be returned than requested if some IDs are not found or
+        if there are duplicated IDs.
+
+        Users should not assume that the order of the returned documents matches
+        the order of the input IDs. Instead, users should rely on the ID field of the
+        returned documents.
+
+        Args:
+            ids: List of ids to retrieve.
+            batch_size: If many IDs are requested, these are split in chunks and
+                multiple requests are run and collated. This sets the size of each
+                such chunk of IDs.
+                Default is 80. The database sets a hard limit of 100.
+            batch_concurrency: Number of threads for executing multiple requests
+                if needed. Default is 20.
+
+        Returns:
+            List of Documents.
+        """
+        return await self.aget_by_ids(
+            ids,
+            batch_size=batch_size,
+            batch_concurrency=batch_concurrency,
+        )
 
     @override
     def similarity_search(

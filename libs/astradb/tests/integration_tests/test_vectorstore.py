@@ -1403,6 +1403,10 @@ class TestAstraDBVectorStore:
         exp_ids1 = [f"doc_{i:03}" for i in range(10, 220)]
         ids1 = [doc.id or "" for doc in vstore.get_by_ids(exp_ids1)]
         assert sorted(exp_ids1) == sorted(ids1)
+        # long-name alias
+        exp_ids1l = [f"doc_{i:03}" for i in range(10, 220)]
+        ids1l = [doc.id or "" for doc in vstore.get_by_document_ids(exp_ids1l)]
+        assert sorted(exp_ids1l) == sorted(ids1l)
         # including non-found ids
         qry_ids2 = [f"doc_{i:03}" for i in range(110, 350)]
         exp_ids2 = list(doc_ids & set(qry_ids2))
@@ -1462,6 +1466,10 @@ class TestAstraDBVectorStore:
         exp_ids1 = [f"doc_{i:03}" for i in range(10, 220)]
         ids1 = [doc.id or "" for doc in await vstore.aget_by_ids(exp_ids1)]
         assert sorted(exp_ids1) == sorted(ids1)
+        # long-name alias
+        exp_ids1l = [f"doc_{i:03}" for i in range(10, 220)]
+        ids1l = [doc.id or "" for doc in await vstore.aget_by_document_ids(exp_ids1l)]
+        assert sorted(exp_ids1l) == sorted(ids1l)
         # including non-found ids
         qry_ids2 = [f"doc_{i:03}" for i in range(110, 350)]
         exp_ids2 = list(doc_ids & set(qry_ids2))
