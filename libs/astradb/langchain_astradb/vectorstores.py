@@ -1452,11 +1452,14 @@ class AstraDBVectorStore(VectorStore):
         self,
         texts: Iterable[str],
         embedding_vectors: Sequence[list[float] | None],
-        metadatas: list[dict] | None = None,
-        ids: list[str] | None = None,
+        metadatas: list[dict[str, Any]] | None = None,
+        ids: list[str | None] | None = None,
     ) -> list[DocDict]:
+        ids1: list[str]
         if ids is None:
-            ids = [uuid.uuid4().hex for _ in texts]
+            ids1 = [uuid.uuid4().hex for _ in texts]
+        else:
+            ids1 = [uuid.uuid4().hex if id_ is None else id_ for id_ in ids]
         if metadatas is None:
             metadatas = [{} for _ in texts]
         documents_to_insert = [
@@ -1469,7 +1472,7 @@ class AstraDBVectorStore(VectorStore):
             for b_txt, b_emb, b_id, b_md in zip(
                 texts,
                 embedding_vectors,
-                ids,
+                ids1,
                 metadatas,
                 strict=True,
             )
@@ -1484,7 +1487,7 @@ class AstraDBVectorStore(VectorStore):
     def add_texts(
         self,
         texts: Iterable[str],
-        metadatas: list[dict] | None = None,
+        metadatas: list[dict[str, Any]] | None = None,
         ids: list[str] | None = None,
         *,
         batch_size: int | None = None,
@@ -1537,7 +1540,7 @@ class AstraDBVectorStore(VectorStore):
         else:
             embedding_vectors = self._get_safe_embedding().embed_documents(list(texts))
         documents_to_insert = self._get_documents_to_insert(
-            texts, embedding_vectors, metadatas, ids
+            texts, embedding_vectors, metadatas, cast("list[str | None]", ids)
         )
 
         # perform an AstraPy insert_many, catching exceptions for overwriting docs
@@ -1680,7 +1683,7 @@ class AstraDBVectorStore(VectorStore):
                 list(texts)
             )
         documents_to_insert = self._get_documents_to_insert(
-            texts, embedding_vectors, metadatas, ids
+            texts, embedding_vectors, metadatas, cast("list[str | None]", ids)
         )
 
         # perform an AstraPy insert_many, catching exceptions for overwriting docs
