@@ -33,9 +33,11 @@ from typing_extensions import override
 from langchain_astradb.utils.astradb import (
     COMPONENT_NAME_VECTORSTORE,
     DEFAULT_DOCUMENT_CHUNK_SIZE,
+    DEFAULT_ID_LIST_SIZE,
     MAX_CONCURRENT_DOCUMENT_DELETIONS,
     MAX_CONCURRENT_DOCUMENT_INSERTIONS,
     MAX_CONCURRENT_DOCUMENT_REPLACEMENTS,
+    MAX_CONCURRENT_GET_BY_IDS_REQUESTS,
     HybridSearchMode,
     SetupMode,
     _AstraDBCollectionEnvironment,
@@ -1451,11 +1453,14 @@ class AstraDBVectorStore(VectorStore):
         self,
         texts: Iterable[str],
         embedding_vectors: Sequence[list[float] | None],
-        metadatas: list[dict] | None = None,
-        ids: list[str] | None = None,
+        metadatas: list[dict[str, Any]] | None = None,
+        ids: list[str | None] | None = None,
     ) -> list[DocDict]:
+        ids1: list[str]
         if ids is None:
-            ids = [uuid.uuid4().hex for _ in texts]
+            ids1 = [uuid.uuid4().hex for _ in texts]
+        else:
+            ids1 = [uuid.uuid4().hex if id_ is None else id_ for id_ in ids]
         if metadatas is None:
             metadatas = [{} for _ in texts]
         documents_to_insert = [
@@ -1468,7 +1473,7 @@ class AstraDBVectorStore(VectorStore):
             for b_txt, b_emb, b_id, b_md in zip(
                 texts,
                 embedding_vectors,
-                ids,
+                ids1,
                 metadatas,
                 strict=True,
             )
@@ -1483,7 +1488,7 @@ class AstraDBVectorStore(VectorStore):
     def add_texts(
         self,
         texts: Iterable[str],
-        metadatas: list[dict] | None = None,
+        metadatas: list[dict[str, Any]] | None = None,
         ids: list[str] | None = None,
         *,
         batch_size: int | None = None,
@@ -1536,7 +1541,7 @@ class AstraDBVectorStore(VectorStore):
         else:
             embedding_vectors = self._get_safe_embedding().embed_documents(list(texts))
         documents_to_insert = self._get_documents_to_insert(
-            texts, embedding_vectors, metadatas, ids
+            texts, embedding_vectors, metadatas, cast("list[str | None]", ids)
         )
 
         # perform an AstraPy insert_many, catching exceptions for overwriting docs
@@ -1679,7 +1684,7 @@ class AstraDBVectorStore(VectorStore):
                 list(texts)
             )
         documents_to_insert = self._get_documents_to_insert(
-            texts, embedding_vectors, metadatas, ids
+            texts, embedding_vectors, metadatas, cast("list[str | None]", ids)
         )
 
         # perform an AstraPy insert_many, catching exceptions for overwriting docs
@@ -2524,6 +2529,184 @@ class AstraDBVectorStore(VectorStore):
             return hits[0]
 
         return None
+
+    @override
+    def get_by_ids(
+        self,
+        ids: Sequence[str],
+        /,
+        batch_size: int | None = None,
+        batch_concurrency: int | None = None,
+    ) -> list[Document]:
+        """Get documents by their IDs.
+
+        The returned documents have the ID field set to the ID of the
+        document in the vector store.
+
+        Fewer documents may be returned than requested if some IDs are not found or
+        if there are duplicated IDs.
+
+        Users should not assume that the order of the returned documents matches
+        the order of the input IDs. Instead, users should rely on the ID field of the
+        returned documents.
+
+        Args:
+            ids: List of ids to retrieve.
+            batch_size: If many IDs are requested, these are split in chunks and
+                multiple requests are run and collated. This sets the size of each
+                such chunk of IDs.
+                Default is 80. The database sets a hard limit of 100.
+            batch_concurrency: Number of threads for executing multiple requests
+                if needed. Default is 20.
+
+        Returns:
+            List of Documents.
+        """
+        batch_size_ = batch_size or DEFAULT_ID_LIST_SIZE
+        batch_concurrency_ = batch_concurrency or MAX_CONCURRENT_GET_BY_IDS_REQUESTS
+        id_list1 = list(set(ids))
+        num_chunks = 1 + (len(id_list1) - 1) // batch_size_
+        id_chunks = [
+            id_list1[batch_size_ * chunk_id : batch_size_ * (chunk_id + 1)]
+            for chunk_id in range(num_chunks)
+        ]
+
+        def query_for_ids(id_chunk: list[str]) -> Iterable[AstraDBQueryResult]:
+            return self.run_query(n=batch_size_, ids=id_chunk)
+
+        with ThreadPoolExecutor(max_workers=batch_concurrency_) as executor:
+            hit_lists = executor.map(
+                query_for_ids,
+                id_chunks,
+            )
+        return [doc for hit_list in hit_lists for doc, _, _, _ in hit_list]
+
+    def get_by_document_ids(
+        self,
+        ids: Sequence[str],
+        /,
+        batch_size: int | None = None,
+        batch_concurrency: int | None = None,
+    ) -> list[Document]:
+        """Get documents by their IDs.
+
+        The returned documents have the ID field set to the ID of the
+        document in the vector store.
+
+        Fewer documents may be returned than requested if some IDs are not found or
+        if there are duplicated IDs.
+
+        Users should not assume that the order of the returned documents matches
+        the order of the input IDs. Instead, users should rely on the ID field of the
+        returned documents.
+
+        Args:
+            ids: List of ids to retrieve.
+            batch_size: If many IDs are requested, these are split in chunks and
+                multiple requests are run and collated. This sets the size of each
+                such chunk of IDs.
+                Default is 80. The database sets a hard limit of 100.
+            batch_concurrency: Number of threads for executing multiple requests
+                if needed. Default is 20.
+
+        Returns:
+            List of Documents.
+        """
+        return self.get_by_ids(
+            ids,
+            batch_size=batch_size,
+            batch_concurrency=batch_concurrency,
+        )
+
+    @override
+    async def aget_by_ids(
+        self,
+        ids: Sequence[str],
+        /,
+        batch_size: int | None = None,
+        batch_concurrency: int | None = None,
+    ) -> list[Document]:
+        """Get documents by their IDs.
+
+        The returned documents have the ID field set to the ID of the
+        document in the vector store.
+
+        Fewer documents may be returned than requested if some IDs are not found or
+        if there are duplicated IDs.
+
+        Users should not assume that the order of the returned documents matches
+        the order of the input IDs. Instead, users should rely on the ID field of the
+        returned documents.
+
+        Args:
+            ids: List of ids to retrieve.
+            batch_size: If many IDs are requested, these are split in chunks and
+                multiple requests are run and collated. This sets the size of each
+                such chunk of IDs.
+                Default is 80. The database sets a hard limit of 100.
+            batch_concurrency: Number of threads for executing multiple requests
+                if needed. Default is 20.
+
+        Returns:
+            List of Documents.
+        """
+        batch_size_ = batch_size or DEFAULT_ID_LIST_SIZE
+        batch_concurrency_ = batch_concurrency or MAX_CONCURRENT_GET_BY_IDS_REQUESTS
+        id_list1 = list(set(ids))
+        num_chunks = 1 + (len(id_list1) - 1) // batch_size_
+        id_chunks = [
+            id_list1[batch_size_ * chunk_id : batch_size_ * (chunk_id + 1)]
+            for chunk_id in range(num_chunks)
+        ]
+
+        sem = asyncio.Semaphore(batch_concurrency_)
+
+        async def query_for_ids(
+            id_chunk: list[str],
+        ) -> AsyncIterable[AstraDBQueryResult]:
+            async with sem:
+                return await self.arun_query(n=batch_size_, ids=id_chunk)
+
+        tasks = [asyncio.create_task(query_for_ids(id_chunk)) for id_chunk in id_chunks]
+        hit_lists = await asyncio.gather(*tasks, return_exceptions=False)
+        return [doc for hit_list in hit_lists async for doc, _, _, _ in hit_list]
+
+    async def aget_by_document_ids(
+        self,
+        ids: Sequence[str],
+        /,
+        batch_size: int | None = None,
+        batch_concurrency: int | None = None,
+    ) -> list[Document]:
+        """Get documents by their IDs.
+
+        The returned documents have the ID field set to the ID of the
+        document in the vector store.
+
+        Fewer documents may be returned than requested if some IDs are not found or
+        if there are duplicated IDs.
+
+        Users should not assume that the order of the returned documents matches
+        the order of the input IDs. Instead, users should rely on the ID field of the
+        returned documents.
+
+        Args:
+            ids: List of ids to retrieve.
+            batch_size: If many IDs are requested, these are split in chunks and
+                multiple requests are run and collated. This sets the size of each
+                such chunk of IDs.
+                Default is 80. The database sets a hard limit of 100.
+            batch_concurrency: Number of threads for executing multiple requests
+                if needed. Default is 20.
+
+        Returns:
+            List of Documents.
+        """
+        return await self.aget_by_ids(
+            ids,
+            batch_size=batch_size,
+            batch_concurrency=batch_concurrency,
+        )
 
     @override
     def similarity_search(

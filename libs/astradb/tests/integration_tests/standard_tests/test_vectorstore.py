@@ -12,7 +12,9 @@ from tests.integration_tests.conftest import (
     astra_db_env_vars_available,
 )
 
-GET_BY_IDS_NOT_SUPPORTED_MESSAGE = "AstraDBVectorStore doesn't support get_by_ids."
+TEST_EXPECTS_DEFINITE_DOCUMENT_ORDERING = (
+    "Currently a specific document ordering is expected."
+)
 
 
 @pytest.mark.skipif(
@@ -39,38 +41,30 @@ class TestAstraDBVectorStoreIntegration(VectorStoreIntegrationTests):
     def vectorstore(self) -> VectorStore:
         return self._vectorstore
 
-    @pytest.mark.xfail(reason=GET_BY_IDS_NOT_SUPPORTED_MESSAGE)
-    def test_get_by_ids(self, vectorstore: VectorStore) -> None:
-        pass
-
-    @pytest.mark.xfail(reason=GET_BY_IDS_NOT_SUPPORTED_MESSAGE)
-    def test_get_by_ids_missing(self, vectorstore: VectorStore) -> None:
-        pass
-
-    @pytest.mark.xfail(reason=GET_BY_IDS_NOT_SUPPORTED_MESSAGE)
-    def test_add_documents_documents(self, vectorstore: VectorStore) -> None:
-        pass
-
-    @pytest.mark.xfail(reason=GET_BY_IDS_NOT_SUPPORTED_MESSAGE)
+    @pytest.mark.xfail(reason=TEST_EXPECTS_DEFINITE_DOCUMENT_ORDERING)
     def test_add_documents_with_existing_ids(self, vectorstore: VectorStore) -> None:
         pass
 
-    @pytest.mark.xfail(reason=GET_BY_IDS_NOT_SUPPORTED_MESSAGE)
-    async def test_get_by_ids_async(self, vectorstore: VectorStore) -> None:
-        pass
-
-    @pytest.mark.xfail(reason=GET_BY_IDS_NOT_SUPPORTED_MESSAGE)
-    async def test_get_by_ids_missing_async(self, vectorstore: VectorStore) -> None:
-        pass
-
-    @pytest.mark.xfail(reason=GET_BY_IDS_NOT_SUPPORTED_MESSAGE)
-    async def test_add_documents_documents_async(
+    @pytest.mark.xfail(reason=TEST_EXPECTS_DEFINITE_DOCUMENT_ORDERING)
+    async def test_add_documents_with_existing_ids_async(
         self, vectorstore: VectorStore
     ) -> None:
         pass
 
-    @pytest.mark.xfail(reason=GET_BY_IDS_NOT_SUPPORTED_MESSAGE)
-    async def test_add_documents_with_existing_ids_async(
+    @pytest.mark.xfail(reason=TEST_EXPECTS_DEFINITE_DOCUMENT_ORDERING)
+    def test_get_by_ids(self, vectorstore: VectorStore) -> None:
+        pass
+
+    @pytest.mark.xfail(reason=TEST_EXPECTS_DEFINITE_DOCUMENT_ORDERING)
+    async def test_get_by_ids_async(self, vectorstore: VectorStore) -> None:
+        pass
+
+    @pytest.mark.xfail(reason=TEST_EXPECTS_DEFINITE_DOCUMENT_ORDERING)
+    def test_add_documents_documents(self, vectorstore: VectorStore) -> None:
+        pass
+
+    @pytest.mark.xfail(reason=TEST_EXPECTS_DEFINITE_DOCUMENT_ORDERING)
+    async def test_add_documents_documents_async(
         self, vectorstore: VectorStore
     ) -> None:
         pass

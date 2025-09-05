@@ -74,6 +74,10 @@ MAX_CONCURRENT_DOCUMENT_INSERTIONS = 20
 MAX_CONCURRENT_DOCUMENT_REPLACEMENTS = 20
 # Thread/coroutine count for one-doc-at-a-time deletes:
 MAX_CONCURRENT_DOCUMENT_DELETIONS = 20
+# Size of each chunk of document IDs for get_by_ids
+DEFAULT_ID_LIST_SIZE = 80
+# Thread/coroutine count for concurrent requests for get_by_ids
+MAX_CONCURRENT_GET_BY_IDS_REQUESTS = 20
 
 # Hardcoded here for the time being
 ASTRA_DB_REQUEST_TIMEOUT_MS = 30000

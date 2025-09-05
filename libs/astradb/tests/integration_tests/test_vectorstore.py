@@ -1383,6 +1383,132 @@ class TestAstraDBVectorStore:
         assert valid.metadata["group"] == "consonant"
         assert valid.metadata["letter"] == "q"
 
+    def test_astradb_vectorstore_get_by_ids_sync(
+        self,
+        vector_store_d2: AstraDBVectorStore,
+    ) -> None:
+        """Get by (multiple) document ids"""
+        vstore = vector_store_d2
+        docs = [Document(id=f"doc_{i:03}", page_content=f"[0,{i}]") for i in range(250)]
+        doc_ids = {doc.id or "" for doc in docs}
+        vstore.add_documents(docs)
+
+        # empty id list
+        assert vstore.get_by_ids([]) == []
+        # small id list
+        exp_ids0 = [f"doc_{i:03}" for i in range(10)]
+        ids0 = {doc.id or "" for doc in vstore.get_by_ids(exp_ids0)}
+        assert sorted(exp_ids0) == sorted(ids0)
+        # long id list
+        exp_ids1 = [f"doc_{i:03}" for i in range(10, 220)]
+        ids1 = [doc.id or "" for doc in vstore.get_by_ids(exp_ids1)]
+        assert sorted(exp_ids1) == sorted(ids1)
+        # long-name alias
+        exp_ids1l = [f"doc_{i:03}" for i in range(10, 220)]
+        ids1l = [doc.id or "" for doc in vstore.get_by_document_ids(exp_ids1l)]
+        assert sorted(exp_ids1l) == sorted(ids1l)
+        # including non-found ids
+        qry_ids2 = [f"doc_{i:03}" for i in range(110, 350)]
+        exp_ids2 = list(doc_ids & set(qry_ids2))
+        ids2 = [doc.id or "" for doc in vstore.get_by_ids(exp_ids2)]
+        assert sorted(exp_ids2) == sorted(ids2)
+        # repeated ids
+        exp_ids3 = [f"doc_{i:03}" for i in range(50, 75)]
+        ids3 = {doc.id or "" for doc in vstore.get_by_ids(exp_ids3 + exp_ids3)}
+        assert sorted(exp_ids3) == sorted(ids3)
+        # passing a tuple
+        exp_ids4 = ("doc_019", "doc_002", "doc_174", "doc_159", "doc_041")
+        ids4 = {doc.id or "" for doc in vstore.get_by_ids(exp_ids4)}
+        assert sorted(exp_ids4) == sorted(ids4)
+        # customized batch/concurrency 1
+        exp_ids5 = [f"doc_{i:03}" for i in range(20)]
+        ids5 = {
+            doc.id or ""
+            for doc in vstore.get_by_ids(
+                exp_ids5,
+                batch_size=4,
+                batch_concurrency=2,
+            )
+        }
+        assert sorted(exp_ids5) == sorted(ids5)
+        # customized batch/concurrency 2 (with remainder)
+        exp_ids6 = [f"doc_{i:03}" for i in range(20)]
+        ids6 = {
+            doc.id or ""
+            for doc in vstore.get_by_ids(
+                exp_ids6,
+                batch_size=7,
+                batch_concurrency=5,
+            )
+        }
+        assert sorted(exp_ids6) == sorted(ids6)
+        # unacceptable batch/concurrency parameters
+        with pytest.raises(ValueError, match="must be greater than 0"):
+            vstore.get_by_ids([], batch_concurrency=-1)
+
+    async def test_astradb_vectorstore_get_by_ids_async(
+        self,
+        vector_store_d2: AstraDBVectorStore,
+    ) -> None:
+        """Get by (multiple) document ids"""
+        vstore = vector_store_d2
+        docs = [Document(id=f"doc_{i:03}", page_content=f"[0,{i}]") for i in range(250)]
+        doc_ids = {doc.id or "" for doc in docs}
+        await vstore.aadd_documents(docs)
+
+        # empty id list
+        assert await vstore.aget_by_ids([]) == []
+        # small id list
+        exp_ids0 = [f"doc_{i:03}" for i in range(10)]
+        ids0 = {doc.id or "" for doc in await vstore.aget_by_ids(exp_ids0)}
+        assert sorted(exp_ids0) == sorted(ids0)
+        # long id list
+        exp_ids1 = [f"doc_{i:03}" for i in range(10, 220)]
+        ids1 = [doc.id or "" for doc in await vstore.aget_by_ids(exp_ids1)]
+        assert sorted(exp_ids1) == sorted(ids1)
+        # long-name alias
+        exp_ids1l = [f"doc_{i:03}" for i in range(10, 220)]
+        ids1l = [doc.id or "" for doc in await vstore.aget_by_document_ids(exp_ids1l)]
+        assert sorted(exp_ids1l) == sorted(ids1l)
+        # including non-found ids
+        qry_ids2 = [f"doc_{i:03}" for i in range(110, 350)]
+        exp_ids2 = list(doc_ids & set(qry_ids2))
+        ids2 = [doc.id or "" for doc in await vstore.aget_by_ids(exp_ids2)]
+        assert sorted(exp_ids2) == sorted(ids2)
+        # repeated ids
+        exp_ids3 = [f"doc_{i:03}" for i in range(50, 75)]
+        ids3 = {doc.id or "" for doc in await vstore.aget_by_ids(exp_ids3 + exp_ids3)}
+        assert sorted(exp_ids3) == sorted(ids3)
+        # passing a tuple
+        exp_ids4 = ("doc_019", "doc_002", "doc_174", "doc_159", "doc_041")
+        ids4 = {doc.id or "" for doc in await vstore.aget_by_ids(exp_ids4)}
+        assert sorted(exp_ids4) == sorted(ids4)
+        # customized batch/concurrency 1
+        exp_ids5 = [f"doc_{i:03}" for i in range(20)]
+        ids5 = {
+            doc.id or ""
+            for doc in await vstore.aget_by_ids(
+                exp_ids5,
+                batch_size=4,
+                batch_concurrency=2,
+            )
+        }
+        assert sorted(exp_ids5) == sorted(ids5)
+        # customized batch/concurrency 2 (with remainder)
+        exp_ids6 = [f"doc_{i:03}" for i in range(20)]
+        ids6 = {
+            doc.id or ""
+            for doc in await vstore.aget_by_ids(
+                exp_ids6,
+                batch_size=7,
+                batch_concurrency=5,
+            )
+        }
+        assert sorted(exp_ids6) == sorted(ids6)
+        # unacceptable batch/concurrency parameters
+        with pytest.raises(ValueError, match="initial value must be"):
+            await vstore.aget_by_ids([], batch_concurrency=-1)
+
     @pytest.mark.parametrize(
         ("is_vectorize", "vector_store", "texts", "query"),
         [
