@@ -1296,7 +1296,7 @@ class AstraDBVectorStore(VectorStore):
     @override
     def delete(
         self,
-        ids: list[str] | None = None,
+        ids: Iterable[str] | None = None,
         concurrency: int | None = None,
         **kwargs: Any,
     ) -> bool | None:
@@ -1336,7 +1336,7 @@ class AstraDBVectorStore(VectorStore):
     @override
     async def adelete(
         self,
-        ids: list[str] | None = None,
+        ids: Iterable[str] | None = None,
         concurrency: int | None = None,
         **kwargs: Any,
     ) -> bool | None:
@@ -1453,14 +1453,13 @@ class AstraDBVectorStore(VectorStore):
         self,
         texts: Iterable[str],
         embedding_vectors: Sequence[list[float] | None],
-        metadatas: list[dict[str, Any]] | None = None,
-        ids: list[str | None] | None = None,
+        metadatas: Iterable[dict] | None = None,
+        ids: Iterable[str | None] | None = None,
     ) -> list[DocDict]:
-        ids1: list[str]
         if ids is None:
-            ids1 = [uuid.uuid4().hex for _ in texts]
+            ids_ = [uuid.uuid4().hex for _ in texts]
         else:
-            ids1 = [uuid.uuid4().hex if id_ is None else id_ for id_ in ids]
+            ids_ = [uuid.uuid4().hex if id_ is None else id_ for id_ in ids]
         if metadatas is None:
             metadatas = [{} for _ in texts]
         documents_to_insert = [
@@ -1473,7 +1472,7 @@ class AstraDBVectorStore(VectorStore):
             for b_txt, b_emb, b_id, b_md in zip(
                 texts,
                 embedding_vectors,
-                ids1,
+                ids_,
                 metadatas,
                 strict=True,
             )
@@ -1488,8 +1487,8 @@ class AstraDBVectorStore(VectorStore):
     def add_texts(
         self,
         texts: Iterable[str],
-        metadatas: list[dict[str, Any]] | None = None,
-        ids: list[str] | None = None,
+        metadatas: Iterable[dict] | None = None,
+        ids: Iterable[str | None] | None = None,
         *,
         batch_size: int | None = None,
         batch_concurrency: int | None = None,
@@ -1541,7 +1540,7 @@ class AstraDBVectorStore(VectorStore):
         else:
             embedding_vectors = self._get_safe_embedding().embed_documents(list(texts))
         documents_to_insert = self._get_documents_to_insert(
-            texts, embedding_vectors, metadatas, cast("list[str | None]", ids)
+            texts, embedding_vectors, metadatas, ids
         )
 
         # perform an AstraPy insert_many, catching exceptions for overwriting docs
@@ -1629,8 +1628,8 @@ class AstraDBVectorStore(VectorStore):
     async def aadd_texts(
         self,
         texts: Iterable[str],
-        metadatas: list[dict] | None = None,
-        ids: list[str] | None = None,
+        metadatas: Iterable[dict] | None = None,
+        ids: Iterable[str | None] | None = None,
         *,
         batch_size: int | None = None,
         batch_concurrency: int | None = None,
@@ -1684,7 +1683,7 @@ class AstraDBVectorStore(VectorStore):
                 list(texts)
             )
         documents_to_insert = self._get_documents_to_insert(
-            texts, embedding_vectors, metadatas, cast("list[str | None]", ids)
+            texts, embedding_vectors, metadatas, ids
         )
 
         # perform an AstraPy insert_many, catching exceptions for overwriting docs
@@ -3804,10 +3803,10 @@ class AstraDBVectorStore(VectorStore):
     @override
     def from_texts(
         cls: type[AstraDBVectorStore],
-        texts: list[str],
+        texts: Iterable[str],
         embedding: Embeddings | None = None,
-        metadatas: list[dict] | None = None,
-        ids: list[str] | None = None,
+        metadatas: Iterable[dict] | None = None,
+        ids: Iterable[str | None] | None = None,
         **kwargs: Any,
     ) -> AstraDBVectorStore:
         """Create an Astra DB vectorstore from raw texts.
@@ -3848,10 +3847,10 @@ class AstraDBVectorStore(VectorStore):
     @classmethod
     async def afrom_texts(
         cls: type[AstraDBVectorStore],
-        texts: list[str],
+        texts: Iterable[str],
         embedding: Embeddings | None = None,
-        metadatas: list[dict] | None = None,
-        ids: list[str] | None = None,
+        metadatas: Iterable[dict] | None = None,
+        ids: Iterable[str | None] | None = None,
         **kwargs: Any,
     ) -> AstraDBVectorStore:
         """Create an Astra DB vectorstore from raw texts.
@@ -3892,7 +3891,7 @@ class AstraDBVectorStore(VectorStore):
     @override
     def from_documents(
         cls: type[AstraDBVectorStore],
-        documents: list[Document],
+        documents: Iterable[Document],
         embedding: Embeddings | None = None,
         **kwargs: Any,
     ) -> AstraDBVectorStore:
@@ -3942,7 +3941,7 @@ class AstraDBVectorStore(VectorStore):
     @classmethod
     async def afrom_documents(
         cls: type[AstraDBVectorStore],
-        documents: list[Document],
+        documents: Iterable[Document],
         embedding: Embeddings | None = None,
         **kwargs: Any,
     ) -> AstraDBVectorStore:
