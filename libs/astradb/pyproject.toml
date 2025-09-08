@@ -44,6 +44,9 @@ test_integration = [
 ]
 codespell = ["codespell<3.0.0,>=2.2.0"]
 
+[tool.ruff.format]
+docstring-code-format = true
+
 [tool.ruff.lint]
 pydocstyle.convention = "google"
 pep8-naming.classmethod-decorators = [
