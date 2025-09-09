@@ -503,7 +503,12 @@ class AstraDBSemanticCache(BaseCache):
     ) -> tuple[str, RETURN_VAL_TYPE] | None:
         """Look up based on prompt and llm_string.
 
-        If there are hits, return (document_id, cached_entry) for the top hit
+        Args:
+            prompt: the prompt string to look up
+            llm_string: the str representation of the model parameters
+
+        Returns:
+            If there are hits, (document_id, cached_entry) for the top hit
         """
         self.astra_env.ensure_db_setup()
         prompt_embedding: list[float] = self._get_embedding(text=prompt)
@@ -533,7 +538,12 @@ class AstraDBSemanticCache(BaseCache):
     ) -> tuple[str, RETURN_VAL_TYPE] | None:
         """Look up based on prompt and llm_string.
 
-        If there are hits, return (document_id, cached_entry) for the top hit
+        Args:
+            prompt: the prompt string to look up
+            llm_string: the str representation of the model parameters
+
+        Returns:
+            If there are hits, (document_id, cached_entry) for the top hit
         """
         await self.astra_env.aensure_db_setup()
         prompt_embedding: list[float] = await self._aget_embedding(text=prompt)
@@ -563,7 +573,13 @@ class AstraDBSemanticCache(BaseCache):
     ) -> tuple[str, RETURN_VAL_TYPE] | None:
         """Look up based on prompt and LLM.
 
-        If there are hits, return (document_id, cached_entry) for the top hit
+        Args:
+            prompt: the prompt string to look up
+            llm: the LLM instance whose parameters are used in the lookup
+            stop: optional list of stop words passed to the LLM calls
+
+        Returns:
+            If there are hits, (document_id, cached_entry) for the top hit.
         """
         llm_string = get_prompts(
             {**llm.dict(), "stop": stop},
@@ -576,7 +592,13 @@ class AstraDBSemanticCache(BaseCache):
     ) -> tuple[str, RETURN_VAL_TYPE] | None:
         """Look up based on prompt and LLM.
 
-        If there are hits, return (document_id, cached_entry) for the top hit
+        Args:
+            prompt: the prompt string to look up
+            llm: the LLM instance whose parameters are used in the lookup
+            stop: optional list of stop words passed to the LLM calls
+
+        Returns:
+            If there are hits, (document_id, cached_entry) for the top hit.
         """
         llm_string = (
             await aget_prompts(

@@ -32,7 +32,7 @@ def document_loader_collection(
 
 
 @pytest.fixture
-async def async_document_loader_collection(
+def async_document_loader_collection(
     collection_idxall: Collection,
 ) -> AsyncCollection:
     return collection_idxall.to_async()
@@ -257,7 +257,7 @@ class TestAstraDB:
             page_content_mapper=itemgetter("foo"),
             filter_criteria={"foo": "bar"},
         )
-        doc = await loader.alazy_load().__anext__()
+        doc = await anext(loader.alazy_load())
         assert doc.page_content == "bar"
 
     async def test_metadata_mapper_async(
@@ -275,5 +275,5 @@ class TestAstraDB:
             metadata_mapper=lambda x: {"a": x["foo"]},
             filter_criteria={"foo": "bar"},
         )
-        doc = await loader.alazy_load().__anext__()
+        doc = await anext(loader.alazy_load())
         assert doc.metadata == {"a": "bar"}

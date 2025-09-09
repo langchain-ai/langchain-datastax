@@ -59,7 +59,7 @@ class TestAstraDBEnvironment:
 
             # just tokenn, no endpoint
             with pytest.raises(
-                ValueError, match="API endpoint for Data API not provided."
+                ValueError, match="API endpoint for Data API not provided"
             ):
                 _AstraDBEnvironment(
                     token=FAKE_TOKEN,

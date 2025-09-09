@@ -145,8 +145,8 @@ class AstraDBLoader(BaseLoader):
         ):
             yield self._to_langchain_doc(doc)
 
+    @override
     async def aload(self) -> list[Document]:
-        """Load data into Document objects."""
         return [doc async for doc in self.alazy_load()]
 
     @override
