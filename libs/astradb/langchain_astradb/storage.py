@@ -38,7 +38,12 @@ V = TypeVar("V")
 
 class AstraDBBaseStore(BaseStore[str, V], Generic[V]):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
-        """Base class for the DataStax Astra DB data store."""
+        """Base class for the DataStax Astra DB data store.
+
+        Raises:
+            ValueError: if 'requested_indexing_policy' or
+                'default_indexing_policy' are passed in kwargs.
+        """
         if "requested_indexing_policy" in kwargs:
             msg = "Do not pass 'requested_indexing_policy' to AstraDBBaseStore init"
             raise ValueError(msg)

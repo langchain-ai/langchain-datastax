@@ -235,7 +235,7 @@ class TestAstraDBVectorStoreHybrid:
             assert rscore < 100
             assert isinstance(rid, str)
             # run other search methods
-            with pytest.raises(ValueError, match="not allowed."):
+            with pytest.raises(ValueError, match="not allowed"):
                 store2_ad.similarity_search_by_vector([1, 2, 3])
             mmr_hits_docs = store2_ad.max_marginal_relevance_search(
                 query=QUERY_TEXT,
@@ -349,7 +349,7 @@ class TestAstraDBVectorStoreHybrid:
             assert rscore < 100
             assert isinstance(rid, str)
             # run other search methods
-            with pytest.raises(ValueError, match="not allowed."):
+            with pytest.raises(ValueError, match="not allowed"):
                 store4.similarity_search_by_vector([1, 2, 3])
             mmr_hits_docs = store4.max_marginal_relevance_search(
                 query=QUERY_TEXT,
@@ -615,7 +615,7 @@ class TestAstraDBVectorStoreHybrid:
             assert rscore < 100
             assert isinstance(rid, str)
             # run other search methods
-            with pytest.raises(ValueError, match="not allowed."):
+            with pytest.raises(ValueError, match="not allowed"):
                 await store4.asimilarity_search_by_vector([1, 2, 3])
             mmr_hits_docs = await store4.amax_marginal_relevance_search(
                 query=QUERY_TEXT,

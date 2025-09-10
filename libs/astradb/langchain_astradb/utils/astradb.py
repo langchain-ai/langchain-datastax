@@ -505,6 +505,10 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
                 feature and a required secret is not stored with the database.
                 In order to suppress the API Key in the copy, explicitly pass
                 ``astrapy.authentication.RerankingAPIKeyHeaderProvider(None)``.
+
+        Returns:
+            A shallow copy of this environment, with the possibly updated
+            attributes.
         """
         return _AstraDBCollectionEnvironment(
             collection_name=self.collection_name,

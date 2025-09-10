@@ -245,9 +245,9 @@ def _decide_hybrid_search_setting(
 
 
 def _make_hybrid_limits(
-    hlf: None | float | dict[str, float],
+    hlf: float | dict[str, float] | None,
     k: int,
-) -> None | int | dict[str, int]:
+) -> int | dict[str, int] | None:
     if hlf is None:
         return None
     if isinstance(hlf, float):
@@ -258,9 +258,9 @@ def _make_hybrid_limits(
 
 def _normalize_hybrid_limit_factor(
     hybrid_limit_factor: float
-    | None
     | dict[str, float]
-    | HybridLimitFactorPrescription,
+    | HybridLimitFactorPrescription
+    | None,
 ) -> float | dict[str, float] | None:
     """Bring `hybrid_limit_factor` to a normal form."""
     if hybrid_limit_factor is None:
@@ -740,9 +740,9 @@ class AstraDBVectorStore(VectorStore):
         | None = None,
         hybrid_search: HybridSearchMode | None = None,
         hybrid_limit_factor: float
-        | None
         | dict[str, float]
-        | HybridLimitFactorPrescription = None,
+        | HybridLimitFactorPrescription
+        | None = None,
     ) -> None:
         """A vector store which uses DataStax Astra DB as backend.
 
@@ -891,6 +891,9 @@ class AstraDBVectorStore(VectorStore):
                 and the lexical subsearches. Alternatively, a simple dictionary
                 with keys "$lexical" and "$vector" achieves the same effect.
 
+        Raises:
+            ValueError: if the parameters are inconsistent or invalid.
+
         Note:
             For concurrency in synchronous :meth:`~add_texts`:, as a rule of thumb,
             on a typical client machine it is suggested to keep the quantity
@@ -941,7 +944,7 @@ class AstraDBVectorStore(VectorStore):
         self.has_lexical: bool
         self.has_hybrid: bool
         self.hybrid_search: bool  # affecting the actual behaviour when running searches
-        self.hybrid_limit_factor: None | float | dict[str, float]
+        self.hybrid_limit_factor: float | dict[str, float] | None
         self.collection_reranking_api_key = collection_reranking_api_key
 
         if not self.autodetect_collection:
@@ -1178,7 +1181,7 @@ class AstraDBVectorStore(VectorStore):
         In those cases, one should create a new instance of ``AstraDBVectorStore``
         from scratch.
 
-        Attributes:
+        Args:
             token: API token for Astra DB usage, either in the form of a string
                 or a subclass of ``astrapy.authentication.TokenProvider``.
                 In order to suppress token usage in the copy, explicitly pass
@@ -1200,6 +1203,10 @@ class AstraDBVectorStore(VectorStore):
                 This is useful when the service is configured for the collection,
                 but no corresponding secret is stored within
                 Astra's key management system.
+
+        Returns:
+            a shallow copy of this vector store, possibly with some changed
+            attributes.
         """
         copy = AstraDBVectorStore(
             collection_name="moot",
@@ -1310,6 +1317,9 @@ class AstraDBVectorStore(VectorStore):
 
         Returns:
             True if deletion is (entirely) successful, False otherwise.
+
+        Raises:
+            ValueError: if no ids are provided.
         """
         if kwargs:
             warnings.warn(
@@ -1350,6 +1360,9 @@ class AstraDBVectorStore(VectorStore):
 
         Returns:
             True if deletion is (entirely) successful, False otherwise.
+
+        Raises:
+            ValueError: if no ids are provided.
         """
         if kwargs:
             warnings.warn(
@@ -1383,6 +1396,9 @@ class AstraDBVectorStore(VectorStore):
 
         Returns:
             A number expressing the amount of deleted documents.
+
+        Raises:
+            ValueError: if the provided filter is empty.
         """
         if not filter:
             msg = (
@@ -1412,6 +1428,9 @@ class AstraDBVectorStore(VectorStore):
 
         Returns:
             A number expressing the amount of deleted documents.
+
+        Raises:
+            ValueError: if the provided filter is empty.
         """
         if not filter:
             msg = (
@@ -1524,6 +1543,9 @@ class AstraDBVectorStore(VectorStore):
 
         Returns:
             The list of ids of the added texts.
+
+        Raises:
+            AstraDBVectorStoreError: if not all documents could be inserted.
         """
         if kwargs:
             warnings.warn(
@@ -1665,6 +1687,9 @@ class AstraDBVectorStore(VectorStore):
 
         Returns:
             The list of ids of the added texts.
+
+        Raises:
+            AstraDBVectorStoreError: if not all documents could be inserted.
         """
         if kwargs:
             warnings.warn(
@@ -2473,6 +2498,9 @@ class AstraDBVectorStore(VectorStore):
         Args:
             filter: the metadata to query for.
             n: the maximum number of documents to return.
+
+        Returns:
+            The documents found.
         """
         docs_ite = self.run_query(n=n, filter=filter)
         return [doc for doc, _, _, _ in docs_ite]
@@ -2487,6 +2515,9 @@ class AstraDBVectorStore(VectorStore):
         Args:
             filter: the metadata to query for.
             n: the maximum number of documents to return.
+
+        Returns:
+            The documents found.
         """
         docs_ite = await self.arun_query(n=n, filter=filter)
         return [doc async for doc, _, _, _ in docs_ite]
@@ -2933,6 +2964,9 @@ class AstraDBVectorStore(VectorStore):
 
         Returns:
             The list of (Document, score, id), the most similar to the query vector.
+
+        Raises:
+            ValueError: if the vector store uses server-side embeddings.
         """
         if self.document_codec.server_side_embeddings:
             msg = (
@@ -3232,6 +3266,9 @@ class AstraDBVectorStore(VectorStore):
 
         Returns:
             The list of (Document, score, id), the most similar to the query vector.
+
+        Raises:
+            ValueError: If the vector store uses server-side embeddings.
         """
         if self.document_codec.server_side_embeddings:
             msg = (
@@ -3559,8 +3596,8 @@ class AstraDBVectorStore(VectorStore):
             prefetch_hit_pairs=prefetch_hit_pairs,
         )
 
+    @staticmethod
     def _get_mmr_hits(
-        self,
         embedding: list[float],
         k: int,
         lambda_mult: float,

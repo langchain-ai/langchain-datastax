@@ -55,7 +55,7 @@ def history2(
 
 
 @pytest.fixture
-async def async_history1(
+def async_history1(
     astra_db_credentials: AstraDBCredentials,
     history1: AstraDBChatMessageHistory,
 ) -> AstraDBChatMessageHistory:
@@ -71,7 +71,7 @@ async def async_history1(
 
 
 @pytest.fixture
-async def async_history2(
+def async_history2(
     astra_db_credentials: AstraDBCredentials,
     history1: AstraDBChatMessageHistory,
 ) -> AstraDBChatMessageHistory:
