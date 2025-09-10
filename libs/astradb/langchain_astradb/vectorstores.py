@@ -401,7 +401,8 @@ class AstraDBVectorStore(VectorStore):
     Setup:
         Install the ``langchain-astradb`` package and head to the
         `AstraDB website <https://astra.datastax.com>`_, create an account, create a
-        new database and `create an application token <https://docs.datastax.com/en/astra-db-serverless/administration/manage-application-tokens.html>`_.
+        new database and
+        `create an application token <https://docs.datastax.com/en/astra-db-serverless/administration/manage-application-tokens.html>`_.
 
         .. code-block:: bash
 
@@ -424,7 +425,8 @@ class AstraDBVectorStore(VectorStore):
     Instantiate:
         Get your API endpoint and application token from the dashboard of your database.
 
-        Create a vector store and provide a LangChain embedding object for working with it:
+        Create a vector store and provide a LangChain embedding object for working with
+        it:
 
         .. code-block:: python
 
@@ -434,7 +436,9 @@ class AstraDBVectorStore(VectorStore):
             from langchain_openai import OpenAIEmbeddings
 
             ASTRA_DB_API_ENDPOINT = getpass.getpass("ASTRA_DB_API_ENDPOINT = ")
-            ASTRA_DB_APPLICATION_TOKEN = getpass.getpass("ASTRA_DB_APPLICATION_TOKEN = ")
+            ASTRA_DB_APPLICATION_TOKEN = getpass.getpass(
+                "ASTRA_DB_APPLICATION_TOKEN = "
+            )
 
             vector_store = AstraDBVectorStore(
                 collection_name="astra_vector_langchain",
@@ -443,8 +447,10 @@ class AstraDBVectorStore(VectorStore):
                 token=ASTRA_DB_APPLICATION_TOKEN,
             )
 
-        (Vectorize) Create a vector store where the embedding vector computation happens entirely
-        on the server-side, using the `vectorize <https://docs.datastax.com/en/astra-db-serverless/databases/embedding-generation.html>`_ feature:
+        (Vectorize) Create a vector store where the embedding vector computation
+        happens entirely on the server-side, using the
+        `vectorize <https://docs.datastax.com/en/astra-db-serverless/databases/embedding-generation.html>`_
+        feature:
 
         .. code-block:: python
 
@@ -454,7 +460,9 @@ class AstraDBVectorStore(VectorStore):
             from langchain_astradb import AstraDBVectorStore
 
             ASTRA_DB_API_ENDPOINT = getpass.getpass("ASTRA_DB_API_ENDPOINT = ")
-            ASTRA_DB_APPLICATION_TOKEN = getpass.getpass("ASTRA_DB_APPLICATION_TOKEN = ")
+            ASTRA_DB_APPLICATION_TOKEN = getpass.getpass(
+                "ASTRA_DB_APPLICATION_TOKEN = "
+            )
 
             vector_store = AstraDBVectorStore(
                 collection_name="astra_vectorize_langchain",
@@ -485,14 +493,18 @@ class AstraDBVectorStore(VectorStore):
             from langchain_astradb import AstraDBVectorStore
 
             ASTRA_DB_API_ENDPOINT = getpass.getpass("ASTRA_DB_API_ENDPOINT = ")
-            ASTRA_DB_APPLICATION_TOKEN = getpass.getpass("ASTRA_DB_APPLICATION_TOKEN = ")
+            ASTRA_DB_APPLICATION_TOKEN = getpass.getpass(
+                "ASTRA_DB_APPLICATION_TOKEN = "
+            )
 
             vector_store = AstraDBVectorStore(
                 collection_name="astra_vectorize_langchain",
                 # embedding=...,  # needed unless using 'vectorize'
                 api_endpoint=ASTRA_DB_API_ENDPOINT,
                 token=ASTRA_DB_APPLICATION_TOKEN,
-                collection_vector_service_options=VectorServiceOptions(...),  # see above
+                collection_vector_service_options=VectorServiceOptions(
+                    ...
+                ),  # see above
                 collection_lexical=CollectionLexicalOptions(analyzer="standard"),
                 collection_rerank=CollectionRerankOptions(
                     service=RerankServiceOptions(
@@ -509,11 +521,13 @@ class AstraDBVectorStore(VectorStore):
         the options to resolve are:
         (1) use autodetect mode, (2) switch to ``setup_mode`` "OFF", or
         (3) explicitly specify lexical and/or rerank settings in the vector
-        store constructor, to match the existing collection configuration.
-        See `here <https://github.com/langchain-ai/langchain-datastax/blob/main/libs/astradb/README.md#collection-defaults-mismatch>`_ for more details.
+        store constructor, to match the existing collection configuration. See
+        `here <https://github.com/langchain-ai/langchain-datastax/blob/main/libs/astradb/README.md#collection-defaults-mismatch>`_
+        for more details.
 
-        (Autodetect) Let the vector store figure out the configuration (including vectorize
-        and document encoding scheme on DB), by inspection of an existing collection:
+        (Autodetect) Let the vector store figure out the configuration (including
+        vectorize and document encoding scheme on DB), by inspection of an existing
+        collection:
 
         .. code-block:: python
 
@@ -522,7 +536,9 @@ class AstraDBVectorStore(VectorStore):
             from langchain_astradb import AstraDBVectorStore
 
             ASTRA_DB_API_ENDPOINT = getpass.getpass("ASTRA_DB_API_ENDPOINT = ")
-            ASTRA_DB_APPLICATION_TOKEN = getpass.getpass("ASTRA_DB_APPLICATION_TOKEN = ")
+            ASTRA_DB_APPLICATION_TOKEN = getpass.getpass(
+                "ASTRA_DB_APPLICATION_TOKEN = "
+            )
 
             vector_store = AstraDBVectorStore(
                 collection_name="astra_existing_collection",
@@ -575,7 +591,7 @@ class AstraDBVectorStore(VectorStore):
     Search:
         .. code-block:: python
 
-            results = vector_store.similarity_search(query="thud",k=1)
+            results = vector_store.similarity_search(query="thud", k=1)
             for doc in results:
                 print(f"* {doc.page_content} [{doc.metadata}]")
 
@@ -586,7 +602,9 @@ class AstraDBVectorStore(VectorStore):
     Search with filter:
         .. code-block:: python
 
-            results = vector_store.similarity_search(query="thud",k=1,filter={"bar": "baz"})
+            results = vector_store.similarity_search(
+                query="thud", k=1, filter={"bar": "baz"}
+            )
             for doc in results:
                 print(f"* {doc.page_content} [{doc.metadata}]")
 
@@ -597,7 +615,7 @@ class AstraDBVectorStore(VectorStore):
     Search with score:
         .. code-block:: python
 
-            results = vector_store.similarity_search_with_score(query="qux",k=1)
+            results = vector_store.similarity_search_with_score(query="qux", k=1)
             for doc, score in results:
                 print(f"* [SIM={score:3f}] {doc.page_content} [{doc.metadata}]")
 
@@ -615,11 +633,11 @@ class AstraDBVectorStore(VectorStore):
             await vector_store.adelete(ids=["3"])
 
             # search
-            results = vector_store.asimilarity_search(query="thud",k=1)
+            results = vector_store.asimilarity_search(query="thud", k=1)
 
             # search with score
-            results = await vector_store.asimilarity_search_with_score(query="qux",k=1)
-            for doc,score in results:
+            results = await vector_store.asimilarity_search_with_score(query="qux", k=1)
+            for doc, score in results:
                 print(f"* [SIM={score:3f}] {doc.page_content} [{doc.metadata}]")
 
         .. code-block:: none
@@ -639,7 +657,7 @@ class AstraDBVectorStore(VectorStore):
 
             [Document(metadata={'bar': 'baz'}, page_content='thud')]
 
-    """  # noqa: E501
+    """
 
     def filter_to_query(self, filter_dict: dict[str, Any] | None) -> dict[str, Any]:
         """Prepare a query for use on DB based on metadata filter.
