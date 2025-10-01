@@ -24,7 +24,7 @@ jobs:
           - "3.13"
     name: "make integration_tests #${{ matrix.python-version }}"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Set up Python ${{ matrix.python-version }} + uv
         uses: "./.github/actions/uv_setup"
