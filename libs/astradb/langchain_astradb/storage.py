@@ -260,13 +260,13 @@ class AstraDBStore(AstraDBBaseStore[Any]):
 
         Documents in the AstraDB collection will have the format
 
-        .. code-block:: json
-
-            {
-              "_id": "<key>",
-              "value": <value>
-            }
-
+        ```json
+        {
+            "_id": "<key>",
+            "value": <value>
+        }
+        ```
+            
         Args:
             collection_name: name of the Astra DB collection to create/use.
             token: API token for Astra DB usage, either in the form of a string
@@ -341,11 +341,12 @@ class AstraDBByteStore(AstraDBBaseStore[bytes], ByteStore):
         The bytes values are converted to base64 encoded strings
         Documents in the AstraDB collection will have the format
 
-        .. code-block:: json
-            {
-              "_id": "<key>",
-              "value": "<byte64 string value>"
-            }
+        ```json
+        {
+            "_id": "<key>",
+            "value": "<byte64 string value>"
+        }
+        ```
 
         Args:
             collection_name: name of the Astra DB collection to create/use.

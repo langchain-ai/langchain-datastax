@@ -404,9 +404,9 @@ class AstraDBVectorStore(VectorStore):
         new database and
         `create an application token <https://docs.datastax.com/en/astra-db-serverless/administration/manage-application-tokens.html>`_.
 
-        .. code-block:: bash
-
-            pip install -qU langchain-astradb
+        ```bash
+        pip install -qU langchain-astradb
+        ```
 
     Key init args — indexing params:
         collection_name: str
@@ -428,93 +428,93 @@ class AstraDBVectorStore(VectorStore):
         Create a vector store and provide a LangChain embedding object for working with
         it:
 
-        .. code-block:: python
+        ```python
+        import getpass
 
-            import getpass
+        from langchain_astradb import AstraDBVectorStore
+        from langchain_openai import OpenAIEmbeddings
 
-            from langchain_astradb import AstraDBVectorStore
-            from langchain_openai import OpenAIEmbeddings
+        ASTRA_DB_API_ENDPOINT = getpass.getpass("ASTRA_DB_API_ENDPOINT = ")
+        ASTRA_DB_APPLICATION_TOKEN = getpass.getpass(
+            "ASTRA_DB_APPLICATION_TOKEN = "
+        )
 
-            ASTRA_DB_API_ENDPOINT = getpass.getpass("ASTRA_DB_API_ENDPOINT = ")
-            ASTRA_DB_APPLICATION_TOKEN = getpass.getpass(
-                "ASTRA_DB_APPLICATION_TOKEN = "
-            )
-
-            vector_store = AstraDBVectorStore(
-                collection_name="astra_vector_langchain",
-                embedding=OpenAIEmbeddings(),
-                api_endpoint=ASTRA_DB_API_ENDPOINT,
-                token=ASTRA_DB_APPLICATION_TOKEN,
-            )
-
+        vector_store = AstraDBVectorStore(
+            collection_name="astra_vector_langchain",
+            embedding=OpenAIEmbeddings(),
+            api_endpoint=ASTRA_DB_API_ENDPOINT,
+            token=ASTRA_DB_APPLICATION_TOKEN,
+        )
+        ```
+        
         (Vectorize) Create a vector store where the embedding vector computation
         happens entirely on the server-side, using the
         `vectorize <https://docs.datastax.com/en/astra-db-serverless/databases/embedding-generation.html>`_
         feature:
 
-        .. code-block:: python
+        ```python
+        import getpass
+        from astrapy.info import VectorServiceOptions
 
-            import getpass
-            from astrapy.info import VectorServiceOptions
+        from langchain_astradb import AstraDBVectorStore
 
-            from langchain_astradb import AstraDBVectorStore
+        ASTRA_DB_API_ENDPOINT = getpass.getpass("ASTRA_DB_API_ENDPOINT = ")
+        ASTRA_DB_APPLICATION_TOKEN = getpass.getpass(
+            "ASTRA_DB_APPLICATION_TOKEN = "
+        )
 
-            ASTRA_DB_API_ENDPOINT = getpass.getpass("ASTRA_DB_API_ENDPOINT = ")
-            ASTRA_DB_APPLICATION_TOKEN = getpass.getpass(
-                "ASTRA_DB_APPLICATION_TOKEN = "
-            )
-
-            vector_store = AstraDBVectorStore(
-                collection_name="astra_vectorize_langchain",
-                api_endpoint=ASTRA_DB_API_ENDPOINT,
-                token=ASTRA_DB_APPLICATION_TOKEN,
-                collection_vector_service_options=VectorServiceOptions(
-                    provider="nvidia",
-                    model_name="NV-Embed-QA",
-                    # authentication=...,  # needed by some providers/models
-                ),
-            )
-
+        vector_store = AstraDBVectorStore(
+            collection_name="astra_vectorize_langchain",
+            api_endpoint=ASTRA_DB_API_ENDPOINT,
+            token=ASTRA_DB_APPLICATION_TOKEN,
+            collection_vector_service_options=VectorServiceOptions(
+                provider="nvidia",
+                model_name="NV-Embed-QA",
+                # authentication=...,  # needed by some providers/models
+            ),
+        )
+        ```
+        
         (Hybrid) The underlying Astra DB typically supports hybrid search
         (i.e. lexical + vector ANN) to boost the results' accuracy.
         This is provisioned and used automatically when available. For manual control,
         use the ``collection_rerank`` and ``collection_lexical`` constructor parameters:
 
-        .. code-block:: python
+        ```python
+        import getpass
+        from astrapy.info import (
+            CollectionLexicalOptions,
+            CollectionRerankOptions,
+            RerankServiceOptions,
+            VectorServiceOptions,
+        )
 
-            import getpass
-            from astrapy.info import (
-                CollectionLexicalOptions,
-                CollectionRerankOptions,
-                RerankServiceOptions,
-                VectorServiceOptions,
-            )
+        from langchain_astradb import AstraDBVectorStore
 
-            from langchain_astradb import AstraDBVectorStore
+        ASTRA_DB_API_ENDPOINT = getpass.getpass("ASTRA_DB_API_ENDPOINT = ")
+        ASTRA_DB_APPLICATION_TOKEN = getpass.getpass(
+            "ASTRA_DB_APPLICATION_TOKEN = "
+        )
 
-            ASTRA_DB_API_ENDPOINT = getpass.getpass("ASTRA_DB_API_ENDPOINT = ")
-            ASTRA_DB_APPLICATION_TOKEN = getpass.getpass(
-                "ASTRA_DB_APPLICATION_TOKEN = "
-            )
-
-            vector_store = AstraDBVectorStore(
-                collection_name="astra_vectorize_langchain",
-                # embedding=...,  # needed unless using 'vectorize'
-                api_endpoint=ASTRA_DB_API_ENDPOINT,
-                token=ASTRA_DB_APPLICATION_TOKEN,
-                collection_vector_service_options=VectorServiceOptions(
-                    ...
-                ),  # see above
-                collection_lexical=CollectionLexicalOptions(analyzer="standard"),
-                collection_rerank=CollectionRerankOptions(
-                    service=RerankServiceOptions(
-                        provider="nvidia",
-                        model_name="nvidia/llama-3.2-nv-rerankqa-1b-v2",
-                    ),
+        vector_store = AstraDBVectorStore(
+            collection_name="astra_vectorize_langchain",
+            # embedding=...,  # needed unless using 'vectorize'
+            api_endpoint=ASTRA_DB_API_ENDPOINT,
+            token=ASTRA_DB_APPLICATION_TOKEN,
+            collection_vector_service_options=VectorServiceOptions(
+                ...
+            ),  # see above
+            collection_lexical=CollectionLexicalOptions(analyzer="standard"),
+            collection_rerank=CollectionRerankOptions(
+                service=RerankServiceOptions(
+                    provider="nvidia",
+                    model_name="nvidia/llama-3.2-nv-rerankqa-1b-v2",
                 ),
-                collection_reranking_api_key=...,  # if needed by the model/setup
-            )
-
+            ),
+            collection_reranking_api_key=...,  # if needed by the model/setup
+        )
+        ```
+        
         Hybrid-related server upgrades may introduce a mismatch between the store
         defaults and a pre-existing collection: in case one such mismatch is
         reported (as a Data API "EXISTING_COLLECTION_DIFFERENT_SETTINGS" error),
@@ -529,133 +529,140 @@ class AstraDBVectorStore(VectorStore):
         vectorize and document encoding scheme on DB), by inspection of an existing
         collection:
 
-        .. code-block:: python
+        ```python
+        import getpass
 
-            import getpass
+        from langchain_astradb import AstraDBVectorStore
 
-            from langchain_astradb import AstraDBVectorStore
+        ASTRA_DB_API_ENDPOINT = getpass.getpass("ASTRA_DB_API_ENDPOINT = ")
+        ASTRA_DB_APPLICATION_TOKEN = getpass.getpass(
+            "ASTRA_DB_APPLICATION_TOKEN = "
+        )
 
-            ASTRA_DB_API_ENDPOINT = getpass.getpass("ASTRA_DB_API_ENDPOINT = ")
-            ASTRA_DB_APPLICATION_TOKEN = getpass.getpass(
-                "ASTRA_DB_APPLICATION_TOKEN = "
-            )
-
-            vector_store = AstraDBVectorStore(
-                collection_name="astra_existing_collection",
-                # embedding=...,  # needed unless using 'vectorize'
-                api_endpoint=ASTRA_DB_API_ENDPOINT,
-                token=ASTRA_DB_APPLICATION_TOKEN,
-                autodetect_collection=True,
-            )
+        vector_store = AstraDBVectorStore(
+            collection_name="astra_existing_collection",
+            # embedding=...,  # needed unless using 'vectorize'
+            api_endpoint=ASTRA_DB_API_ENDPOINT,
+            token=ASTRA_DB_APPLICATION_TOKEN,
+            autodetect_collection=True,
+        )
+        ```
 
         (Non-Astra DB) This class can also target a non-Astra DB database, such as a
         self-deployed HCD, through the Data API:
 
-        .. code-block:: python
+        ```python
+        import getpass
 
-            import getpass
+        from astrapy.authentication import UsernamePasswordTokenProvider
 
-            from astrapy.authentication import UsernamePasswordTokenProvider
+        from langchain_astradb import AstraDBVectorStore
 
-            from langchain_astradb import AstraDBVectorStore
-
-            vector_store = AstraDBVectorStore(
-                collection_name="astra_existing_collection",
-                # embedding=...,  # needed unless using 'vectorize'
-                api_endpoint="http://localhost:8181",
-                token=UsernamePasswordTokenProvider(
-                    username="user",
-                    password="pwd",
-                ),
-                collection_vector_service_options=...,  # if 'vectorize'
-            )
+        vector_store = AstraDBVectorStore(
+            collection_name="astra_existing_collection",
+            # embedding=...,  # needed unless using 'vectorize'
+            api_endpoint="http://localhost:8181",
+            token=UsernamePasswordTokenProvider(
+                username="user",
+                password="pwd",
+            ),
+            collection_vector_service_options=...,  # if 'vectorize'
+        )
+        ```
 
     Add Documents:
-        .. code-block:: python
 
-            from langchain_core.documents import Document
+        ```python
+        from langchain_core.documents import Document
 
-            document_1 = Document(page_content="foo", metadata={"baz": "bar"})
-            document_2 = Document(page_content="thud", metadata={"bar": "baz"})
-            document_3 = Document(page_content="i will be deleted :(")
+        document_1 = Document(page_content="foo", metadata={"baz": "bar"})
+        document_2 = Document(page_content="thud", metadata={"bar": "baz"})
+        document_3 = Document(page_content="i will be deleted :(")
 
-            documents = [document_1, document_2, document_3]
-            ids = ["1", "2", "3"]
-            vector_store.add_documents(documents=documents, ids=ids)
-
+        documents = [document_1, document_2, document_3]
+        ids = ["1", "2", "3"]
+        vector_store.add_documents(documents=documents, ids=ids)
+        ```
+        
     Delete Documents:
-        .. code-block:: python
 
-            vector_store.delete(ids=["3"])
-
+        ```python
+        vector_store.delete(ids=["3"])
+        ```
+            
     Search:
-        .. code-block:: python
 
-            results = vector_store.similarity_search(query="thud", k=1)
-            for doc in results:
-                print(f"* {doc.page_content} [{doc.metadata}]")
-
-        .. code-block:: none
-
-            thud [{'bar': 'baz'}]
-
+        ```python
+        results = vector_store.similarity_search(query="thud", k=1)
+        for doc in results:
+            print(f"* {doc.page_content} [{doc.metadata}]")
+        ```
+            
+        ```
+        thud [{'bar': 'baz'}]
+        ```
+        
     Search with filter:
-        .. code-block:: python
 
-            results = vector_store.similarity_search(
-                query="thud", k=1, filter={"bar": "baz"}
-            )
-            for doc in results:
-                print(f"* {doc.page_content} [{doc.metadata}]")
-
-        .. code-block:: none
-
-            thud [{'bar': 'baz'}]
-
+        ```python
+        results = vector_store.similarity_search(
+            query="thud", k=1, filter={"bar": "baz"}
+        )
+        for doc in results:
+            print(f"* {doc.page_content} [{doc.metadata}]")
+        ```
+            
+        ```
+        thud [{'bar': 'baz'}]
+        ```
+        
     Search with score:
-        .. code-block:: python
 
-            results = vector_store.similarity_search_with_score(query="qux", k=1)
-            for doc, score in results:
-                print(f"* [SIM={score:3f}] {doc.page_content} [{doc.metadata}]")
+        ```python
+        results = vector_store.similarity_search_with_score(query="qux", k=1)
+        for doc, score in results:
+            print(f"* [SIM={score:3f}] {doc.page_content} [{doc.metadata}]")
+        ```
 
-        .. code-block:: none
-
-            [SIM=0.916135] foo [{'baz': 'bar'}]
-
+        ```
+        [SIM=0.916135] foo [{'baz': 'bar'}]
+        ```
+        
     Async:
-        .. code-block:: python
 
-            # add documents
-            await vector_store.aadd_documents(documents=documents, ids=ids)
+        ```python
+        # add documents
+        await vector_store.aadd_documents(documents=documents, ids=ids)
 
-            # delete documents
-            await vector_store.adelete(ids=["3"])
+        # delete documents
+        await vector_store.adelete(ids=["3"])
 
-            # search
-            results = vector_store.asimilarity_search(query="thud", k=1)
+        # search
+        results = vector_store.asimilarity_search(query="thud", k=1)
 
-            # search with score
-            results = await vector_store.asimilarity_search_with_score(query="qux", k=1)
-            for doc, score in results:
-                print(f"* [SIM={score:3f}] {doc.page_content} [{doc.metadata}]")
-
-        .. code-block:: none
-
-            [SIM=0.916135] foo [{'baz': 'bar'}]
-
+        # search with score
+        results = await vector_store.asimilarity_search_with_score(query="qux", k=1)
+        for doc, score in results:
+            print(f"* [SIM={score:3f}] {doc.page_content} [{doc.metadata}]")
+        ```
+            
+        ```
+        [SIM=0.916135] foo [{'baz': 'bar'}]
+        ```
+        
     Use as Retriever:
-        .. code-block:: python
 
-            retriever = vector_store.as_retriever(
-                search_type="similarity_score_threshold",
-                search_kwargs={"k": 1, "score_threshold": 0.5},
-            )
-            retriever.invoke("thud")
-
-        .. code-block:: none
-
-            [Document(metadata={'bar': 'baz'}, page_content='thud')]
+        ```python
+        retriever = vector_store.as_retriever(
+            search_type="similarity_score_threshold",
+            search_kwargs={"k": 1, "score_threshold": 0.5},
+        )
+        retriever.invoke("thud")
+        ```
+            
+        ```
+        [Document(metadata={'bar': 'baz'}, page_content='thud')]
+        ```
 
     """
 
