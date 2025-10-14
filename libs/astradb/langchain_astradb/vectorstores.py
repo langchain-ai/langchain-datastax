@@ -589,7 +589,7 @@ class AstraDBVectorStore(VectorStore):
         ```python
         vector_store.delete(ids=["3"])
         ```
-    
+
     Search:
 
         ```python
@@ -597,7 +597,7 @@ class AstraDBVectorStore(VectorStore):
         for doc in results:
             print(f"* {doc.page_content} [{doc.metadata}]")
         ```
-    
+
         ```
         thud [{'bar': 'baz'}]
         ```
@@ -611,7 +611,7 @@ class AstraDBVectorStore(VectorStore):
         for doc in results:
             print(f"* {doc.page_content} [{doc.metadata}]")
         ```
-    
+
         ```
         thud [{'bar': 'baz'}]
         ```
@@ -645,7 +645,7 @@ class AstraDBVectorStore(VectorStore):
         for doc, score in results:
             print(f"* [SIM={score:3f}] {doc.page_content} [{doc.metadata}]")
         ```
-    
+
         ```
         [SIM=0.916135] foo [{'baz': 'bar'}]
         ```
@@ -659,7 +659,7 @@ class AstraDBVectorStore(VectorStore):
         )
         retriever.invoke("thud")
         ```
-    
+
         ```
         [Document(metadata={'bar': 'baz'}, page_content='thud')]
         ```
