@@ -1196,7 +1196,7 @@ class AstraDBVectorStore(VectorStore):
         The method allows changing only the parameters that ensure the copy is
         functional and does not trigger side-effects:
         for example, one cannot create a copy acting on a new collection.
-        In those cases, one should create a new instance of ``AstraDBVectorStore``
+        In those cases, one should create a new instance of `AstraDBVectorStore`
         from scratch.
 
         Args:
@@ -3873,12 +3873,12 @@ class AstraDBVectorStore(VectorStore):
             ids: ids to associate to the texts.
             **kwargs: you can pass any argument that you would
                 to :meth:`~add_texts` and/or to the
-                ``AstraDBVectorStore`` constructor (see these methods for
+                `AstraDBVectorStore` constructor (see these methods for
                 details). These arguments will be
                 routed to the respective methods as they are.
 
         Returns:
-            an ``AstraDBVectorStore`` vectorstore.
+            an `AstraDBVectorStore` vectorstore.
         """
         add_texts_inspection = inspect.getfullargspec(AstraDBVectorStore.add_texts)
         method_args = (
@@ -3916,12 +3916,12 @@ class AstraDBVectorStore(VectorStore):
             metadatas: metadata dicts for the texts.
             ids: ids to associate to the texts.
             **kwargs: you can pass any argument that you would
-                to :meth:`~aadd_texts` and/or to the ``AstraDBVectorStore``
+                to :meth:`~aadd_texts` and/or to the `AstraDBVectorStore`
                 constructor (see these methods for details). These arguments
                 will be routed to the respective methods as they are.
 
         Returns:
-            an ``AstraDBVectorStore`` vectorstore.
+            an `AstraDBVectorStore` vectorstore.
         """
         aadd_texts_inspection = inspect.getfullargspec(AstraDBVectorStore.aadd_texts)
         method_args = (
@@ -3955,17 +3955,16 @@ class AstraDBVectorStore(VectorStore):
         Utility method that defers to :meth:`from_texts` (see that one).
 
         Args:
-            texts: the texts to insert.
             documents: a list of `Document` objects for insertion in the store.
             embedding: the embedding function to use in the store.
             **kwargs: you can pass any argument that you would
                 to :meth:`~add_texts` and/or to the
-                ``AstraDBVectorStore`` constructor (see these methods for
+                `AstraDBVectorStore` constructor (see these methods for
                 details). These arguments will be
                 routed to the respective methods as they are.
 
         Returns:
-            an ``AstraDBVectorStore`` vectorstore.
+            an `AstraDBVectorStore` vectorstore.
         """
         texts = [d.page_content for d in documents]
         metadatas = [d.metadata for d in documents]
@@ -4004,11 +4003,17 @@ class AstraDBVectorStore(VectorStore):
 
         Utility method that defers to :meth:`afrom_texts` (see that one).
 
-        Args: see :meth:`afrom_texts`, except here you have to supply ``documents``
-            in place of ``texts`` and ``metadatas``.
+        Args:
+            documents: a list of `Document` objects for insertion in the store.
+            embedding: the embedding function to use in the store.
+            **kwargs: you can pass any argument that you would
+                to :meth:`~aadd_texts` and/or to the
+                `AstraDBVectorStore` constructor (see these methods for
+                details). These arguments will be
+                routed to the respective methods as they are.
 
         Returns:
-            an ``AstraDBVectorStore`` vectorstore.
+            an `AstraDBVectorStore` vectorstore.
         """
         texts = [d.page_content for d in documents]
         metadatas = [d.metadata for d in documents]
