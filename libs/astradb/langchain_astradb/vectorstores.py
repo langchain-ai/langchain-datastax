@@ -446,7 +446,7 @@ class AstraDBVectorStore(VectorStore):
             token=ASTRA_DB_APPLICATION_TOKEN,
         )
         ```
-        
+
         (Vectorize) Create a vector store where the embedding vector computation
         happens entirely on the server-side, using the
         `vectorize <https://docs.datastax.com/en/astra-db-serverless/databases/embedding-generation.html>`_
@@ -474,7 +474,7 @@ class AstraDBVectorStore(VectorStore):
             ),
         )
         ```
-        
+
         (Hybrid) The underlying Astra DB typically supports hybrid search
         (i.e. lexical + vector ANN) to boost the results' accuracy.
         This is provisioned and used automatically when available. For manual control,
@@ -514,7 +514,7 @@ class AstraDBVectorStore(VectorStore):
             collection_reranking_api_key=...,  # if needed by the model/setup
         )
         ```
-        
+
         Hybrid-related server upgrades may introduce a mismatch between the store
         defaults and a pre-existing collection: in case one such mismatch is
         reported (as a Data API "EXISTING_COLLECTION_DIFFERENT_SETTINGS" error),
@@ -583,13 +583,13 @@ class AstraDBVectorStore(VectorStore):
         ids = ["1", "2", "3"]
         vector_store.add_documents(documents=documents, ids=ids)
         ```
-        
+
     Delete Documents:
 
         ```python
         vector_store.delete(ids=["3"])
         ```
-            
+    
     Search:
 
         ```python
@@ -597,11 +597,11 @@ class AstraDBVectorStore(VectorStore):
         for doc in results:
             print(f"* {doc.page_content} [{doc.metadata}]")
         ```
-            
+    
         ```
         thud [{'bar': 'baz'}]
         ```
-        
+
     Search with filter:
 
         ```python
@@ -611,11 +611,11 @@ class AstraDBVectorStore(VectorStore):
         for doc in results:
             print(f"* {doc.page_content} [{doc.metadata}]")
         ```
-            
+    
         ```
         thud [{'bar': 'baz'}]
         ```
-        
+
     Search with score:
 
         ```python
@@ -627,7 +627,7 @@ class AstraDBVectorStore(VectorStore):
         ```
         [SIM=0.916135] foo [{'baz': 'bar'}]
         ```
-        
+
     Async:
 
         ```python
@@ -645,11 +645,11 @@ class AstraDBVectorStore(VectorStore):
         for doc, score in results:
             print(f"* [SIM={score:3f}] {doc.page_content} [{doc.metadata}]")
         ```
-            
+    
         ```
         [SIM=0.916135] foo [{'baz': 'bar'}]
         ```
-        
+
     Use as Retriever:
 
         ```python
@@ -659,7 +659,7 @@ class AstraDBVectorStore(VectorStore):
         )
         retriever.invoke("thud")
         ```
-            
+    
         ```
         [Document(metadata={'bar': 'baz'}, page_content='thud')]
         ```

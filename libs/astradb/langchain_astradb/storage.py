@@ -266,7 +266,7 @@ class AstraDBStore(AstraDBBaseStore[Any]):
             "value": <value>
         }
         ```
-            
+
         Args:
             collection_name: name of the Astra DB collection to create/use.
             token: API token for Astra DB usage, either in the form of a string
