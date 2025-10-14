@@ -47,10 +47,10 @@ def _dumps_generations(generations: RETURN_VAL_TYPE) -> str:
     """Serialization for generic RETURN_VAL_TYPE, i.e. sequence of `Generation`.
 
     Args:
-        generations (RETURN_VAL_TYPE): A list of language model generations.
+        generations: A list of language model generations.
 
     Returns:
-        str: a single string representing a list of generations.
+        a single string representing a list of generations.
 
     This function (+ its counterpart `_loads_generations`) rely on
     the dumps/loads pair with Reviver, so are able to deal
@@ -71,14 +71,14 @@ def _loads_generations(generations_str: str) -> RETURN_VAL_TYPE | None:
     See `_dumps_generations`, the inverse of this function.
 
     Args:
-        generations_str (str): A string representing a list of generations.
+        generations_str: A string representing a list of generations.
 
     Compatible with the legacy cache-blob format
     Does not raise exceptions for malformed entries, just logs a warning
     and returns none: the caller should be prepared for such a cache miss.
 
     Returns:
-        RETURN_VAL_TYPE: A list of generations.
+        A list of generations.
     """
     try:
         return [loads(_item_str) for _item_str in json.loads(generations_str)]
