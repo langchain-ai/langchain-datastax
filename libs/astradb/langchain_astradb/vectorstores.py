@@ -585,11 +585,11 @@ class AstraDBVectorStore(VectorStore):
         ```python
         results = vector_store.similarity_search(query="thud", k=1)
         for doc in results:
-            print(f"* {doc.page_content} [{doc.metadata}]")
+            print(f"{doc.page_content}[{doc.metadata}]")
         ```
 
         ```
-        * thud [{"bar": "baz"}]
+        thud[{"bar": "baz"}]
         ```
 
     Search with filter:
@@ -599,11 +599,11 @@ class AstraDBVectorStore(VectorStore):
             query="thud", k=1, filter={"bar": "baz"}
         )
         for doc in results:
-            print(f"* {doc.page_content} [{doc.metadata}]")
+            print(f"{doc.page_content}[{doc.metadata}]")
         ```
 
         ```
-        * thud [{"bar": "baz"}]
+        thud[{"bar": "baz"}]
         ```
 
     Search with score:
@@ -3956,8 +3956,7 @@ class AstraDBVectorStore(VectorStore):
         """Create an Astra DB vectorstore from a document list.
 
         Utility method that defers to
-        [from_texts](langchain_astradb.AstraDBVectorStore.from_texts)
-        (see).
+        [from_texts](langchain_astradb.AstraDBVectorStore.from_texts).
 
         Args:
             documents: a list of `Document` objects for insertion in the store.
@@ -4007,8 +4006,7 @@ class AstraDBVectorStore(VectorStore):
         """Create an Astra DB vectorstore from a document list.
 
         Utility method that defers to
-        [afrom_texts](langchain_astradb.AstraDBVectorStore.afrom_texts)
-        (see).
+        [afrom_texts](langchain_astradb.AstraDBVectorStore.afrom_texts).
 
         Args:
             documents: a list of `Document` objects for insertion in the store.
