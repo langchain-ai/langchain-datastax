@@ -110,7 +110,7 @@ class AstraDBQueryResult(NamedTuple):
     a query, which goes beyond just the corresponding Document.
 
     Attributes:
-        document: a ``langchain_core.documents.Document`` object representing the query
+        document: a `langchain_core.documents.Document` object representing the query
             result.
         id: the ID of the returned document.
         embedding: the embedding vector associated to the document. This may be None,
@@ -399,10 +399,10 @@ class AstraDBVectorStore(VectorStore):
     """A vector store which uses DataStax Astra DB as backend.
 
     Setup:
-        Install the ``langchain-astradb`` package and head to the
-        `AstraDB website <https://astra.datastax.com>`_, create an account, create a
+        Install the `langchain-astradb` package and head to the
+        [AstraDB website](https://astra.datastax.com), create an account, create a
         new database and
-        `create an application token <https://docs.datastax.com/en/astra-db-serverless/administration/manage-application-tokens.html>`_.
+        [create an application token](https://docs.datastax.com/en/astra-db-serverless/administration/manage-application-tokens.html).
 
         ```bash
         pip install -qU langchain-astradb
@@ -435,9 +435,7 @@ class AstraDBVectorStore(VectorStore):
         from langchain_openai import OpenAIEmbeddings
 
         ASTRA_DB_API_ENDPOINT = getpass.getpass("ASTRA_DB_API_ENDPOINT = ")
-        ASTRA_DB_APPLICATION_TOKEN = getpass.getpass(
-            "ASTRA_DB_APPLICATION_TOKEN = "
-        )
+        ASTRA_DB_APPLICATION_TOKEN = getpass.getpass("ASTRA_DB_APPLICATION_TOKEN = ")
 
         vector_store = AstraDBVectorStore(
             collection_name="astra_vector_langchain",
@@ -449,7 +447,7 @@ class AstraDBVectorStore(VectorStore):
 
         (Vectorize) Create a vector store where the embedding vector computation
         happens entirely on the server-side, using the
-        `vectorize <https://docs.datastax.com/en/astra-db-serverless/databases/embedding-generation.html>`_
+        [vectorize](https://docs.datastax.com/en/astra-db-serverless/databases/embedding-generation.html)
         feature:
 
         ```python
@@ -459,9 +457,7 @@ class AstraDBVectorStore(VectorStore):
         from langchain_astradb import AstraDBVectorStore
 
         ASTRA_DB_API_ENDPOINT = getpass.getpass("ASTRA_DB_API_ENDPOINT = ")
-        ASTRA_DB_APPLICATION_TOKEN = getpass.getpass(
-            "ASTRA_DB_APPLICATION_TOKEN = "
-        )
+        ASTRA_DB_APPLICATION_TOKEN = getpass.getpass("ASTRA_DB_APPLICATION_TOKEN = ")
 
         vector_store = AstraDBVectorStore(
             collection_name="astra_vectorize_langchain",
@@ -478,7 +474,7 @@ class AstraDBVectorStore(VectorStore):
         (Hybrid) The underlying Astra DB typically supports hybrid search
         (i.e. lexical + vector ANN) to boost the results' accuracy.
         This is provisioned and used automatically when available. For manual control,
-        use the ``collection_rerank`` and ``collection_lexical`` constructor parameters:
+        use the `collection_rerank` and `collection_lexical` constructor parameters:
 
         ```python
         import getpass
@@ -492,18 +488,14 @@ class AstraDBVectorStore(VectorStore):
         from langchain_astradb import AstraDBVectorStore
 
         ASTRA_DB_API_ENDPOINT = getpass.getpass("ASTRA_DB_API_ENDPOINT = ")
-        ASTRA_DB_APPLICATION_TOKEN = getpass.getpass(
-            "ASTRA_DB_APPLICATION_TOKEN = "
-        )
+        ASTRA_DB_APPLICATION_TOKEN = getpass.getpass("ASTRA_DB_APPLICATION_TOKEN = ")
 
         vector_store = AstraDBVectorStore(
             collection_name="astra_vectorize_langchain",
             # embedding=...,  # needed unless using 'vectorize'
             api_endpoint=ASTRA_DB_API_ENDPOINT,
             token=ASTRA_DB_APPLICATION_TOKEN,
-            collection_vector_service_options=VectorServiceOptions(
-                ...
-            ),  # see above
+            collection_vector_service_options=VectorServiceOptions(...),  # see above
             collection_lexical=CollectionLexicalOptions(analyzer="standard"),
             collection_rerank=CollectionRerankOptions(
                 service=RerankServiceOptions(
@@ -519,10 +511,10 @@ class AstraDBVectorStore(VectorStore):
         defaults and a pre-existing collection: in case one such mismatch is
         reported (as a Data API "EXISTING_COLLECTION_DIFFERENT_SETTINGS" error),
         the options to resolve are:
-        (1) use autodetect mode, (2) switch to ``setup_mode`` "OFF", or
+        (1) use autodetect mode, (2) switch to `setup_mode` "OFF", or
         (3) explicitly specify lexical and/or rerank settings in the vector
         store constructor, to match the existing collection configuration. See
-        `here <https://github.com/langchain-ai/langchain-datastax/blob/main/libs/astradb/README.md#collection-defaults-mismatch>`_
+        [here](https://github.com/langchain-ai/langchain-datastax/blob/main/libs/astradb/README.md#collection-defaults-mismatch)
         for more details.
 
         (Autodetect) Let the vector store figure out the configuration (including
@@ -535,9 +527,7 @@ class AstraDBVectorStore(VectorStore):
         from langchain_astradb import AstraDBVectorStore
 
         ASTRA_DB_API_ENDPOINT = getpass.getpass("ASTRA_DB_API_ENDPOINT = ")
-        ASTRA_DB_APPLICATION_TOKEN = getpass.getpass(
-            "ASTRA_DB_APPLICATION_TOKEN = "
-        )
+        ASTRA_DB_APPLICATION_TOKEN = getpass.getpass("ASTRA_DB_APPLICATION_TOKEN = ")
 
         vector_store = AstraDBVectorStore(
             collection_name="astra_existing_collection",
@@ -599,7 +589,7 @@ class AstraDBVectorStore(VectorStore):
         ```
 
         ```
-        thud [{'bar': 'baz'}]
+        thud[{"bar": "baz"}]
         ```
 
     Search with filter:
@@ -613,7 +603,7 @@ class AstraDBVectorStore(VectorStore):
         ```
 
         ```
-        thud [{'bar': 'baz'}]
+        thud[{"bar": "baz"}]
         ```
 
     Search with score:
@@ -661,7 +651,7 @@ class AstraDBVectorStore(VectorStore):
         ```
 
         ```
-        [Document(metadata={'bar': 'baz'}, page_content='thud')]
+        [Document(metadata={"bar": "baz"}, page_content="thud")]
         ```
 
     """
@@ -777,19 +767,19 @@ class AstraDBVectorStore(VectorStore):
         Args:
             embedding: the embeddings function or service to use.
                 This enables client-side embedding functions or calls to external
-                embedding providers. If ``embedding`` is passed, then
-                ``collection_vector_service_options`` can not be provided.
+                embedding providers. If `embedding` is passed, then
+                `collection_vector_service_options` can not be provided.
             collection_name: name of the Astra DB collection to create/use.
             token: API token for Astra DB usage, either in the form of a string
-                or a subclass of ``astrapy.authentication.TokenProvider``.
+                or a subclass of `astrapy.authentication.TokenProvider`.
                 If not provided, the environment variable
                 ASTRA_DB_APPLICATION_TOKEN is inspected.
             api_endpoint: full URL to the API endpoint, such as
-                ``https://<DB-ID>-us-east1.apps.astra.datastax.com``. If not provided,
+                `https://<DB-ID>-us-east1.apps.astra.datastax.com`. If not provided,
                 the environment variable ASTRA_DB_API_ENDPOINT is inspected.
             environment: a string specifying the environment of the target Data API.
                 If omitted, defaults to "prod" (Astra DB production).
-                Other values are in ``astrapy.constants.Environment`` enum class.
+                Other values are in `astrapy.constants.Environment` enum class.
             namespace: namespace (aka keyspace) where the collection is created.
                 If not provided, the environment variable ASTRA_DB_KEYSPACE is
                 inspected. Defaults to the database's "default namespace".
@@ -816,15 +806,15 @@ class AstraDBVectorStore(VectorStore):
             collection_indexing_policy: a full "indexing" specification for
                 what fields should be indexed for later filtering in searches.
                 This dict must conform to to the API specifications
-                (see https://docs.datastax.com/en/astra-db-serverless/api-reference/collections.html#the-indexing-option)
+                (see https://docs.datastax.com/en/astra-db-serverless/api-reference/collection-indexes.html)
             collection_vector_service_options: specifies the use of server-side
-                embeddings within Astra DB. If passing this parameter, ``embedding``
+                embeddings within Astra DB. If passing this parameter, `embedding`
                 cannot be provided.
             collection_embedding_api_key: for usage of server-side embeddings
                 within Astra DB. With this parameter one can supply an API Key
                 that will be passed to Astra DB with each data request.
                 This parameter can be either a string or a subclass of
-                ``astrapy.authentication.EmbeddingHeadersProvider``.
+                `astrapy.authentication.EmbeddingHeadersProvider`.
                 This is useful when the service is configured for the collection,
                 but no corresponding secret is stored within
                 Astra's key management system.
@@ -837,32 +827,32 @@ class AstraDBVectorStore(VectorStore):
                 guessed by inspection of a few documents from the collection, under the
                 assumption that the longer strings are the most likely candidates.
                 Please understand the limitations of this method and get some
-                understanding of your data before passing ``"*"`` for this parameter.
+                understanding of your data before passing `"*"` for this parameter.
             ignore_invalid_documents: if False (default), exceptions are raised
                 when a document is found on the Astra DB collection that does
                 not have the expected shape. If set to True, such results
                 from the database are ignored and a warning is issued. Note
                 that in this case a similarity search may end up returning fewer
-                results than the required ``k``.
+                results than the required `k`.
             autodetect_collection: if True, turns on autodetect behavior.
                 The store will look for an existing collection of the provided name
                 and infer the store settings from it. Default is False.
-                In autodetect mode, ``content_field`` can be given as ``"*"``, meaning
+                In autodetect mode, `content_field` can be given as `"*"`, meaning
                 that an attempt will be made to determine it by inspection (unless
-                vectorize is enabled, in which case ``content_field`` is ignored).
+                vectorize is enabled, in which case `content_field` is ignored).
                 In autodetect mode, the store not only determines whether embeddings
                 are client- or server-side, but - most importantly - switches
                 automatically between "nested" and "flat" representations of documents
                 on DB (i.e. having the metadata key-value pairs grouped in a
-                ``metadata`` field or spread at the documents' top-level). The former
+                `metadata` field or spread at the documents' top-level). The former
                 scheme is the native mode of the AstraDBVectorStore; the store resorts
                 to the latter in case of vector collections populated with external
                 means (such as a third-party data import tool) before applying
                 an AstraDBVectorStore to them.
                 Note that the following parameters cannot be used if this is True:
-                ``metric``, ``setup_mode``, ``metadata_indexing_include``,
-                ``metadata_indexing_exclude``, ``collection_indexing_policy``,
-                ``collection_vector_service_options``.
+                `metric`, `setup_mode`, `metadata_indexing_include`,
+                `metadata_indexing_exclude`, `collection_indexing_policy`,
+                `collection_vector_service_options`.
             ext_callers: one or more caller identities to identify Data API calls
                 in the User-Agent header. This is a list of (name, version) pairs,
                 or just strings if no version info is provided, which, if supplied,
@@ -872,8 +862,8 @@ class AstraDBVectorStore(VectorStore):
                 stack of usage info passed as the User-Agent string to the Data API.
                 Defaults to "langchain_vectorstore", but can be overridden if this
                 component actually serves as the building block for another component
-                (such as when the vector store is used within a ``GraphRetriever``).
-            api_options: an instance of ``astrapy.utils.api_options.APIOptions`` that
+                (such as when the vector store is used within a `GraphRetriever`).
+            api_options: an instance of `astrapy.utils.api_options.APIOptions` that
                 can be supplied to customize the interaction with the Data API
                 regarding serialization/deserialization, timeouts, custom headers
                 and so on. The provided options are applied on top of settings already
@@ -883,12 +873,12 @@ class AstraDBVectorStore(VectorStore):
             collection_rerank: providing reranking settings is necessary to run
                 hybrid searches for similarity. This parameter can be an instance
                 of the astrapy classes `CollectionRerankOptions` or
-                ``RerankServiceOptions``.
+                `RerankServiceOptions`.
             collection_reranking_api_key: for usage of server-side reranking services
                 within Astra DB. With this parameter one can supply an API Key
                 that will be passed to Astra DB with each data request.
                 This parameter can be either a string or a subclass of
-                ``astrapy.authentication.RerankingHeadersProvider``.
+                `astrapy.authentication.RerankingHeadersProvider`.
                 This is useful when the service is configured for the collection,
                 but no corresponding secret is stored within
                 Astra's key management system.
@@ -1208,9 +1198,9 @@ class AstraDBVectorStore(VectorStore):
 
         Args:
             token: API token for Astra DB usage, either in the form of a string
-                or a subclass of ``astrapy.authentication.TokenProvider``.
+                or a subclass of `astrapy.authentication.TokenProvider`.
                 In order to suppress token usage in the copy, explicitly pass
-                ``astrapy.authentication.StaticTokenProvider(None)``.
+                `astrapy.authentication.StaticTokenProvider(None)`.
             ext_callers: additional custom (caller_name, caller_version) pairs
                 to attach to the User-Agent header when issuing Data API requests.
             component_name: a value for the LangChain component name to use when
@@ -1219,12 +1209,12 @@ class AstraDBVectorStore(VectorStore):
                 request if necessary. This is necessary if using the Vectorize
                 feature and no secret is stored with the database.
                 In order to suppress the API Key in the copy, explicitly pass
-                ``astrapy.authentication.EmbeddingAPIKeyHeaderProvider(None)``.
+                `astrapy.authentication.EmbeddingAPIKeyHeaderProvider(None)`.
             collection_reranking_api_key: for usage of server-side reranking services
                 within Astra DB. With this parameter one can supply an API Key
                 that will be passed to Astra DB with each data request.
                 This parameter can be either a string or a subclass of
-                ``astrapy.authentication.RerankingHeadersProvider``.
+                `astrapy.authentication.RerankingHeadersProvider`.
                 This is useful when the service is configured for the collection,
                 but no corresponding secret is stored within
                 Astra's key management system.
@@ -1563,7 +1553,7 @@ class AstraDBVectorStore(VectorStore):
             The allowed field names for the metadata document attributes must
             obey certain rules (such as: keys cannot start with a dollar sign
             and cannot be empty).
-            See `Naming Conventions <https://docs.datastax.com/en/astra-db-serverless/api-reference/dataapiclient.html#naming-conventions>`_
+            See [Naming Conventions](https://docs.datastax.com/en/astra-db-serverless/api-reference/dataapiclient.html#naming-conventions)
             for details.
 
         Returns:
@@ -1707,7 +1697,7 @@ class AstraDBVectorStore(VectorStore):
             The allowed field names for the metadata document attributes must
             obey certain rules (such as: keys cannot start with a dollar sign
             and cannot be empty).
-            See `Naming Conventions <https://docs.datastax.com/en/astra-db-serverless/api-reference/dataapiclient.html#naming-conventions>`_
+            See [Naming Conventions](https://docs.datastax.com/en/astra-db-serverless/api-reference/dataapiclient.html#naming-conventions)
             for details.
 
         Returns:

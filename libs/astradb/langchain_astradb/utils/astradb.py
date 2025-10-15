@@ -484,13 +484,13 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
         functional and does not trigger side-effects:
         for example, one cannot create a copy acting on a new collection.
         In those cases, one should create a new instance
-        of ``_AstraDBCollectionEnvironment`` from scratch.
+        of `_AstraDBCollectionEnvironment` from scratch.
 
         Attributes:
             token: API token for Astra DB usage, either in the form of a string
-                or a subclass of ``astrapy.authentication.TokenProvider``.
+                or a subclass of `astrapy.authentication.TokenProvider`.
                 In order to suppress token usage in the copy, explicitly pass
-                ``astrapy.authentication.StaticTokenProvider(None)``.
+                `astrapy.authentication.StaticTokenProvider(None)`.
             ext_callers: additional custom (caller_name, caller_version) pairs
                 to attach to the User-Agent header when issuing Data API requests.
             component_name: a value for the LangChain component name to use when
@@ -499,12 +499,12 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
                 request if necessary. This is necessary if using the Vectorize
                 feature and a required secret is not stored with the database.
                 In order to suppress the API Key in the copy, explicitly pass
-                ``astrapy.authentication.EmbeddingAPIKeyHeaderProvider(None)``.
+                `astrapy.authentication.EmbeddingAPIKeyHeaderProvider(None)`.
             collection_reranking_api_key: the API Key to supply in each Data API
                 request if necessary. This is necessary if using the Rerank
                 feature and a required secret is not stored with the database.
                 In order to suppress the API Key in the copy, explicitly pass
-                ``astrapy.authentication.RerankingAPIKeyHeaderProvider(None)``.
+                `astrapy.authentication.RerankingAPIKeyHeaderProvider(None)`.
 
         Returns:
             A shallow copy of this environment, with the possibly updated
