@@ -589,7 +589,7 @@ class AstraDBVectorStore(VectorStore):
         ```
 
         ```
-        thud[{"bar": "baz"}]
+        * thud [{"bar": "baz"}]
         ```
 
     Search with filter:
@@ -603,7 +603,7 @@ class AstraDBVectorStore(VectorStore):
         ```
 
         ```
-        thud[{"bar": "baz"}]
+        * thud [{"bar": "baz"}]
         ```
 
     Search with score:
