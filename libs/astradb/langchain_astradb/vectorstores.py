@@ -1556,9 +1556,8 @@ class AstraDBVectorStore(VectorStore):
         Note:
             The allowed field names for the metadata document attributes must
             obey certain rules (such as: keys cannot start with a dollar sign
-            and cannot be empty).
-            See [Naming Conventions](https://docs.datastax.com/en/astra-db-serverless/api-reference/dataapiclient.html#naming-conventions)
-            for details.
+            and cannot be empty). See the
+            [document field naming rules](https://docs.datastax.com/en/astra-db-serverless/api-reference/document-methods/insert-one.html#parameters).
 
         Returns:
             The list of ids of the added texts.
@@ -1700,9 +1699,8 @@ class AstraDBVectorStore(VectorStore):
         Note:
             The allowed field names for the metadata document attributes must
             obey certain rules (such as: keys cannot start with a dollar sign
-            and cannot be empty).
-            See [Naming Conventions](https://docs.datastax.com/en/astra-db-serverless/api-reference/dataapiclient.html#naming-conventions)
-            for details.
+            and cannot be empty). See the
+            [document field naming rules](https://docs.datastax.com/en/astra-db-serverless/api-reference/document-methods/insert-one.html#parameters).
 
         Returns:
             The list of ids of the added texts.
