@@ -911,7 +911,7 @@ class AstraDBVectorStore(VectorStore):
 
         Note:
             For concurrency in synchronous
-            [add_texts](langchain_astradb.AstraDBVectorStore.add_texts),
+            [add_texts][langchain_astradb.AstraDBVectorStore.add_texts],
             as a rule of thumb,
             on a typical client machine it is suggested to keep the quantity
             bulk_insert_batch_concurrency * bulk_insert_overwrite_concurrency
@@ -926,8 +926,8 @@ class AstraDBVectorStore(VectorStore):
             depending on both the machine/network specs and the expected workload
             (specifically, how often a write is an update of an existing id).
             Remember you can pass concurrency settings to individual calls to
-            [add_texts](langchain_astradb.AstraDBVectorStore.add_texts) and
-            [add_documents](langchain_astradb.AstraDBVectorStore.add_documents) as well.
+            [add_texts][langchain_astradb.AstraDBVectorStore.add_texts] and
+            [add_documents][langchain_astradb.AstraDBVectorStore.add_documents] as well.
         """
         # general collection settings
         self.collection_name = collection_name
@@ -1468,7 +1468,7 @@ class AstraDBVectorStore(VectorStore):
         """Completely delete the collection from the database.
 
         Completely delete the collection from the database (as opposed
-        to [clear](langchain_astradb.AstraDBVectorStore.clear), which empties it only).
+        to [clear][langchain_astradb.AstraDBVectorStore.clear], which empties it only).
         Stored data is lost and unrecoverable, resources are freed.
         Use with caution.
         """
@@ -1479,7 +1479,7 @@ class AstraDBVectorStore(VectorStore):
         """Completely delete the collection from the database.
 
         Completely delete the collection from the database (as opposed to
-        [aclear](langchain_astradb.AstraDBVectorStore.aclear),
+        [aclear][langchain_astradb.AstraDBVectorStore.aclear],
         which empties it only).
         Stored data is lost and unrecoverable, resources are freed.
         Use with caution.
@@ -3871,7 +3871,7 @@ class AstraDBVectorStore(VectorStore):
             metadatas: metadata dicts for the texts.
             ids: ids to associate to the texts.
             **kwargs: you can pass any argument that you would to
-                [add_texts](langchain_astradb.AstraDBVectorStore.add_texts)
+                [add_texts][langchain_astradb.AstraDBVectorStore.add_texts]
                 and/or to the
                 `AstraDBVectorStore` constructor (see these methods for
                 details). These arguments will be
@@ -3916,7 +3916,7 @@ class AstraDBVectorStore(VectorStore):
             metadatas: metadata dicts for the texts.
             ids: ids to associate to the texts.
             **kwargs: you can pass any argument that you would to
-                [aadd_texts](langchain_astradb.AstraDBVectorStore.aadd_texts)
+                [aadd_texts][langchain_astradb.AstraDBVectorStore.aadd_texts]
                 and/or to the `AstraDBVectorStore`
                 constructor (see these methods for details). These arguments
                 will be routed to the respective methods as they are.
@@ -3954,13 +3954,13 @@ class AstraDBVectorStore(VectorStore):
         """Create an Astra DB vectorstore from a document list.
 
         Utility method that defers to
-        [from_texts](langchain_astradb.AstraDBVectorStore.from_texts).
+        [from_texts][langchain_astradb.AstraDBVectorStore.from_texts].
 
         Args:
             documents: a list of `Document` objects for insertion in the store.
             embedding: the embedding function to use in the store.
             **kwargs: you can pass any argument that you would to
-                [add_texts](langchain_astradb.AstraDBVectorStore.add_texts)
+                [add_texts][langchain_astradb.AstraDBVectorStore.add_texts]
                 and/or to the `AstraDBVectorStore` constructor (see these methods for
                 details). These arguments will be
                 routed to the respective methods as they are.
@@ -4004,13 +4004,13 @@ class AstraDBVectorStore(VectorStore):
         """Create an Astra DB vectorstore from a document list.
 
         Utility method that defers to
-        [afrom_texts](langchain_astradb.AstraDBVectorStore.afrom_texts).
+        [afrom_texts][langchain_astradb.AstraDBVectorStore.afrom_texts].
 
         Args:
             documents: a list of `Document` objects for insertion in the store.
             embedding: the embedding function to use in the store.
             **kwargs: you can pass any argument that you would to
-                [aadd_texts](langchain_astradb.AstraDBVectorStore.aadd_texts)
+                [aadd_texts][langchain_astradb.AstraDBVectorStore.aadd_texts]
                 and/or to the `AstraDBVectorStore` constructor (see these methods for
                 details). These arguments will be
                 routed to the respective methods as they are.
