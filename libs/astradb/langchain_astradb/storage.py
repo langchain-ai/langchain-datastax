@@ -338,7 +338,8 @@ class AstraDBByteStore(AstraDBBaseStore[bytes], ByteStore):
     ) -> None:
         """ByteStore implementation using DataStax AstraDB as the underlying store.
 
-        The bytes values are converted to base64 encoded strings
+        The bytes values are converted to base64 encoded strings.
+
         Documents in the AstraDB collection will have the format
 
         ```json

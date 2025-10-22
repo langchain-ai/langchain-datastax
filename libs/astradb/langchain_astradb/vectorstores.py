@@ -408,20 +408,6 @@ class AstraDBVectorStore(VectorStore):
         pip install -qU langchain-astradb
         ```
 
-    Key init args — indexing params:
-        collection_name: str
-            Name of the collection.
-        embedding: Embeddings
-            Embedding function to use.
-
-    Key init args — client params:
-        api_endpoint: str
-            Astra DB API endpoint.
-        token: str
-            API token for Astra DB usage.
-        namespace: Optional[str]
-            Namespace (aka keyspace) where the collection is created
-
     Instantiate:
         Get your API endpoint and application token from the dashboard of your database.
 
@@ -561,6 +547,8 @@ class AstraDBVectorStore(VectorStore):
         ```
 
     Add Documents:
+        Add one or more documents to the vector store. IDs are optional: if provided,
+        and matching existing documents, an overwrite is performed.
 
         ```python
         from langchain_core.documents import Document
@@ -575,12 +563,14 @@ class AstraDBVectorStore(VectorStore):
         ```
 
     Delete Documents:
+        Delete one or more documents from the vector store by their IDs.
 
         ```python
         vector_store.delete(ids=["3"])
         ```
 
     Search:
+        Run a similarity search with a provided query string.
 
         ```python
         results = vector_store.similarity_search(query="thud", k=1)
@@ -593,6 +583,10 @@ class AstraDBVectorStore(VectorStore):
         ```
 
     Search with filter:
+        Specify metadata filters for a search. Simple `key: value` syntax
+        for the filter means equality (with implied 'and').
+        More complex syntax is available, following the Data API specifications, see
+        (docs)[https://docs.datastax.com/en/astra-db-serverless/api-reference/filter-operator-collections.html].
 
         ```python
         results = vector_store.similarity_search(
@@ -607,6 +601,7 @@ class AstraDBVectorStore(VectorStore):
         ```
 
     Search with score:
+        Search results are returned with their similarity score.
 
         ```python
         results = vector_store.similarity_search_with_score(query="qux", k=1)
@@ -619,6 +614,7 @@ class AstraDBVectorStore(VectorStore):
         ```
 
     Async:
+        All methods come with their async counterpart (method name prepended with `a`).
 
         ```python
         # add documents
@@ -641,6 +637,7 @@ class AstraDBVectorStore(VectorStore):
         ```
 
     Use as Retriever:
+        A Retriever can be spawned from the vector store for further usage.
 
         ```python
         retriever = vector_store.as_retriever(
