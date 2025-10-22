@@ -7,9 +7,9 @@ For an overview, consult the integration
 
 Provided components:
 
-- `AstraDBVectorStore`, a vector store backed by Astra DB, with Vectorize support,  
+- `AstraDBVectorStore`, a vector store backed by Astra DB, with Vectorize support,
   hybrid search and more.
-- `AstraDBStore`, `AstraDBByteStore`, key-value storage components for generic  
+- `AstraDBStore`, `AstraDBByteStore`, key-value storage components for generic
   values and binary blobs, respectively
 - `AstraDBCache`, `AstraDBSemanticCache`, LLM response caches.
 - `AstraDBChatMessageHistory`, memory for use in chat interfaces.

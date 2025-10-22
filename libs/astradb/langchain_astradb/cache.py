@@ -122,12 +122,12 @@ class AstraDBCache(BaseCache):
         ext_callers: list[tuple[str | None, str | None] | str | None] | None = None,
         api_options: APIOptions | None = None,
     ):
-        """Cache that uses Astra DB as a backend, using a single collection as a key-value store.
+        """Cache using Astra DB as a backend, using a collection as a key-value store.
 
         The lookup keys, combined in the _id of the documents, are:
 
         - prompt, a string
-        - llm_string, a deterministic str representation of the model parameters.  
+        - llm_string, a deterministic str representation of the model parameters.
           (needed to prevent same-prompt-different-model collisions)
 
         Args:
