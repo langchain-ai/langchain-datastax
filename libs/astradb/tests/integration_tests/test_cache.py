@@ -116,7 +116,9 @@ class TestAstraDBCache:
         assert test_llm.num_calls == 0
 
         # inject cache entry, check no LLM call is done
-        get_llm_cache().update("prompt0", llm_string, gens0)
+        cache_ = get_llm_cache()
+        assert cache_ is not None
+        cache_.update("prompt0", llm_string, gens0)
         output = test_llm.generate(["prompt0"])
         expected_output = LLMResult(
             generations=[gens0],
@@ -152,7 +154,9 @@ class TestAstraDBCache:
         assert test_llm.num_calls == 0
 
         # inject cache entry, check no LLM call is done
-        await get_llm_cache().aupdate("prompt0", llm_string, gens0)
+        cache_ = get_llm_cache()
+        assert cache_ is not None
+        await cache_.aupdate("prompt0", llm_string, gens0)
         output = await test_llm.agenerate(["prompt0"])
         expected_output = LLMResult(
             generations=[gens0],
