@@ -1,4 +1,20 @@
-"""Astra DB integration for LangChain."""
+"""Astra DB integration for LangChain.
+
+This module provides several LangChain components using Astra DB as the backend.
+
+For an overview, consult the integration
+[docs page](https://docs.langchain.com/oss/python/integrations/providers/astradb).
+
+Provided components:
+
+- `AstraDBVectorStore`, a vector store backed by Astra DB, with Vectorize support,  
+  hybrid search and more.
+- `AstraDBStore`, `AstraDBByteStore`, key-value storage components for generic  
+  values and binary blobs, respectively
+- `AstraDBCache`, `AstraDBSemanticCache`, LLM response caches.
+- `AstraDBChatMessageHistory`, memory for use in chat interfaces.
+- `AstraDBLoader`, loaders of data from Astra DB collections.
+"""
 
 from astrapy.info import VectorServiceOptions
 
