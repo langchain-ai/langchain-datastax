@@ -256,7 +256,7 @@ class _AstraDBVectorStoreDocumentCodec(ABC):
         Args:
             vector: a query vector (if applicable) or None.
             vectorize: a query text for vectorize search (if applicable) or None.
-                Exactly one of ``vector`` and ``vectorize`` must not be None.
+                Exactly one of `vector` and `vectorize` must not be None.
             lexical: the search query text for the lexical part of the hybrid search.
 
         Returns:

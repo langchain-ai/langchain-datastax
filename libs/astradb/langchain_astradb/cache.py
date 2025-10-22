@@ -155,7 +155,7 @@ class AstraDBCache(BaseCache):
                 or just strings if no version info is provided, which, if supplied,
                 becomes the leading part of the User-Agent string in all API requests
                 related to this component.
-            api_options: an instance of ``astrapy.utils.api_options.APIOptions`` that
+            api_options: an instance of `astrapy.utils.api_options.APIOptions` that
                 can be supplied to customize the interaction with the Data API
                 regarding serialization/deserialization, timeouts, custom headers
                 and so on. The provided options are applied on top of settings already
@@ -387,7 +387,7 @@ class AstraDBSemanticCache(BaseCache):
                 or just strings if no version info is provided, which, if supplied,
                 becomes the leading part of the User-Agent string in all API requests
                 related to this component.
-            api_options: an instance of ``astrapy.utils.api_options.APIOptions`` that
+            api_options: an instance of `astrapy.utils.api_options.APIOptions` that
                 can be supplied to customize the interaction with the Data API
                 regarding serialization/deserialization, timeouts, custom headers
                 and so on. The provided options are applied on top of settings already
