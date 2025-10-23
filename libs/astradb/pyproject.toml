@@ -5,7 +5,7 @@ build-backend = "pdm.backend"
 [project]
 authors = []
 license = {text = "MIT"}
-requires-python = ">=3.10"
+requires-python = ">=3.10.0,<4.0.0"
 dependencies = [
     "langchain-core<2.0.0,>=0.3.74",
     "astrapy>=2.0.1,<3.0.0",
@@ -14,7 +14,7 @@ dependencies = [
     "numpy>=2.1.0; python_version>='3.13'",
 ]
 name = "langchain-astradb"
-version = "0.6.1"
+version = "1.0.0"
 description = "An integration package connecting Astra DB and LangChain"
 readme = "README.md"
 

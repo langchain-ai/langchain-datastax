@@ -143,7 +143,9 @@ class TestAstraDBSemanticCache:
         assert test_llm.num_calls == 0
 
         # inject cache entry, check no LLM call is done
-        get_llm_cache().update("[1,2]", llm_string, gens0)
+        cache_ = get_llm_cache()
+        assert cache_ is not None
+        cache_.update("[1,2]", llm_string, gens0)
         output = test_llm.generate(["[0.999,2.001]"])
         expected_output = LLMResult(
             generations=[gens0],
@@ -181,7 +183,9 @@ class TestAstraDBSemanticCache:
         assert test_llm.num_calls == 0
 
         # inject cache entry, check no LLM call is done
-        await get_llm_cache().aupdate("[1,2]", llm_string, gens0)
+        cache_ = get_llm_cache()
+        assert cache_ is not None
+        await cache_.aupdate("[1,2]", llm_string, gens0)
         output = await test_llm.agenerate(["[0.999,2.001]"])
         expected_output = LLMResult(
             generations=[gens0],
