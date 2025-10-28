@@ -12,10 +12,6 @@ from tests.integration_tests.conftest import (
     astra_db_env_vars_available,
 )
 
-TEST_EXPECTS_DEFINITE_DOCUMENT_ORDERING = (
-    "Currently a specific document ordering is expected."
-)
-
 
 @pytest.mark.skipif(
     not astra_db_env_vars_available(), reason="Missing Astra DB env. vars"
@@ -40,31 +36,3 @@ class TestAstraDBVectorStoreIntegration(VectorStoreIntegrationTests):
     @pytest.fixture
     def vectorstore(self) -> VectorStore:
         return self._vectorstore
-
-    @pytest.mark.xfail(reason=TEST_EXPECTS_DEFINITE_DOCUMENT_ORDERING)
-    def test_add_documents_with_existing_ids(self, vectorstore: VectorStore) -> None:
-        pass
-
-    @pytest.mark.xfail(reason=TEST_EXPECTS_DEFINITE_DOCUMENT_ORDERING)
-    async def test_add_documents_with_existing_ids_async(
-        self, vectorstore: VectorStore
-    ) -> None:
-        pass
-
-    @pytest.mark.xfail(reason=TEST_EXPECTS_DEFINITE_DOCUMENT_ORDERING)
-    def test_get_by_ids(self, vectorstore: VectorStore) -> None:
-        pass
-
-    @pytest.mark.xfail(reason=TEST_EXPECTS_DEFINITE_DOCUMENT_ORDERING)
-    async def test_get_by_ids_async(self, vectorstore: VectorStore) -> None:
-        pass
-
-    @pytest.mark.xfail(reason=TEST_EXPECTS_DEFINITE_DOCUMENT_ORDERING)
-    def test_add_documents_documents(self, vectorstore: VectorStore) -> None:
-        pass
-
-    @pytest.mark.xfail(reason=TEST_EXPECTS_DEFINITE_DOCUMENT_ORDERING)
-    async def test_add_documents_documents_async(
-        self, vectorstore: VectorStore
-    ) -> None:
-        pass
