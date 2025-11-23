@@ -924,8 +924,7 @@ class AstraDBVectorStore(VectorStore):
             (specifically, how often a write is an update of an existing id).
             Remember you can pass concurrency settings to individual calls to
             [`add_texts`][langchain_astradb.AstraDBVectorStore.add_texts] and
-            [`add_documents`][langchain_astradb.AstraDBVectorStore.add_documents]as
-            well.
+            `add_documents` as well.
         """
         # general collection settings
         self.collection_name = collection_name
