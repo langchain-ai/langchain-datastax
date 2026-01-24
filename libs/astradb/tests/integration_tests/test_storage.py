@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import pytest
 from astrapy.authentication import StaticTokenProvider
@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 @pytest.fixture
 def astra_db_empty_store(
     astra_db_credentials: AstraDBCredentials,
-    collection_idxid: Collection,
+    collection_idxid: Collection[dict[str, Any]],
 ) -> AstraDBStore:
     collection_idxid.delete_many({})
     return AstraDBStore(
@@ -41,7 +41,7 @@ def astra_db_empty_store(
 @pytest.fixture
 async def astra_db_empty_store_async(
     astra_db_credentials: AstraDBCredentials,
-    collection_idxid: Collection,
+    collection_idxid: Collection[dict[str, Any]],
 ) -> AstraDBStore:
     await collection_idxid.to_async().delete_many({})
     return AstraDBStore(
@@ -57,7 +57,7 @@ async def astra_db_empty_store_async(
 @pytest.fixture
 def astra_db_empty_byte_store(
     astra_db_credentials: AstraDBCredentials,
-    collection_idxid: Collection,
+    collection_idxid: Collection[dict[str, Any]],
 ) -> AstraDBByteStore:
     collection_idxid.delete_many({})
     return AstraDBByteStore(
