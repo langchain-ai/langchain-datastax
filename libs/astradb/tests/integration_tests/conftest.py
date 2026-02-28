@@ -108,8 +108,8 @@ def _load_env() -> None:
 def astra_db_env_vars_available() -> bool:
     return all(
         [
-            "ASTRA_DB_APPLICATION_TOKEN" in os.environ,
-            "ASTRA_DB_API_ENDPOINT" in os.environ,
+            os.environ.get("ASTRA_DB_APPLICATION_TOKEN"),
+            os.environ.get("ASTRA_DB_API_ENDPOINT"),
         ]
     )
 
