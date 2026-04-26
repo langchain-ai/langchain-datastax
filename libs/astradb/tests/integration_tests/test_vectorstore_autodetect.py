@@ -55,7 +55,7 @@ def collection_forcehybrid_vectorize(
     openai_api_key: str,
     nvidia_reranking_api_key: str | None,
     database: Database,
-) -> Iterable[Collection]:
+) -> Iterable[Collection[dict[str, Any]]]:
     """A general-purpose D=2(Euclidean) collection for per-test reuse."""
     collection = database.create_collection(
         COLLECTION_NAME_FORCEHYBRID_VECTORIZE,
@@ -76,8 +76,8 @@ def collection_forcehybrid_vectorize(
 
 @pytest.fixture
 def empty_collection_forcehybrid_vectorize(
-    collection_forcehybrid_vectorize: Collection,
-) -> Collection:
+    collection_forcehybrid_vectorize: Collection[dict[str, Any]],
+) -> Collection[dict[str, Any]]:
     collection_forcehybrid_vectorize.delete_many({})
     return collection_forcehybrid_vectorize
 
@@ -86,7 +86,7 @@ def empty_collection_forcehybrid_vectorize(
 def collection_forcenohybrid_vectorize(
     openai_api_key: str,
     database: Database,
-) -> Iterable[Collection]:
+) -> Iterable[Collection[dict[str, Any]]]:
     """A general-purpose D=2(Euclidean) collection for per-test reuse."""
     collection = database.create_collection(
         COLLECTION_NAME_FORCENOHYBRID_VECTORIZE,
@@ -106,8 +106,8 @@ def collection_forcenohybrid_vectorize(
 
 @pytest.fixture
 def empty_collection_forcenohybrid_vectorize(
-    collection_forcenohybrid_vectorize: Collection,
-) -> Collection:
+    collection_forcenohybrid_vectorize: Collection[dict[str, Any]],
+) -> Collection[dict[str, Any]]:
     collection_forcenohybrid_vectorize.delete_many({})
     return collection_forcenohybrid_vectorize
 
@@ -116,7 +116,7 @@ def empty_collection_forcenohybrid_vectorize(
 def collection_forcehybrid_novectorize(
     nvidia_reranking_api_key: str | None,
     database: Database,
-) -> Iterable[Collection]:
+) -> Iterable[Collection[dict[str, Any]]]:
     """A general-purpose D=2(Euclidean) collection for per-test reuse."""
     collection = database.create_collection(
         COLLECTION_NAME_FORCEHYBRID_NOVECTORIZE,
@@ -136,8 +136,8 @@ def collection_forcehybrid_novectorize(
 
 @pytest.fixture
 def empty_collection_forcehybrid_novectorize(
-    collection_forcehybrid_novectorize: Collection,
-) -> Collection:
+    collection_forcehybrid_novectorize: Collection[dict[str, Any]],
+) -> Collection[dict[str, Any]]:
     collection_forcehybrid_novectorize.delete_many({})
     return collection_forcehybrid_novectorize
 
@@ -145,7 +145,7 @@ def empty_collection_forcehybrid_novectorize(
 @pytest.fixture
 def collection_forcenohybrid_novectorize(
     database: Database,
-) -> Iterable[Collection]:
+) -> Iterable[Collection[dict[str, Any]]]:
     """A general-purpose D=2(Euclidean) collection for per-test reuse."""
     collection = database.create_collection(
         COLLECTION_NAME_FORCENOHYBRID_NOVECTORIZE,
@@ -164,8 +164,8 @@ def collection_forcenohybrid_novectorize(
 
 @pytest.fixture
 def empty_collection_forcenohybrid_novectorize(
-    collection_forcenohybrid_novectorize: Collection,
-) -> Collection:
+    collection_forcenohybrid_novectorize: Collection[dict[str, Any]],
+) -> Collection[dict[str, Any]]:
     collection_forcenohybrid_novectorize.delete_many({})
     return collection_forcenohybrid_novectorize
 
@@ -178,7 +178,7 @@ class TestAstraDBVectorStoreAutodetect:
         self,
         astra_db_credentials: AstraDBCredentials,
         nvidia_reranking_api_key: str | None,
-        empty_collection_idxall_d2: Collection,
+        empty_collection_idxall_d2: Collection[dict[str, Any]],
         embedding_d2: Embeddings,
     ) -> None:
         """Test autodetect on a populated flat collection, checking all codecs."""
@@ -364,7 +364,7 @@ class TestAstraDBVectorStoreAutodetect:
         astra_db_credentials: AstraDBCredentials,
         openai_api_key: str,
         nvidia_reranking_api_key: str | None,
-        empty_collection_idxall_vz: Collection,
+        empty_collection_idxall_vz: Collection[dict[str, Any]],
     ) -> None:
         """Test autodetect on a populated flat collection, checking all codecs."""
         empty_collection_idxall_vz.insert_many(
@@ -458,7 +458,7 @@ class TestAstraDBVectorStoreAutodetect:
         astra_db_credentials: AstraDBCredentials,
         openai_api_key: str,
         nvidia_reranking_api_key: str | None,
-        empty_collection_idxall_vz: Collection,
+        empty_collection_idxall_vz: Collection[dict[str, Any]],
         vector_store_idxall_vz: AstraDBVectorStore,
     ) -> None:
         """Test autodetect on a VS-made collection, checking all codecs."""
@@ -547,7 +547,7 @@ class TestAstraDBVectorStoreAutodetect:
         self,
         astra_db_credentials: AstraDBCredentials,
         nvidia_reranking_api_key: str | None,
-        empty_collection_idxall_d2: Collection,
+        empty_collection_idxall_d2: Collection[dict[str, Any]],
         embedding_d2: Embeddings,
     ) -> None:
         """Test autodetect + skipping failing documents."""
@@ -639,7 +639,7 @@ class TestAstraDBVectorStoreAutodetect:
         astra_db_credentials: AstraDBCredentials,
         openai_api_key: str,
         nvidia_reranking_api_key: str | None,
-        empty_collection_forcehybrid_vectorize: Collection,
+        empty_collection_forcehybrid_vectorize: Collection[dict[str, Any]],
         *,
         lexical_in_docs: bool,
         flat_md: bool,
@@ -720,7 +720,7 @@ class TestAstraDBVectorStoreAutodetect:
         self,
         astra_db_credentials: AstraDBCredentials,
         openai_api_key: str,
-        empty_collection_forcenohybrid_vectorize: Collection,
+        empty_collection_forcenohybrid_vectorize: Collection[dict[str, Any]],
         *,
         flat_md: bool,
     ) -> None:
@@ -807,7 +807,7 @@ class TestAstraDBVectorStoreAutodetect:
         self,
         astra_db_credentials: AstraDBCredentials,
         nvidia_reranking_api_key: str | None,
-        empty_collection_forcehybrid_novectorize: Collection,
+        empty_collection_forcehybrid_novectorize: Collection[dict[str, Any]],
         embedding_d2: Embeddings,
         *,
         lexical_in_docs: bool,
@@ -889,7 +889,7 @@ class TestAstraDBVectorStoreAutodetect:
     def test_vectorstore_autodetect_nohybrid_prepopulated_novectorize(
         self,
         astra_db_credentials: AstraDBCredentials,
-        empty_collection_forcenohybrid_novectorize: Collection,
+        empty_collection_forcenohybrid_novectorize: Collection[dict[str, Any]],
         embedding_d2: Embeddings,
         *,
         flat_md: bool,

@@ -19,6 +19,7 @@ from typing import (
 )
 
 import numpy as np
+import numpy.typing as npt
 from astrapy.constants import Environment
 from astrapy.exceptions import CollectionInsertManyException, DataAPIResponseException
 from astrapy.info import (
@@ -318,10 +319,10 @@ def _insertmany_error_message(err: CollectionInsertManyException) -> str:
     return err_msg
 
 
-_Matrix = list[list[float]] | list[np.ndarray] | np.ndarray
+_Matrix = list[list[float]] | list[npt.NDArray[np.floating]] | npt.NDArray[np.floating]
 
 
-def _cosine_similarity(x: _Matrix, y: _Matrix) -> np.ndarray:
+def _cosine_similarity(x: _Matrix, y: _Matrix) -> npt.NDArray[np.floating]:
     """Row-wise cosine similarity between two equal-width matrices."""
     if len(x) == 0 or len(y) == 0:
         return np.array([])
@@ -348,13 +349,13 @@ def _cosine_similarity(x: _Matrix, y: _Matrix) -> np.ndarray:
     y_norm = np.linalg.norm(y, axis=1)
     # Ignore divide by zero errors run time warnings as those are handled below.
     with np.errstate(divide="ignore", invalid="ignore"):
-        similarity: np.ndarray = np.dot(x, y.T) / np.outer(x_norm, y_norm)
+        similarity: npt.NDArray[np.floating] = np.dot(x, y.T) / np.outer(x_norm, y_norm)
     similarity[np.isnan(similarity) | np.isinf(similarity)] = 0.0
     return similarity
 
 
 def _maximal_marginal_relevance(
-    query_embedding: np.ndarray,
+    query_embedding: npt.NDArray[np.floating],
     embedding_list: list[list[float]],
     lambda_mult: float = 0.5,
     k: int = 4,
@@ -1488,7 +1489,7 @@ class AstraDBVectorStore(VectorStore):
         self,
         texts: Iterable[str],
         embedding_vectors: Sequence[list[float] | None],
-        metadatas: Iterable[dict] | None = None,
+        metadatas: Iterable[dict[str, Any]] | None = None,
         ids: Iterable[str | None] | None = None,
     ) -> list[DocDict]:
         if ids is None:
@@ -1522,7 +1523,7 @@ class AstraDBVectorStore(VectorStore):
     def add_texts(
         self,
         texts: Iterable[str],
-        metadatas: Iterable[dict] | None = None,
+        metadatas: Iterable[dict[str, Any]] | None = None,
         ids: Iterable[str | None] | None = None,
         *,
         batch_size: int | None = None,
@@ -1665,7 +1666,7 @@ class AstraDBVectorStore(VectorStore):
     async def aadd_texts(
         self,
         texts: Iterable[str],
-        metadatas: Iterable[dict] | None = None,
+        metadatas: Iterable[dict[str, Any]] | None = None,
         ids: Iterable[str | None] | None = None,
         *,
         batch_size: int | None = None,
@@ -1809,7 +1810,7 @@ class AstraDBVectorStore(VectorStore):
 
     def update_metadata(
         self,
-        id_to_metadata: dict[str, dict],
+        id_to_metadata: dict[str, dict[str, Any]],
         *,
         overwrite_concurrency: int | None = None,
     ) -> int:
@@ -1840,7 +1841,7 @@ class AstraDBVectorStore(VectorStore):
         ) as executor:
 
             def _update_document(
-                id_md_pair: tuple[str, dict],
+                id_md_pair: tuple[str, dict[str, Any]],
             ) -> CollectionUpdateResult:
                 document_id, update_metadata = id_md_pair
                 encoded_metadata = self.filter_to_query(update_metadata)
@@ -1860,7 +1861,7 @@ class AstraDBVectorStore(VectorStore):
 
     async def aupdate_metadata(
         self,
-        id_to_metadata: dict[str, dict],
+        id_to_metadata: dict[str, dict[str, Any]],
         *,
         overwrite_concurrency: int | None = None,
     ) -> int:
@@ -1892,7 +1893,7 @@ class AstraDBVectorStore(VectorStore):
         async_collection = self.astra_env.async_collection
 
         async def _update_document(
-            id_md_pair: tuple[str, dict],
+            id_md_pair: tuple[str, dict[str, Any]],
         ) -> CollectionUpdateResult:
             document_id, update_metadata = id_md_pair
             encoded_metadata = self.filter_to_query(update_metadata)
@@ -3856,7 +3857,7 @@ class AstraDBVectorStore(VectorStore):
         cls: type[AstraDBVectorStore],
         texts: Iterable[str],
         embedding: Embeddings | None = None,
-        metadatas: Iterable[dict] | None = None,
+        metadatas: Iterable[dict[str, Any]] | None = None,
         ids: Iterable[str | None] | None = None,
         **kwargs: Any,
     ) -> AstraDBVectorStore:
@@ -3901,7 +3902,7 @@ class AstraDBVectorStore(VectorStore):
         cls: type[AstraDBVectorStore],
         texts: Iterable[str],
         embedding: Embeddings | None = None,
-        metadatas: Iterable[dict] | None = None,
+        metadatas: Iterable[dict[str, Any]] | None = None,
         ids: Iterable[str | None] | None = None,
         **kwargs: Any,
     ) -> AstraDBVectorStore:

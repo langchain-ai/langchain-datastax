@@ -398,7 +398,7 @@ class _AstraDBCollectionEnvironment(_AstraDBEnvironment):
         self.default_indexing_policy = default_indexing_policy
         self.collection_vector_service_options = collection_vector_service_options
 
-        self.async_setup_db_task: Task | None = None
+        self.async_setup_db_task: Task[None] | None = None
         if setup_mode == SetupMode.ASYNC:
             self.async_setup_db_task = asyncio.create_task(
                 self._asetup_db(

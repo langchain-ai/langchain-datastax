@@ -125,7 +125,9 @@ class TestAstraDBVectorStore:
         request: pytest.FixtureRequest,
     ) -> None:
         """from_texts methods and the associated warnings."""
-        collection: Collection = request.getfixturevalue(collection_fixture_name)
+        collection: Collection[dict[str, Any]] = request.getfixturevalue(
+            collection_fixture_name
+        )
         init_kwargs: dict[str, Any]
         if is_vectorize:
             init_kwargs = {
@@ -238,7 +240,9 @@ class TestAstraDBVectorStore:
         request: pytest.FixtureRequest,
     ) -> None:
         """from_documents, esp. the various handling of ID-in-doc vs external."""
-        collection: Collection = request.getfixturevalue(collection_fixture_name)
+        collection: Collection[dict[str, Any]] = request.getfixturevalue(
+            collection_fixture_name
+        )
         pc1, pc2 = page_contents
         init_kwargs: dict[str, Any]
         if is_vectorize:
@@ -392,7 +396,7 @@ class TestAstraDBVectorStore:
         request: pytest.FixtureRequest,
     ) -> None:
         """from_texts methods and the associated warnings, async version."""
-        collection: Collection = await asyncio.to_thread(
+        collection: Collection[dict[str, Any]] = await asyncio.to_thread(
             request.getfixturevalue, collection_fixture_name
         )
         init_kwargs: dict[str, Any]
@@ -510,7 +514,7 @@ class TestAstraDBVectorStore:
         from_documents, esp. the various handling of ID-in-doc vs external.
         Async version.
         """
-        collection: Collection = await asyncio.to_thread(
+        collection: Collection[dict[str, Any]] = await asyncio.to_thread(
             request.getfixturevalue, collection_fixture_name
         )
         pc1, pc2 = page_contents
@@ -1771,7 +1775,7 @@ class TestAstraDBVectorStore:
     def test_astradb_vectorstore_custom_params_sync(
         self,
         astra_db_credentials: AstraDBCredentials,
-        empty_collection_d2: Collection,
+        empty_collection_d2: Collection[dict[str, Any]],
         embedding_d2: Embeddings,
     ) -> None:
         """Custom batch size and concurrency params."""
@@ -1806,7 +1810,7 @@ class TestAstraDBVectorStore:
     async def test_astradb_vectorstore_custom_params_async(
         self,
         astra_db_credentials: AstraDBCredentials,
-        empty_collection_d2: Collection,
+        empty_collection_d2: Collection[dict[str, Any]],
         embedding_d2: Embeddings,
     ) -> None:
         """Custom batch size and concurrency params, async version"""
@@ -2329,7 +2333,7 @@ class TestAstraDBVectorStore:
     def test_astradb_vectorstore_custom_api_options(
         self,
         astra_db_credentials: AstraDBCredentials,
-        empty_collection_d2: Collection,
+        empty_collection_d2: Collection[dict[str, Any]],
         embedding_d2: Embeddings,
     ) -> None:
         """Craft a custom APIOptions (very low timeout), expect a timeout to occur."""

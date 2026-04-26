@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import pytest
 from astrapy.authentication import StaticTokenProvider
@@ -21,7 +21,7 @@ class _BaseTestAstraDBStore:
     def setup(
         self,
         astra_db_credentials: AstraDBCredentials,
-        collection_idxid: Collection,
+        collection_idxid: Collection[dict[str, Any]],
     ) -> None:
         collection_idxid.delete_many({})
         self._store = AstraDBStore(
@@ -61,7 +61,7 @@ class _BaseTestAstraDBByteStore:
     def setup(
         self,
         astra_db_credentials: AstraDBCredentials,
-        collection_idxid: Collection,
+        collection_idxid: Collection[dict[str, Any]],
     ) -> None:
         collection_idxid.delete_many({})
         self._store = AstraDBByteStore(

@@ -1,3 +1,5 @@
+from typing import Any
+
 import pytest
 from astrapy import Collection
 from astrapy.authentication import StaticTokenProvider
@@ -15,7 +17,7 @@ class _BaseTestAstraDBCache:
     def setup(
         self,
         astra_db_credentials: AstraDBCredentials,
-        empty_collection_idxall: Collection,
+        empty_collection_idxall: Collection[dict[str, Any]],
     ) -> None:
         self._cache = AstraDBCache(
             collection_name=empty_collection_idxall.name,
