@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from operator import itemgetter
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import pytest
 from astrapy.authentication import StaticTokenProvider
@@ -22,8 +22,8 @@ if TYPE_CHECKING:
 
 @pytest.fixture(scope="module")
 def document_loader_collection(
-    collection_idxall: Collection,
-) -> Collection:
+    collection_idxall: Collection[dict[str, Any]],
+) -> Collection[dict[str, Any]]:
     collection_idxall.delete_many({})
     collection_idxall.insert_many(
         [{"foo": "bar", "baz": "qux"}] * 24 + [{"foo": "bar2", "baz": "qux"}] * 4
@@ -33,8 +33,8 @@ def document_loader_collection(
 
 @pytest.fixture
 def async_document_loader_collection(
-    collection_idxall: Collection,
-) -> AsyncCollection:
+    collection_idxall: Collection[dict[str, Any]],
+) -> AsyncCollection[dict[str, Any]]:
     return collection_idxall.to_async()
 
 
@@ -45,7 +45,7 @@ class TestAstraDB:
     def test_astradb_loader_prefetched_sync(
         self,
         astra_db_credentials: AstraDBCredentials,
-        document_loader_collection: Collection,
+        document_loader_collection: Collection[dict[str, Any]],
     ) -> None:
         """Using 'prefetched' should give a warning but work nonetheless."""
         with pytest.warns(
@@ -74,7 +74,7 @@ class TestAstraDB:
         self,
         astra_db_credentials: AstraDBCredentials,
         database: Database,
-        document_loader_collection: Collection,
+        document_loader_collection: Collection[dict[str, Any]],
     ) -> None:
         loader = AstraDBLoader(
             document_loader_collection.name,
@@ -118,7 +118,7 @@ class TestAstraDB:
     def test_page_content_mapper_sync(
         self,
         astra_db_credentials: AstraDBCredentials,
-        document_loader_collection: Collection,
+        document_loader_collection: Collection[dict[str, Any]],
     ) -> None:
         loader = AstraDBLoader(
             document_loader_collection.name,
@@ -138,7 +138,7 @@ class TestAstraDB:
     def test_metadata_mapper_sync(
         self,
         astra_db_credentials: AstraDBCredentials,
-        document_loader_collection: Collection,
+        document_loader_collection: Collection[dict[str, Any]],
     ) -> None:
         loader = AstraDBLoader(
             document_loader_collection.name,
@@ -159,7 +159,7 @@ class TestAstraDB:
         self,
         astra_db_credentials: AstraDBCredentials,
         database: Database,
-        async_document_loader_collection: AsyncCollection,
+        async_document_loader_collection: AsyncCollection[dict[str, Any]],
     ) -> None:
         """Using 'prefetched' should give a warning but work nonetheless."""
         with pytest.warns(
@@ -214,7 +214,7 @@ class TestAstraDB:
         self,
         astra_db_credentials: AstraDBCredentials,
         database: Database,
-        async_document_loader_collection: AsyncCollection,
+        async_document_loader_collection: AsyncCollection[dict[str, Any]],
     ) -> None:
         loader = AstraDBLoader(
             async_document_loader_collection.name,
@@ -245,7 +245,7 @@ class TestAstraDB:
     async def test_page_content_mapper_async(
         self,
         astra_db_credentials: AstraDBCredentials,
-        async_document_loader_collection: AsyncCollection,
+        async_document_loader_collection: AsyncCollection[dict[str, Any]],
     ) -> None:
         loader = AstraDBLoader(
             async_document_loader_collection.name,
@@ -263,7 +263,7 @@ class TestAstraDB:
     async def test_metadata_mapper_async(
         self,
         astra_db_credentials: AstraDBCredentials,
-        async_document_loader_collection: AsyncCollection,
+        async_document_loader_collection: AsyncCollection[dict[str, Any]],
     ) -> None:
         loader = AstraDBLoader(
             async_document_loader_collection.name,

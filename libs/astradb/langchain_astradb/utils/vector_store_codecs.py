@@ -173,7 +173,7 @@ class _AstraDBVectorStoreDocumentCodec(ABC):
         content: str,
         document_id: str,
         vector: list[float] | None,
-        metadata: dict | None,
+        metadata: dict[str, Any] | None,
     ) -> dict[str, Any]:
         """Create a document for storage on Astra DB.
 
@@ -403,7 +403,7 @@ class _DefaultVSDocumentCodec(_AstraDBVectorStoreDocumentCodec):
         content: str,
         document_id: str,
         vector: list[float] | None,
-        metadata: dict | None,
+        metadata: dict[str, Any] | None,
     ) -> dict[str, Any]:
         if vector is None:
             raise ValueError(NO_NULL_VECTOR_MSG)
@@ -505,7 +505,7 @@ class _DefaultVectorizeVSDocumentCodec(_AstraDBVectorStoreDocumentCodec):
         content: str,
         document_id: str,
         vector: list[float] | None,
-        metadata: dict | None,
+        metadata: dict[str, Any] | None,
     ) -> dict[str, Any]:
         if vector is not None:
             msg = f"{VECTOR_REQUIRED_PREAMBLE_MSG}: {vector}"
@@ -611,7 +611,7 @@ class _FlatVSDocumentCodec(_AstraDBVectorStoreDocumentCodec):
         content: str,
         document_id: str,
         vector: list[float] | None,
-        metadata: dict | None,
+        metadata: dict[str, Any] | None,
     ) -> dict[str, Any]:
         if vector is None:
             raise ValueError(NO_NULL_VECTOR_MSG)
@@ -719,7 +719,7 @@ class _FlatVectorizeVSDocumentCodec(_AstraDBVectorStoreDocumentCodec):
         content: str,
         document_id: str,
         vector: list[float] | None,
-        metadata: dict | None,
+        metadata: dict[str, Any] | None,
     ) -> dict[str, Any]:
         if vector is not None:
             msg = f"{VECTOR_REQUIRED_PREAMBLE_MSG}: {vector}"

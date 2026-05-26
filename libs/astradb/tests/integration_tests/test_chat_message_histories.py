@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage
@@ -24,7 +24,7 @@ if TYPE_CHECKING:
 @pytest.fixture
 def history1(
     astra_db_credentials: AstraDBCredentials,
-    empty_collection_idxall: Collection,
+    empty_collection_idxall: Collection[dict[str, Any]],
 ) -> AstraDBChatMessageHistory:
     return AstraDBChatMessageHistory(
         session_id="session-test-1",
