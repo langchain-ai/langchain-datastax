@@ -29,14 +29,14 @@ typing = [
     "simsimd<7.0.0,>=6.5.1",
 ]
 test = [
-    "pytest<9,>=8",
+    "pytest<10,>=9.0.3",
     "pytest-httpserver<1.1,>=1.0.8",
     "pytest-dotenv<1.0.0,>=0.5.2",
     "freezegun<2.0.0,>=1.2.2",
     "pytest-mock<4.0.0,>=3.10.0",
-    "syrupy<5.0.0,>=4.0.2",
+    "syrupy<6.0.0,>=5.0.0",
     "pytest-watcher<1.0.0,>=0.3.4",
-    "pytest-asyncio<1.0.0,>=0.21.1",
+    "pytest-asyncio<2.0.0,>=1.4.0",
     "blockbuster<1.6.0,>=1.5.25",
 ]
 test_integration = [
