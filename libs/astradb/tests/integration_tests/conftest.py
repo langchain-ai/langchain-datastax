@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import TYPE_CHECKING, TypedDict
+from typing import TYPE_CHECKING, Any, TypedDict
 
 import pytest
 from astrapy import DataAPIClient
@@ -234,7 +234,7 @@ def database(
 @pytest.fixture(scope="module")
 def collection_d2(
     database: Database,
-) -> Iterable[Collection]:
+) -> Iterable[Collection[dict[str, Any]]]:
     """A general-purpose D=2(Euclidean) collection for per-test reuse."""
     collection = database.create_collection(
         COLLECTION_NAME_D2,
@@ -253,8 +253,8 @@ def collection_d2(
 
 @pytest.fixture
 def empty_collection_d2(
-    collection_d2: Collection,
-) -> Collection:
+    collection_d2: Collection[dict[str, Any]],
+) -> Collection[dict[str, Any]]:
     """A per-test-function empty d=2(Euclidean) collection."""
     collection_d2.delete_many({})
     return collection_d2
@@ -262,7 +262,7 @@ def empty_collection_d2(
 
 @pytest.fixture
 def vector_store_d2(
-    empty_collection_d2: Collection,
+    empty_collection_d2: Collection[dict[str, Any]],
     astra_db_credentials: AstraDBCredentials,
     embedding_d2: Embeddings,
 ) -> AstraDBVectorStore:
@@ -280,7 +280,7 @@ def vector_store_d2(
 
 @pytest.fixture
 def vector_store_d2_stringtoken(
-    empty_collection_d2: Collection,
+    empty_collection_d2: Collection[dict[str, Any]],
     astra_db_credentials: AstraDBCredentials,
     embedding_d2: Embeddings,
 ) -> AstraDBVectorStore:
@@ -317,7 +317,7 @@ def ephemeral_collection_cleaner_d2(
 @pytest.fixture(scope="module")
 def collection_idxall(
     database: Database,
-) -> Iterable[Collection]:
+) -> Iterable[Collection[dict[str, Any]]]:
     """
     A general-purpose collection for per-test reuse.
     This one has default indexing (i.e. all fields are covered).
@@ -330,8 +330,8 @@ def collection_idxall(
 
 @pytest.fixture
 def empty_collection_idxall(
-    collection_idxall: Collection,
-) -> Collection:
+    collection_idxall: Collection[dict[str, Any]],
+) -> Collection[dict[str, Any]]:
     """
     A per-test-function empty collection.
     This one has default indexing (i.e. all fields are covered).
@@ -343,7 +343,7 @@ def empty_collection_idxall(
 @pytest.fixture(scope="module")
 def collection_idxid(
     database: Database,
-) -> Iterable[Collection]:
+) -> Iterable[Collection[dict[str, Any]]]:
     """
     A general-purpose collection for per-test reuse.
     This one has id-only indexing (i.e. for Storage classes).
@@ -362,7 +362,7 @@ def collection_idxid(
 @pytest.fixture(scope="module")
 def collection_idxall_d2(
     database: Database,
-) -> Iterable[Collection]:
+) -> Iterable[Collection[dict[str, Any]]]:
     """
     A general-purpose D=2(Euclidean) collection for per-test reuse.
     This one has default indexing (i.e. all fields are covered).
@@ -383,8 +383,8 @@ def collection_idxall_d2(
 
 @pytest.fixture
 def empty_collection_idxall_d2(
-    collection_idxall_d2: Collection,
-) -> Collection:
+    collection_idxall_d2: Collection[dict[str, Any]],
+) -> Collection[dict[str, Any]]:
     """
     A per-test-function empty d=2(Euclidean) collection.
     This one has default indexing (i.e. all fields are covered).
@@ -395,7 +395,7 @@ def empty_collection_idxall_d2(
 
 @pytest.fixture
 def vector_store_idxall_d2(
-    empty_collection_idxall_d2: Collection,
+    empty_collection_idxall_d2: Collection[dict[str, Any]],
     astra_db_credentials: AstraDBCredentials,
     embedding_d2: Embeddings,
 ) -> AstraDBVectorStore:
@@ -431,7 +431,7 @@ def ephemeral_collection_cleaner_idxall_d2(
 def collection_vz(
     openai_api_key: str,
     database: Database,
-) -> Iterable[Collection]:
+) -> Iterable[Collection[dict[str, Any]]]:
     """A general-purpose $vectorize collection for per-test reuse."""
     collection = database.create_collection(
         COLLECTION_NAME_VZ,
@@ -452,8 +452,8 @@ def collection_vz(
 
 @pytest.fixture
 def empty_collection_vz(
-    collection_vz: Collection,
-) -> Collection:
+    collection_vz: Collection[dict[str, Any]],
+) -> Collection[dict[str, Any]]:
     """A per-test-function empty $vecorize collection."""
     collection_vz.delete_many({})
     return collection_vz
@@ -463,7 +463,7 @@ def empty_collection_vz(
 def vector_store_vz(
     astra_db_credentials: AstraDBCredentials,
     openai_api_key: str,
-    empty_collection_vz: Collection,
+    empty_collection_vz: Collection[dict[str, Any]],
 ) -> AstraDBVectorStore:
     """A fresh vector store on a $vectorize collection."""
     return AstraDBVectorStore(
@@ -497,7 +497,7 @@ def ephemeral_collection_cleaner_vz(
 def collection_idxall_vz(
     openai_api_key: str,
     database: Database,
-) -> Iterable[Collection]:
+) -> Iterable[Collection[dict[str, Any]]]:
     """
     A general-purpose $vectorize collection for per-test reuse.
     This one has default indexing (i.e. all fields are covered).
@@ -520,8 +520,8 @@ def collection_idxall_vz(
 
 @pytest.fixture
 def empty_collection_idxall_vz(
-    collection_idxall_vz: Collection,
-) -> Collection:
+    collection_idxall_vz: Collection[dict[str, Any]],
+) -> Collection[dict[str, Any]]:
     """
     A per-test-function empty $vecorize collection.
     This one has default indexing (i.e. all fields are covered).
@@ -533,7 +533,7 @@ def empty_collection_idxall_vz(
 @pytest.fixture
 def vector_store_idxall_vz(
     openai_api_key: str,
-    empty_collection_idxall_vz: Collection,
+    empty_collection_idxall_vz: Collection[dict[str, Any]],
     astra_db_credentials: AstraDBCredentials,
 ) -> AstraDBVectorStore:
     """A fresh vector store on a d=2(Euclidean) collection."""

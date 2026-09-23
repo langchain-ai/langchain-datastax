@@ -305,7 +305,7 @@ class _CachedAwaitable:
         return self.result
 
 
-def _reawaitable(func: Callable) -> Callable:
+def _reawaitable(func: Callable[..., Any]) -> Callable[..., Any]:
     """Make an async function result awaitable multiple times."""
 
     @wraps(func)
@@ -315,13 +315,13 @@ def _reawaitable(func: Callable) -> Callable:
     return wrapper
 
 
-def _async_lru_cache(maxsize: int = 128) -> Callable:
+def _async_lru_cache(maxsize: int = 128) -> Callable[..., Any]:
     """Least-recently-used async cache decorator.
 
     Equivalent to functools.lru_cache for async functions.
     """
 
-    def decorating_function(user_function: Callable) -> Callable:
+    def decorating_function(user_function: Callable[..., Any]) -> Callable[..., Any]:
         return lru_cache(maxsize)(_reawaitable(user_function))
 
     return decorating_function

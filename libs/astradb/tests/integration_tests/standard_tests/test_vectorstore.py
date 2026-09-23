@@ -1,3 +1,5 @@
+from typing import Any
+
 import pytest
 from astrapy import Collection
 from astrapy.authentication import StaticTokenProvider
@@ -20,7 +22,7 @@ class TestAstraDBVectorStoreIntegration(VectorStoreIntegrationTests):
     @pytest.fixture(autouse=True)
     def setup(
         self,
-        empty_collection_d2: Collection,
+        empty_collection_d2: Collection[dict[str, Any]],
         astra_db_credentials: AstraDBCredentials,
     ) -> None:
         self._vectorstore = AstraDBVectorStore(

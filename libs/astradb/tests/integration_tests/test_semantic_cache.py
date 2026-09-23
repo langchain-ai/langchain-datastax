@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import pytest
 from astrapy.authentication import StaticTokenProvider
@@ -26,7 +26,7 @@ if TYPE_CHECKING:
 @pytest.fixture
 def astradb_semantic_cache(
     astra_db_credentials: AstraDBCredentials,
-    empty_collection_idxall_d2: Collection,
+    empty_collection_idxall_d2: Collection[dict[str, Any]],
     embedding_d2: Embeddings,
 ) -> AstraDBSemanticCache:
     return AstraDBSemanticCache(
@@ -43,7 +43,7 @@ def astradb_semantic_cache(
 @pytest.fixture
 async def astradb_semantic_cache_async(
     astra_db_credentials: AstraDBCredentials,
-    empty_collection_idxall_d2: Collection,
+    empty_collection_idxall_d2: Collection[dict[str, Any]],
     embedding_d2: Embeddings,
 ) -> AstraDBSemanticCache:
     return AstraDBSemanticCache(
