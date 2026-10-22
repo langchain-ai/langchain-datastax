@@ -7,7 +7,7 @@ authors = []
 license = {text = "MIT"}
 requires-python = ">=3.10.0,<4.0.0"
 dependencies = [
-    "langchain-core>=0.3.74",
+    "langchain-core<2.0.0,>=0.3.74",
     "astrapy>=2.0.1",
     "numpy>=1.21",
     "numpy>=1.26; python_version>='3.12'",

@@ -433,7 +433,7 @@ typing = [
 [package.metadata]
 requires-dist = [
     { name = "astrapy", specifier = ">=2.0.1" },
-    { name = "langchain-core", specifier = ">=0.3.74" },
+    { name = "langchain-core", specifier = ">=0.3.74,<2.0.0" },
     { name = "numpy", specifier = ">=1.21" },
     { name = "numpy", marker = "python_full_version >= '3.12'", specifier = ">=1.26" },
     { name = "numpy", marker = "python_full_version >= '3.13'", specifier = ">=2.1.0" },
